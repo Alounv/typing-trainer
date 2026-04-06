@@ -12,13 +12,15 @@ This spec covers data models, system modules, UX flows, and session logic. It do
 
 ### 2.1 Storage Strategy
 
-Keystroke events are the raw input. Bigram and word statistics are **derived aggregates**, computed in-memory during a session and persisted as summaries at session end. Raw keystroke events are only persisted for **diagnostic sessions** (needed for reclassification with updated thresholds). Drill session keystrokes are discarded after aggregates are computed.
+Keystroke events are the raw input. Bigram statistics are **derived aggregates**, computed in-memory during a session and persisted as summaries at session end. Raw keystroke events are only persisted for **diagnostic sessions** (needed for reclassification with updated thresholds). Drill session keystrokes are discarded after aggregates are computed.
 
-This means bigram/word aggregates cannot be retroactively recomputed for drill sessions — an acceptable tradeoff for keeping storage bounded.
+This means bigram aggregates cannot be retroactively recomputed for drill sessions — an acceptable tradeoff for keeping storage bounded.
 
 ### 2.2 KeystrokeEvent
 
 The atomic unit collected during any typing session. Held in memory during all sessions; persisted to disk only for diagnostic sessions.
+
+**Bigram transition time** = keydown timestamp of the second character minus keydown timestamp of the first character. Space is treated as a regular character for bigram purposes, so word-boundary bigrams like `"e "` and `" t"` are valid and measured.
 
 ```ts
 interface KeystrokeEvent {
@@ -33,6 +35,11 @@ interface KeystrokeEvent {
 
 Note: `corrected` and `correctionDelay` are computed in post-processing (they require lookahead for a subsequent backspace), not recorded on the raw event.
 
+**Backspace / correction model:**
+- The **first input** at each position is what counts for error rate — a backspace does not erase the error
+- Bigram transition time is measured on **first inputs only** — correction time (backspace + retype) is excluded from timing
+- `corrected: boolean` (whether the user backspaced and retyped) and `correctionDelay: number` (ms spent correcting) are tracked for analytics but do not affect classification
+
 ### 2.3 BigramAggregate
 
 Derived from keystroke events at session end. One record per bigram per session. This is what gets persisted.
@@ -46,55 +53,27 @@ interface BigramAggregate {
   stdTime: number
   errorCount: number
   errorRate: number          // errorCount / occurrences
-  classification: 'healthy' | 'fluency' | 'hasty' | 'acquisition'
+  classification: 'healthy' | 'fluency' | 'hasty' | 'acquisition'  // snapshot at session-time thresholds; not recomputed if thresholds change
 }
 ```
 
-### 2.4 WordAggregate
-
-Derived per word from keystroke events at session end.
-
-```ts
-interface WordAggregate {
-  word: string
-  sessionId: string
-  occurrences: number
-  meanWordTime: number           // ms from first to last keystroke of word
-  perPositionMeanTimes: number[] // mean transition time per position
-  errorRate: number
-  compositeScore: number         // see section 3.2
-  hasChunkingGap: boolean        // see section 3.3
-}
-```
-
-### 2.5 UserSettings
+### 2.4 UserSettings
 
 Persistent user configuration. Separated from session data.
 
 ```ts
 interface UserSettings {
-  id: string
   layout: string               // 'bépo' | 'azerty' | 'qwerty' | 'dvorak' | ...
-  language: 'fr' | 'en' | string
-  corpusId: string             // references a CorpusConfig
+  languages: string[]           // e.g. ['en'], ['fr', 'en'] — order = priority
+  corpusIds: string[]           // references CorpusConfig entries, one per language
 }
 ```
 
-### 2.6 PacingProfile
+### 2.5 Pacing
 
-Updated during calibration sessions and periodically adjusted by the scheduler.
+`baselineWPM` is derived from the most recent diagnostic session data (middle quartiles of WPM — see §3.3). `targetWPM` = `baselineWPM × 1.17`, computed on-the-fly. No separate stored entity needed.
 
-```ts
-interface PacingProfile {
-  comfortableWPM: number        // settled speed at <2% errors over a long run
-  ceilingWPM: number            // max speed before errors climb above ~5%
-  trainingTargetWPM: number     // comfortableWPM × 1.15 to 1.20
-  realTextErrorFloor: number    // error rate during real-text sessions
-  lastUpdated: number           // timestamp
-}
-```
-
-### 2.7 CorpusConfig
+### 2.6 CorpusConfig
 
 ```ts
 interface CorpusConfig {
@@ -107,7 +86,9 @@ interface CorpusConfig {
 
 Bigram and word frequency tables are derived from the corpus text at import time and recomputed on any corpus change. They are not stored as part of the config.
 
-### 2.8 SessionSummary
+**Mixed-language support:** When a user selects multiple languages, the corpora are merged into a single bigram/word frequency table weighted by language priority order. Diagnostics and drills draw from the merged corpus, so bigrams common in both languages (e.g. "th" in English, "le" in French) are weighted higher. Words in bigram drills are selected from whichever language contains the target bigram most frequently.
+
+### 2.7 SessionSummary
 
 Session metadata and aggregate results. Raw keystroke events stored separately, only for diagnostic sessions.
 
@@ -115,18 +96,16 @@ Session metadata and aggregate results. Raw keystroke events stored separately, 
 interface SessionSummary {
   id: string
   timestamp: number
-  type: 'diagnostic' | 'bigram-drill' | 'word-drill' | 'real-text' | 'race'
+  type: 'diagnostic' | 'bigram-drill' | 'real-text'
   durationMs: number
   wpm: number
   errorRate: number
   bigramsTargeted?: string[]
-  wordsTargeted?: string[]
   bigramAggregates: BigramAggregate[]
-  wordAggregates: WordAggregate[]
 }
 ```
 
-### 2.9 DiagnosticRawData
+### 2.8 DiagnosticRawData
 
 Persisted only for diagnostic sessions. Allows reclassification with updated thresholds.
 
@@ -148,11 +127,6 @@ Run after collecting enough occurrences (minimum 10 per bigram, ideally 20+).
 **Thresholds** (configurable, defaults below):
 - `SPEED_THRESHOLD`: 150ms mean transition time
 - `HIGH_ERROR_THRESHOLD`: 0.05 (5% error rate)
-- `HIGH_VARIANCE_THRESHOLD`: std/mean > 0.4
-
-To avoid oscillation around the threshold, a **hysteresis band** applies to reclassification:
-- A bigram must drop below 140ms to be reclassified as fast (from slow)
-- A bigram must rise above 160ms to be reclassified as slow (from fast)
 
 **Classification logic:**
 
@@ -161,8 +135,7 @@ if meanTime <= SPEED_THRESHOLD AND errorRate < HIGH_ERROR_THRESHOLD → 'healthy
 if meanTime <= SPEED_THRESHOLD AND errorRate >= HIGH_ERROR_THRESHOLD → 'hasty'
 if meanTime > SPEED_THRESHOLD AND errorRate < HIGH_ERROR_THRESHOLD → 'fluency'
 if meanTime > SPEED_THRESHOLD AND errorRate >= HIGH_ERROR_THRESHOLD → 'acquisition'
-// Orthogonal modifier: high variance flags inconsistent execution
-if HIGH_VARIANCE → add 'unstable' sub-tag to any classification
+
 ```
 
 **Each classification maps to a training prescription:**
@@ -171,9 +144,8 @@ if HIGH_VARIANCE → add 'unstable' sub-tag to any classification
 |---|---|---|
 | `healthy` | Skip | No action needed |
 | `fluency` | Program exists, not fast | Speed bursts above ceiling |
-| `hasty` | Program unstable, rush errors | Slow deliberate repetition first |
+| `hasty` | Rush errors under speed pressure | Slow deliberate repetition first |
 | `acquisition` | Program missing or wrong | Blocked slow drill, then consolidation |
-| `unstable` (sub-tag) | Inconsistent execution | Blocked repetition to stabilize first |
 
 ### 3.2 Bigram Lifecycle
 
@@ -190,7 +162,7 @@ A bigram has two orthogonal dimensions of state: its **classification** (`acquis
 
 - **unobserved → drilling**: first diagnostic classifies the bigram as non-healthy.
 - **drilling → healthy**: bigram classified as `healthy` at end of a diagnostic. Removed from active drills but still tracked in every session it appears in.
-- **healthy → drilling**: bigram regresses to a non-healthy classification during a diagnostic. Re-added to drills. Surfaced in the weekly report.
+- **healthy → drilling**: bigram regresses to a non-healthy classification during a diagnostic. Re-added to drills. Surfaced in the diagnostic report.
 
 **Classification transitions:**
 
@@ -206,39 +178,11 @@ Valid transitions (any direction is possible, but typical progressions are):
 
 Regressions (any non-healthy → worse classification, or `healthy` → any) are valid and surfaced explicitly.
 
-**Stubborn bigram rule:** if a bigram's classification has not improved after 4 consecutive diagnostics while in-rotation, flag it as "stubborn" in the UI and suggest the user review it (possible layout issue, not just a motor learning issue).
-
 **Drill session graduation vs. classification change:** graduating a drill (15 consecutive correct + timing target met) means the bigram is done *for that session*. It does not change the bigram's classification — that only happens at the next diagnostic.
 
-### 3.3 Word Composite Score
+### 3.3 Pacing Derivation
 
-Used to rank words for the word-drill phase:
-
-```
-compositeScore(word) = Σ over bigrams b in word:
-  bigramBadness(b) × log(wordFrequency(word) + 1)
-
-bigramBadness(b) =
-  (meanTime(b) / SPEED_THRESHOLD) × (1 + errorRate(b) × 10)
-```
-
-This ensures common words with moderately bad bigrams outrank rare words with very bad bigrams.
-
-### 3.3 Position-in-Word Analysis
-
-For each word with ≥ 5 occurrences, compute `perPositionMeanTimes`. Flag a word as having a **chunking gap** if:
-- Any position has a mean time > 1.5× the word's own mean inter-key time
-- And that position is not also flagged as a bad isolated bigram
-
-A chunking gap means the word hasn't been compiled into a motor program — the fix is word-level repetition, not bigram drilling.
-
-### 3.4 Pacing Calibration Session
-
-A special session type run during onboarding and periodically (every 2 weeks suggested):
-- Present 300-400 words of real text
-- User is simply prompted to "type naturally" — no mention of phases or speed targets
-- Derive pacing profile from the data: `comfortableWPM` from the middle quartiles (discard slowest and fastest deciles), `ceilingWPM` from the fastest decile
-- `trainingTargetWPM` = comfortableWPM × 1.17 (adjustable)
+`baselineWPM` is derived from diagnostic session data: take the middle quartiles of WPM (discard slowest and fastest deciles). `targetWPM` = baselineWPM × 1.17 (adjustable, computed on-the-fly). Updated every time a diagnostic runs — no separate calibration session needed.
 
 ---
 
@@ -249,63 +193,38 @@ A special session type run during onboarding and periodically (every 2 weeks sug
 **Input:** Ranked list of target bigrams from diagnostic, with classifications.
 
 **Sequence generation:**
-1. Wrap each target bigram in CVC nonsense words to force bigram execution without word-program interference: e.g. for "th" → "atha", "uthe", "othi"
-2. Interleave with filler bigrams (healthy ones) at ratio 70% target / 30% filler
+1. Select real words from the corpus that contain the target bigram, weighted by word frequency (e.g. for "th" → "the", "that", "with", "other")
+2. Interleave with filler words containing healthy bigrams at ratio 70% target / 30% filler
 3. Group by classification:
-   - `acquisition` and `hasty` bigrams: start at 60% of comfortableWPM, no speed pressure
-   - `fluency` bigrams: target trainingTargetWPM, use visual pacer
+   - `acquisition` and `hasty` bigrams: start at 60% of baselineWPM, no speed pressure
+   - `fluency` bigrams: target targetWPM, use visual pacer
 
 **Speed pacer:**
-- Optional bouncing cursor or highlight advancing at trainingTargetWPM
+- Optional bouncing cursor or highlight advancing at targetWPM
 - Visual feedback: green if on pace, amber if slightly behind, red if far behind
 - Do not penalize errors during speed-push phase beyond visual indication
 
 **Session end trigger:**
-- Stop a bigram target when: 15 consecutive correct occurrences AND last 5 are within 20% of target time
-- Or: session time limit reached (default 8 minutes)
+- Stop a bigram target when: 14 out of 15 most recent occurrences correct AND last 5 are within 20% of phase speed target
+- Phase speed targets: `acquisition` and `hasty` bigrams target 60% of baselineWPM; `fluency` bigrams target targetWPM
+- Or: session time limit reached (default 5 minutes)
 
 **Output per bigram:** updated BigramRecord appended to bigramHistory.
 
-### 4.2 Word Drill Session
-
-**Input:** Top N words by compositeScore (default N=20 per session).
-
-**Blocked phase (first 2/3 of session):**
-- Present one word at a time, repeat until:
-  - 5 consecutive correct hits AND
-  - last 3 hits are within target time (word length × target ms/char)
-- If a chunking gap was flagged: show the word split at the gap position on first attempts, then remove the split guide after 3 successes
-
-**Interleaved phase (last 1/3 of session):**
-- Mix all session words in random order
-- No repetition targeting — just free flow
-- Measure if per-word times hold up under context-switching (they often degrade 15-20% — this is normal and temporary)
-
-**Output:** updated WordRecord for each drilled word.
-
-### 4.3 Real Text Session
+### 4.2 Real Text Session
 
 **Input:** Corpus excerpt. Selection algorithm:
-1. Prefer sentences containing ≥ 2 words from current word-drill targets
-2. Prefer sentences with high density of `fluency`-classified bigrams (since real text is where speed gains transfer)
+1. Prefer sentences with high density of non-healthy bigrams (target bigrams from diagnostic)
+2. Prefer sentences containing common words with `fluency`-classified bigrams (since real text is where speed gains transfer)
 3. Minimum sentence length: 8 words (shorter = too many word-boundary effects, not representative)
 
-**Pacer:** ghost cursor running at trainingTargetWPM. User can toggle off.
+**Pacer:** ghost cursor running at targetWPM. User can toggle off.
 
 **No stop-on-error:** user types through errors. Errors are recorded but not corrected mid-stream (mirrors real use conditions). Backspace allowed but not penalized beyond time cost.
 
-**Session exit condition:** user-chosen duration (default 15 minutes) or word count.
+**Session exit condition:** user-chosen duration (default 10 minutes) or word count.
 
-**Output:** full KeystrokeEvent log; update bigramHistory and wordHistory for all encountered patterns.
-
-### 4.4 Race Session
-
-Full-speed, no pacer, no guidance. Purely motivational and diagnostic of "real ceiling."
-
-- Present 200-word excerpt (configurable: 100–500)
-- Measure gross WPM and net WPM (penalizing uncorrected errors as -1 word each)
-- Compare to previous race WPM — show delta
-- Output: updates ceilingWPM in PacingProfile if new record
+**Output:** full KeystrokeEvent log; update bigramHistory for all encountered patterns.
 
 ---
 
@@ -313,20 +232,17 @@ Full-speed, no pacer, no guidance. Purely motivational and diagnostic of "real c
 
 The app should suggest a daily session structure rather than leaving the user to choose manually. This is important for progression and avoiding over-drilling.
 
-**Default daily structure (30 min):**
+**Default daily structure (15 min):**
 
 | Phase | Duration | Type |
 |---|---|---|
-| Bigram drill | 8 min | Targeted, from diagnostic |
-| Word drill | 7 min | Top words by compositeScore |
-| Real text | 15 min | Corpus-based |
+| Bigram drill | 5 min | Targeted, from diagnostic |
+| Real text | 10 min | Corpus-based |
 
 **Scheduler rules:**
-- Run full diagnostic every 7 days (or on demand)
+- Run full diagnostic every 7 sessions (or on demand)
+- Each session contains both phases (bigram drill followed by real text) as shown above
 - After 3 consecutive sessions where a bigram is `healthy`, remove from drill rotation
-- If real-text error floor is rising (>10% increase over 3 sessions): reduce trainingTargetWPM by 5%, flag to user
-- If no improvement on a bigram after 4 drill sessions: surface it in UI as "stubborn pattern" and suggest manual attention or layout review
-- After 5 consecutive days of practice, suggest a lighter session (real-text only, no drills) or a rest day. Typing fatigue degrades motor learning — consolidation happens during rest
 
 ---
 
@@ -345,7 +261,16 @@ Each corpus includes:
 - Pre-computed bigram frequency table for that corpus
 - Recommended layout pairings
 
-### 6.2 Custom Corpus Import
+### 6.2 Mixed-Language Corpora
+
+When a user selects multiple languages, the app merges their corpora:
+1. Combine word frequency tables, applying a weight per language (default: equal weight, user-adjustable)
+2. Weight is expressed as **proportion of words** in the diagnostic session — e.g. 70% French / 30% English means 70% of diagnostic words are drawn from the French corpus. The user sets this in settings.
+3. Recompute the merged bigram frequency table from the combined word lists, scaled by the same word proportion weights
+4. Diagnostic sessions draw text from both languages, interleaved according to the weight ratio
+5. Bigram drill word selection pulls from whichever language has the best word for a given target bigram
+
+### 6.3 Custom Corpus Import
 
 User can paste or upload their own text (code, emails, domain-specific writing). The app:
 1. Tokenizes and computes word and bigram frequencies
@@ -357,14 +282,9 @@ User can paste or upload their own text (code, emails, domain-specific writing).
 
 ## 7. Analytics & Progress Views
 
-### 7.1 Bigram Heatmap
+### 7.1 Bigram Table
 
-Keyboard layout rendered as a heatmap. Each key colored by:
-- Mean transition time FROM this key (outgoing bigrams)
-- Or TO this key (incoming bigrams)
-- Toggle between speed heatmap and error heatmap
-
-Clicking a key shows its top 10 outgoing/incoming bigrams sorted by badness.
+Sortable table of all observed bigrams showing: bigram, classification, mean transition time, error rate, occurrences, and trend (improving / flat / regressing). Default sort: badness × corpus frequency descending (worst first).
 
 ### 7.2 Progress Charts
 
@@ -380,9 +300,8 @@ Generated after each diagnostic session. Structured output:
 Diagnostic Report — [date]
 
 Pacing:
-  Comfortable: 68 WPM
-  Ceiling: 84 WPM
-  Training target: 79 WPM
+  Baseline: 68 WPM
+  Target: 79 WPM (baseline × 1.17)
 
 Bigram breakdown:
   Healthy: 312 bigrams
@@ -390,8 +309,8 @@ Bigram breakdown:
   Hasty patterns (top 5): "ti", "ng", "er", "ou", "in"
   Acquisition gaps: "wh", "ck"
 
-Priority word targets (top 10):
-  [word list with scores]
+Priority bigram targets (top 10):
+  [bigram list with badness × corpus frequency scores]
 
 Corpus fit:
   Training coverage: 87% of your corpus bigrams have ≥10 observations
@@ -404,9 +323,8 @@ Corpus fit:
 
 ```
 Onboarding
-  → Choose layout + language
-  → Pacing calibration session (5 min)
-  → First diagnostic session (10 min)
+  → Choose layout + language(s)
+  → First diagnostic session (10 min) — also derives baselineWPM
   → First diagnostic report shown
   → Enter daily session flow
 
@@ -414,11 +332,11 @@ Daily Session
   → Scheduler shows suggested structure for today
   → User can override (skip a phase, extend another)
   → After each phase: brief stats shown (don't interrupt flow with too much)
-  → End-of-session summary: WPM delta, bigrams graduated, words improved
+  → End-of-session summary: WPM delta, bigrams graduated
 
-Weekly
-  → Full diagnostic re-run suggested
-  → Weekly progress report: which bigrams moved classifications, WPM trend, error trend
+Diagnostic (every 7 days or on demand)
+  → Full diagnostic session
+  → Progress report: which bigrams moved classifications, WPM trend, error trend since last diagnostic
 ```
 
 ---
@@ -436,13 +354,9 @@ Weekly
 
 ### Minimum data requirements before diagnostic is meaningful
 - Each bigram needs ≥ 10 occurrences for classification, ≥ 20 for stability
-- A diagnostic session should be designed to guarantee ≥ 15 occurrences of the top 200 corpus bigrams
+- A diagnostic session should be designed to guarantee ≥ 15 occurrences of the top 50 corpus bigrams, with best-effort coverage for the remaining top 200
 - This typically requires ~500-800 keystrokes, roughly 5-8 minutes of typing
-
-### Layout awareness
-- Bigram badness should be normalized against layout expected difficulty
-- For Bépo: "ou", "en", "qu", "an" are high-frequency — weight them accordingly
-- Do not penalize bigrams that are inherently slow due to same-finger usage if the layout has no alternative
+- Text generation should prioritize sentences that maximize coverage of undertrained bigrams (those with < 10 observations)
 
 ---
 
@@ -452,7 +366,7 @@ Weekly
 
 The user should never have to infer progress from raw numbers. The app's job is to interpret data and surface conclusions — *"you're getting better at X"*, *"Y is stuck"*, *"Z breakthrough happened this week"* — backed by evidence. Numbers are evidence, not the message. Every metric exposed in the UI must answer "so what?" before it reaches the user.
 
-A secondary principle: **session performance and structural progress are different things** and must be visually separated. WPM fluctuates ±15% from noise alone. Structural progress (bigram classifications, error floor, chunking scores) is slow but monotonic. Conflating the two is the main cause of discouragement in typing training tools.
+A secondary principle: **session performance and structural progress are different things** and must be visually separated. WPM fluctuates ±15% from noise alone. Structural progress (bigram classifications, error floor) is slow but monotonic. Conflating the two is the main cause of discouragement in typing training tools.
 
 ---
 
@@ -461,7 +375,7 @@ A secondary principle: **session performance and structural progress are differe
 These are the canonical progress signals the app maintains. Not all are shown in every context — see section 10.4 for where each appears.
 
 #### Bigrams Graduated
-Count of bigrams that have moved classification in the current week:
+Count of bigrams that have moved classification since the last diagnostic:
 - `acquisition → fluency`
 - `fluency → healthy`
 - `hasty → fluency` or `hasty → healthy`
@@ -502,15 +416,12 @@ interface SDMHistory {
 }
 ```
 
-#### Word Chunking Score
-Count of words in the corpus whose per-position timing profile is flat (no chunking gap detected). Grows slowly but directly reflects motor consolidation.
-
 #### WPM — Smoothed and Raw
 Both are kept and displayed together:
 - `rawWPM`: actual session WPM
 - `smoothedWPM`: 7-session rolling average
 - `floorWPM`: rolling minimum over last 10 sessions
-- `ceilingWPM`: rolling maximum over last 10 race sessions
+- `ceilingWPM`: rolling maximum over last 10 sessions (derived from history)
 
 Never show raw WPM in isolation. Always show it alongside the smoothed trend.
 
@@ -538,7 +449,7 @@ Progress must feel real at three timescales, each requiring different treatment.
 The user needs visceral, immediate feedback during practice — not numbers. Numbers pull attention away from typing.
 
 - **Pacer color shift**: green when on pace, amber when slightly behind, red when far behind. No numbers needed.
-- **Bigram color on heatmap**: during a drill, the target bigram's heatmap cell should visibly lighten as the session progresses and transition times improve. Watching a cell change color in real time is more motivating than any number.
+- **Bigram highlight in drill panel**: during a drill, the target bigram's entry should visibly update as the session progresses and transition times improve.
 - **Warm-up curve**: most users improve 5–10 WPM during the first 3 minutes of a session. Surface this subtly (a thin line showing WPM trend within the session) so users learn their own warm-up pattern and don't quit early thinking they're having a bad session.
 
 #### Session to Session (days)
@@ -562,19 +473,18 @@ The interpretive sentence at the bottom is essential. The app provides the concl
 
 - If session WPM drops more than 15% below the rolling average: explicitly attribute it — *"You're 18% below your average today. This often reflects fatigue or a harder-than-usual corpus selection."* Never let a bad session feel like regression without context.
 
-#### Week to Week (long term)
-Shown as a **Weekly Report** at the first session of each week. Structured around three questions:
+#### Diagnostic to Diagnostic (long term)
+Shown as a **Diagnostic Report** after each diagnostic session. Structured around three questions:
 
 **What got better?**
 - Bigrams graduated (listed by name with classification change)
 - SDM delta
-- Words with closed chunking gaps
+- Bigrams with improved transition times
 
 **What's stubborn?**
-- Bigrams that have been in drill rotation for 4+ sessions without classification change → flagged as "needs attention"
-- If a bigram has been stuck for 3+ weeks: surface it as a note, suggest slowing down further or checking for a layout-level issue
+- Bigrams that have been in drill rotation for 4+ sessions without classification change — surfaced so the user can see what isn't moving
 
-**What to focus on this week?**
+**What to focus on next?**
 - Auto-generated priority list: top 5 bigrams by badness × corpus frequency
 - Suggested session structure adjustment if any metric is trending poorly
 
@@ -629,14 +539,14 @@ Users will have bad sessions and genuine plateaus. Both must be handled with hon
 - Show raw WPM in context of rolling average
 - If within 15% of average: no comment needed
 - If 15–25% below: attribute likely cause (fatigue, hard corpus), confirm bigram profile is stable
-- If 25%+ below: suggest the session not be used to update pacing targets; log it but don't let it pull down the rolling average weight
+- If 25%+ below: attribute likely cause and reassure, but still include the session in all averages — no outlier exclusion
 
 **Genuine plateau (signal):**
 A plateau is defined as: no change in SDM or classification distribution over 10+ sessions.
 
 When detected:
 - Surface explicitly: *"Your slowest bigrams haven't improved in 10 sessions. Here's what to try:"*
-- Offer concrete suggestions: increase blocked drill proportion, reduce trainingTargetWPM by 10%, review whether plateau bigrams share a finger (layout issue vs. motor issue)
+- Offer concrete suggestions: increase blocked drill proportion, reduce baselineWPM by 10%, review whether plateau bigrams share a finger (layout issue vs. motor issue)
 - Never hide a plateau. Users who trust the system's honesty stay engaged longer than those who sense it's papering over reality.
 
 **Classification regression:**
@@ -646,7 +556,7 @@ A bigram that drops classification (e.g. `fluency → hasty`) after being out of
 ⚠ "ng" has slipped back to hasty — re-added to drill rotation
 ```
 
-Surface this in the weekly report, not as a mid-session alert.
+Surface this in the diagnostic report, not as a mid-session alert.
 
 ---
 
@@ -661,7 +571,7 @@ A stacked horizontal bar showing the current distribution of active bigrams acro
 Today        [acquisition ███]    [hasty ██]   [fluency ██████]   [healthy █████████████████████]
 ```
 
-This is the single most honest representation of structural progress. Update it weekly, not per-session, to avoid visual noise.
+This is the single most honest representation of structural progress. Update it per diagnostic, not per-session, to avoid visual noise.
 
 #### The Bigram Sparkline
 Each bigram in the drill panel shows a miniature line chart: mean transition time over the last 8 sessions. Flat or downward = good. A visible downward slope on a previously stubborn bigram is more satisfying than any WPM number.
@@ -673,26 +583,6 @@ Line chart with three layers:
 - Shaded band: ±1 standard deviation envelope
 
 The envelope makes variance feel normal and expected rather than alarming.
-
-#### The "What This Means in Real Life" Translation
-Shown in the weekly report:
-
-```
-Your top 30 bigrams are now 38ms faster on average.
-In a 500-word document, that's roughly 11 seconds saved.
-In a full day of writing (est. 3000 words), that's over a minute.
-```
-
-Abstract millisecond gains become concrete felt experience. Use the user's actual corpus word frequency to compute estimates.
-
-#### The Personal Record Board
-A small, permanent widget showing:
-- Best session WPM ever
-- Best smoothed WPM (rolling average peak)
-- Fastest bigram ever recorded
-- Most bigrams graduated in a single week
-
-Personal records are motivating because they only go up.
 
 ---
 
@@ -711,24 +601,17 @@ interface ProgressStore {
   }[]
   sdmHistory: SDMHistory
   errorFloorHistory: ErrorFloorHistory
-  personalRecords: {
-    bestRawWPM: number
-    bestSmoothedWPM: number
-    fastestBigram: { bigram: string; time: number }
-    mostGraduationsInWeek: number
-  }
-  weeklyReports: WeeklyReport[]
+  diagnosticReports: DiagnosticProgressReport[]
 }
 
-interface WeeklyReport {
-  weekStart: number           // timestamp
+interface DiagnosticProgressReport {
+  diagnosticSessionId: string
+  timestamp: number
   bigramsGraduated: GraduationEvent[]
-  stubbornBigrams: string[]
   sdmDelta: number
-  wpmDelta: number            // smoothed, week over week
-  chunkingGapsClosed: string[]
-  priorityBigrams: string[]   // recommended focus for next week
-  interpretiveSummary: string // generated text, see section 10.3
+  wpmDelta: number            // smoothed, since last diagnostic
+  bigramsImproved: string[]
+  priorityBigrams: string[]   // recommended focus for next period
 }
 ```
 
@@ -741,15 +624,15 @@ interface WeeklyReport {
 - Voice or audio feedback
 - Ergonomics / RSI guidance
 - Auto-layout detection
+- PWA / offline support
 
 ---
 
 ## Appendix: Classification Quick Reference
 
-| Signal | Slow? | Errors? | Variance? | Classification | First action |
-|---|---|---|---|---|---|
-| Fast, clean, consistent | No | No | No | Healthy | Nothing |
-| Slow, clean | Yes | No | — | Fluency | Speed bursts |
-| Fast, errors | No | Yes | — | Hasty | Slow down, deliberate reps |
-| Slow, errors | Yes | Yes | — | Acquisition | Blocked slow drill |
-| Any + high variance | — | — | Yes | + Unstable tag | Stabilize before pushing speed |
+| Signal | Slow? | Errors? | Classification | First action |
+|---|---|---|---|---|
+| Fast, clean | No | No | Healthy | Nothing |
+| Slow, clean | Yes | No | Fluency | Speed bursts |
+| Fast, errors | No | Yes | Hasty | Slow down, deliberate reps |
+| Slow, errors | Yes | Yes | Acquisition | Blocked slow drill |

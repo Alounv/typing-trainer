@@ -10,7 +10,8 @@
       "Bash(git checkout:*)",
       "Bash(git stash:*)",
       "Bash(git symbolic-ref:*)",
-      "Bash(jj log:*)"
+      "Bash(jj log:*)",
+      "Bash(git mv:*)"
     ]
   }
 }
