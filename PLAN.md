@@ -10,7 +10,7 @@ Based on the [technical specification](/Users/alounvangkeosay/Desktop/typing-tra
 |-------|--------|-----------|
 | Framework | **SvelteKit** | No virtual DOM = minimal overhead for keystroke capture; 100% client-side app doesn't need Next.js server features |
 | Language | **TypeScript** | Spec is already in TS interfaces |
-| Styling | **Tailwind CSS** | Rapid UI iteration, responsive by default |
+| Styling | **Tailwind CSS + DaisyUI** | Rapid UI iteration, responsive by default; DaisyUI adds pre-built component classes (btn, card, modal, etc.) as a Tailwind plugin |
 | State | **Svelte stores** | Built-in reactive stores, no extra dependency needed |
 | Storage | **IndexedDB via Dexie.js** | Spec requires client-side storage, Dexie simplifies IndexedDB |
 | Charts | **LayerCake** | Svelte-native charting, composable, good for sparklines + custom visualizations |
@@ -20,10 +20,42 @@ Based on the [technical specification](/Users/alounvangkeosay/Desktop/typing-tra
 
 ---
 
+## Architecture: Fully Client-Side (No Backend)
+
+This app runs **100% in the browser**. There is no server, no database, no API. All data lives in the user's browser via IndexedDB. SvelteKit is used purely as a frontend framework with static adapter for deployment.
+
+### Pros
+
+| | |
+|---|---|
+| **Zero infrastructure** | No server to provision, maintain, or pay for. Deploy as static files to any CDN (Vercel, Netlify, GitHub Pages). |
+| **Privacy by design** | All typing data stays on the user's machine. No data leaves the browser. No GDPR concerns, no data breaches possible. |
+| **Instant responses** | No network round-trips for data reads/writes. Keystroke capture and analytics are real-time with no latency. |
+| **Works offline** | Once loaded, the app works without internet. Can be enhanced with a service worker for full PWA support. |
+| **Simpler development** | No API layer to design, no auth system, no server deployment pipeline. One codebase, one build artifact. |
+| **Free to host** | Static files on a CDN cost virtually nothing, even at scale. |
+
+### Cons
+
+| | |
+|---|---|
+| **No cross-device sync** | User's progress is stuck on one browser. Clearing browser data = losing everything. |
+| **No backups (by default)** | If IndexedDB is wiped, data is gone. Mitigated by the JSON export/import feature (spec §9), but it's manual. |
+| **No multiplayer/leaderboards** | Would require a backend to add later (out of scope for v1 per spec §11). |
+| **Storage limits** | IndexedDB has browser-imposed quotas (usually 50%+ of disk, so plenty for this use case, but not unlimited). |
+| **No server-side analytics** | Can't track usage patterns or errors unless a third-party service is added. |
+| **Corpus updates require redeploy** | Adding new word lists or prose means publishing a new version of the app. |
+
+### Why it's the right call for this project
+
+The typing trainer is fundamentally a **single-user, latency-sensitive, privacy-friendly** tool. The data is personal (keystroke timings, error patterns), the core loop demands sub-millisecond precision (`performance.now()`), and there's no interaction between users in v1. A backend would add complexity with no clear benefit. If cross-device sync or multiplayer is needed later, a lightweight sync layer can be added without rewriting the app.
+
+---
+
 ## Phase 0 — Project Scaffolding
 > Get the repo buildable with all tooling in place.
 
-- [ ] **0.1** Initialize SvelteKit project with TypeScript, Tailwind, ESLint
+- [ ] **0.1** Initialize SvelteKit project with TypeScript, Tailwind, DaisyUI, ESLint
 - [ ] **0.2** Install core dependencies: `dexie`, `layercake`, `uuid`
 - [ ] **0.3** Set up project structure (see below)
 - [ ] **0.4** Configure Vitest (included with SvelteKit)
