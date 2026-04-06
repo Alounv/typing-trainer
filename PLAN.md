@@ -6,16 +6,16 @@ Based on the [technical specification](spec.md).
 
 ## Tech Stack Decision
 
-| Layer | Choice | Rationale |
-|-------|--------|-----------|
-| Framework | **SvelteKit** | No virtual DOM = minimal overhead for keystroke capture; 100% client-side app doesn't need Next.js server features |
-| Language | **TypeScript** | Spec is already in TS interfaces |
-| Styling | **Tailwind CSS + DaisyUI** | Rapid UI iteration, responsive by default; DaisyUI adds pre-built component classes (btn, card, modal, etc.) as a Tailwind plugin |
-| State | **Svelte stores** | Built-in reactive stores, no extra dependency needed |
-| Storage | **IndexedDB via Dexie.js** | Spec requires client-side storage, Dexie simplifies IndexedDB |
-| Charts | **LayerCake** | Svelte-native charting, composable, good for sparklines + custom visualizations |
-| Timing | **`performance.now()`** | Spec requirement for precision |
-| Testing | **Vitest + Svelte Testing Library** | Fast, TS-native, SvelteKit default |
+| Layer     | Choice                              | Rationale                                                                                                                         |
+| --------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Framework | **SvelteKit**                       | No virtual DOM = minimal overhead for keystroke capture; 100% client-side app doesn't need Next.js server features                |
+| Language  | **TypeScript**                      | Spec is already in TS interfaces                                                                                                  |
+| Styling   | **Tailwind CSS + DaisyUI**          | Rapid UI iteration, responsive by default; DaisyUI adds pre-built component classes (btn, card, modal, etc.) as a Tailwind plugin |
+| State     | **Svelte stores**                   | Built-in reactive stores, no extra dependency needed                                                                              |
+| Storage   | **IndexedDB via Dexie.js**          | Spec requires client-side storage, Dexie simplifies IndexedDB                                                                     |
+| Charts    | **LayerCake**                       | Svelte-native charting, composable, good for sparklines + custom visualizations                                                   |
+| Timing    | **`performance.now()`**             | Spec requirement for precision                                                                                                    |
+| Testing   | **Vitest + Svelte Testing Library** | Fast, TS-native, SvelteKit default                                                                                                |
 
 ---
 
@@ -25,25 +25,25 @@ This app runs **100% in the browser**. There is no server, no database, no API. 
 
 ### Pros
 
-| | |
-|---|---|
-| **Zero infrastructure** | No server to provision, maintain, or pay for. Deploy as static files to any CDN (Vercel, Netlify, GitHub Pages). |
-| **Privacy by design** | All typing data stays on the user's machine. No data leaves the browser. No GDPR concerns, no data breaches possible. |
-| **Instant responses** | No network round-trips for data reads/writes. Keystroke capture and analytics are real-time with no latency. |
-| **Works offline** | Once loaded, the app works without internet. Can be enhanced with a service worker for full PWA support. |
-| **Simpler development** | No API layer to design, no auth system, no server deployment pipeline. One codebase, one build artifact. |
-| **Free to host** | Static files on a CDN cost virtually nothing, even at scale. |
+|                         |                                                                                                                       |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Zero infrastructure** | No server to provision, maintain, or pay for. Deploy as static files to any CDN (Vercel, Netlify, GitHub Pages).      |
+| **Privacy by design**   | All typing data stays on the user's machine. No data leaves the browser. No GDPR concerns, no data breaches possible. |
+| **Instant responses**   | No network round-trips for data reads/writes. Keystroke capture and analytics are real-time with no latency.          |
+| **Works offline**       | Once loaded, the app works without internet. Can be enhanced with a service worker for full PWA support.              |
+| **Simpler development** | No API layer to design, no auth system, no server deployment pipeline. One codebase, one build artifact.              |
+| **Free to host**        | Static files on a CDN cost virtually nothing, even at scale.                                                          |
 
 ### Cons
 
-| | |
-|---|---|
-| **No cross-device sync** | User's progress is stuck on one browser. Clearing browser data = losing everything. |
-| **No backups (by default)** | If IndexedDB is wiped, data is gone. Mitigated by the JSON export/import feature (spec §9), but it's manual. |
-| **No multiplayer/leaderboards** | Would require a backend to add later (out of scope for v1 per spec §11). |
-| **Storage limits** | IndexedDB has browser-imposed quotas (usually 50%+ of disk, so plenty for this use case, but not unlimited). |
-| **No server-side analytics** | Can't track usage patterns or errors unless a third-party service is added. |
-| **Corpus updates require redeploy** | Adding new word lists or prose means publishing a new version of the app. |
+|                                     |                                                                                                              |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **No cross-device sync**            | User's progress is stuck on one browser. Clearing browser data = losing everything.                          |
+| **No backups (by default)**         | If IndexedDB is wiped, data is gone. Mitigated by the JSON export/import feature (spec §9), but it's manual. |
+| **No multiplayer/leaderboards**     | Would require a backend to add later (out of scope for v1 per spec §11).                                     |
+| **Storage limits**                  | IndexedDB has browser-imposed quotas (usually 50%+ of disk, so plenty for this use case, but not unlimited). |
+| **No server-side analytics**        | Can't track usage patterns or errors unless a third-party service is added.                                  |
+| **Corpus updates require redeploy** | Adding new word lists or prose means publishing a new version of the app.                                    |
 
 ### Why it's the right call for this project
 
@@ -51,7 +51,48 @@ The typing trainer is fundamentally a **single-user, latency-sensitive, privacy-
 
 ---
 
+## Release Slices
+
+The phases below are build order, not release order. These slices define what it takes to cut a usable version at each stage — so scope can be trimmed honestly if time is short.
+
+| Slice                    | Includes                            | What it's good for                                                                                                                 |
+| ------------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **v0.1** (internal demo) | Phases 0–3 + walking skeleton (2.5) | End-to-end: capture → store → diagnostic report. No drills, no progress tracking. Proves the core loop works.                      |
+| **v0.5** (dogfood)       | Adds Phases 4–6, 8                  | Diagnostic + drill generation + session scheduling + per-session feedback. Usable daily for yourself, missing long-term analytics. |
+| **v1.0** (ship)          | Adds Phases 7, 9, 10                | Onboarding, analytics dashboards, settings, polish. Shippable to others.                                                           |
+
+If you have to cut, cut from v1.0 inward — not from v0.1 outward.
+
+---
+
+## Risks & Spikes
+
+Prototype these before committing to the design. Each spike should answer a concrete go/no-go question within a few hours of exploration — if a spike fails, the relevant phase needs a different approach.
+
+- **Keystroke capture perf under reactive re-renders.** Svelte's reactivity can re-run DOM updates on every `KeystrokeEvent` append. _Question:_ does capture stay sub-ms when the event array is reactive and the text display is rebinding per keystroke, or do we need an untracked buffer? Prototype by typing 500 chars at speed and measuring p99 event-handler duration.
+- **IndexedDB quota & eviction.** Diagnostic sessions persist raw events; long-term usage could hit quota, especially under browser storage pressure. _Question:_ what's the realistic retention window, and do we need a pruning policy (e.g., keep last N diagnostics)? Check `navigator.storage.estimate()` behavior and Safari's 7-day eviction.
+- **Svelte action lifecycle on dynamic text.** The typing action attaches to a node that may re-render when the text prop changes between drills. _Question:_ does the action correctly tear down and re-attach without losing events or double-counting? Prototype with sequential drill starts.
+- **Corpus data sourcing & licensing.** Top-1000 word lists and prose excerpts must come from permissively licensed sources. _Question:_ which sources (OPUS, Project Gutenberg, Google Books n-grams, Leipzig Corpora) satisfy both license and frequency-data quality? Resolve before Phase 4.
+
+---
+
+## Testing Strategy
+
+Not every module benefits equally from tests. Focus effort where correctness is non-obvious or where regressions are silent.
+
+- **Classification boundaries (`bigram/classification.ts`).** Table-driven tests covering each boundary of `SPEED_THRESHOLD` × `HIGH_ERROR_THRESHOLD`, including exact-threshold inputs and insufficient-data cases. High value because thresholds are tunable and incorrect classification propagates into drill selection.
+- **Timing precision (`typing/capture.ts`).** Synthetic event streams with known timestamps fed into capture — verify transition times, correction delays, and first-input-only bigram timing. Do not rely on real keyboard events in tests.
+- **Drill determinism (`drill/*.ts`).** Generators take an injected RNG; tests use a seeded RNG to pin sequences. Lets us assert "given this diagnostic + corpus, produce this sequence" without flakiness.
+- **Bigram extraction (`bigram/extraction.ts`).** Property-based tests: for any KeystrokeEvent[], aggregate counts must equal input counts; means must fall within [min, max]; no bigram appears twice per session.
+- **Storage round-trip.** Write → read → compare — the only test storage really needs. Don't test Dexie's internals.
+- **Manual / felt-experience checkpoints.** Pacer distraction, celebration tone, error highlight readability — these cannot be unit-tested. Flag in each phase for real-use evaluation before closing.
+
+The scattered "write tests" checkboxes in phases below defer to this strategy.
+
+---
+
 ## Phase 0 — Project Scaffolding
+
 > Get the repo buildable with all tooling in place.
 
 - [ ] **0.1** Initialize SvelteKit project with TypeScript, Tailwind, DaisyUI, ESLint
@@ -163,7 +204,20 @@ storage/         (depends on: all domain types)
 
 ---
 
+## Phase 0.5 — CI & Deploy
+
+> Get a green build and a live preview URL before writing domain code.
+
+- [ ] **0.5.1** Configure `@sveltejs/adapter-static` for SPA output
+- [ ] **0.5.2** GitHub Actions workflow: install → lint → typecheck → test → build
+- [ ] **0.5.3** Preview deploy target (Vercel / Netlify / GitHub Pages) wired to PRs
+- [ ] **0.5.4** Production deploy on merge to `main`
+- [ ] **0.5.5** Verify the deployed shell loads offline-ready (service worker optional for v0.1)
+
+---
+
 ## Phase 1 — Domain Types & Storage
+
 > Define types co-located with their domains, and implement the persistence layer.
 
 - [ ] **1.1** Define `typing/types.ts` — `KeystrokeEvent`, `CaptureConfig`
@@ -182,6 +236,7 @@ storage/         (depends on: all domain types)
 ---
 
 ## Phase 2 — Typing Surface (`typing/`)
+
 > The standalone typing input module. Takes text + config, emits KeystrokeEvent[]. No domain knowledge.
 
 - [ ] **2.1** `capture.ts` — Svelte action for keystroke capture
@@ -197,11 +252,30 @@ storage/         (depends on: all domain types)
 - [ ] **2.3** `Pacer.svelte` — speed pacer overlay
   - Visual cursor/highlight advancing at configured WPM
   - Color feedback: green (on pace) / amber (slightly behind) / red (far behind)
-- [ ] **2.4** Write tests for capture logic (the module's public contract)
+- [ ] **2.4** Accessibility & focus management (load-bearing, not polish)
+  - Focus trap on the typing surface during an active session
+  - ARIA live region for error announcements (opt-in, off by default during timed drills)
+  - Visible focus ring that doesn't interfere with cursor rendering
+  - Verify screen reader doesn't re-announce every character — test with VoiceOver
+- [ ] **2.5** Write tests for capture logic (the module's public contract)
+
+---
+
+## Phase 2.5 — Walking Skeleton
+
+> End-to-end vertical slice: capture one session → persist raw events → render a throwaway summary page. Proves the wiring works before going wide. This code is disposable; Phase 3+ replaces the summary page with the real diagnostic report.
+
+- [ ] **2.5.1** Hardcode a single short passage (no corpus yet)
+- [ ] **2.5.2** Wire `typing/capture` → session runner stub → Dexie `sessions` table
+- [ ] **2.5.3** Trivial summary page: raw WPM, error count, list of slowest 5 character-pair transitions
+- [ ] **2.5.4** Smoke-test the full loop on the deployed preview URL
+
+Exit criterion: you can go to the deployed app, type the passage, and see stored session data rendered on the next page. No classification, no drills, no pacer.
 
 ---
 
 ## Phase 2b — Bigram Analysis (`bigram/`)
+
 > Pure computation: extract and classify bigram data from keystroke events.
 
 - [ ] **2b.1** `extraction.ts` — `extractBigramAggregates(events: KeystrokeEvent[]): BigramAggregate[]`
@@ -214,6 +288,7 @@ storage/         (depends on: all domain types)
 ---
 
 ## Phase 3 — Diagnostic Module (`diagnostic/`)
+
 > Orchestrates a diagnostic session, derives pacing, and produces reports. Depends on `bigram/`.
 
 - [ ] **3.1** `pacing.ts` — pacing derivation from diagnostic data (spec §3.3)
@@ -227,13 +302,17 @@ storage/         (depends on: all domain types)
 ---
 
 ## Phase 4 — Corpus Management
+
 > Load and manage word/bigram frequency data.
 
-- [ ] **4.1** Create built-in corpus data files (spec §6.1)
-  - English top 1000 word list with frequencies
-  - French top 1000 word list with frequencies
-  - English and French prose excerpts
-  - Pre-computed bigram frequency tables for each corpus
+- [ ] **4.1** Source and build built-in corpus data files (spec §6.1) — this is a real chunk of work, not a checkbox
+  - [ ] **4.1a** Identify permissively licensed sources for each language (see Risks & Spikes) and record license terms in repo
+  - [ ] **4.1b** English top-1000 word list with frequencies
+  - [ ] **4.1c** French top-1000 word list with frequencies
+  - [ ] **4.1d** English prose excerpts (length target: enough for §4.2 sentence selection)
+  - [ ] **4.1e** French prose excerpts
+  - [ ] **4.1f** Precomputed bigram frequency table per corpus (offline script checked into repo)
+  - [ ] **4.1g** Validation fixtures: hand-verified frequencies for ~20 sentinel words / bigrams per corpus to catch build-script regressions
 - [ ] **4.2** Corpus loader — parse and validate corpus files
 - [ ] **4.3** Mixed-language corpus merging (spec §6.2)
   - Weighted merge of word frequency tables across languages
@@ -251,9 +330,11 @@ storage/         (depends on: all domain types)
 ---
 
 ## Phase 5 — Drill Generation & Session Orchestration (`drill/` + `session/`)
+
 > `drill/` generates sequences (pure functions). `session/` manages lifecycle (wires `typing/` + `drill/`).
 
 ### Drill generation (`drill/`)
+
 - [ ] **5.1** `bigram-drill.ts` — bigram drill sequence generator (spec §4.1)
   - Real word selector from corpus (words containing target bigrams, weighted by frequency)
   - Interleave target (70%) and filler (30%) bigrams
@@ -264,17 +345,19 @@ storage/         (depends on: all domain types)
 - [ ] **5.3** Tests for drill sequence generation
 
 ### Session orchestration (`session/`)
+
 - [ ] **5.4** `runner.ts` — session lifecycle manager
   - Start → feed text to `typing/` → collect KeystrokeEvent[] → pass to `bigram/extraction` → persist via `storage/`
   - Manages timer, session end conditions
 - [ ] **5.5** `graduation.ts` — in-session graduation check
-  - 14/15 recent correct + within 20% of target time, or 5 min timeout
+  - Follow spec §4.1: 14/15 recent correct AND last 5 within 20% of phase speed target, or 5 min timeout
 - [ ] **5.6** Session UI chrome (`session/components/`) — timer, stats bar
 - [ ] **5.7** Tests for session runner and graduation logic
 
 ---
 
 ## Phase 6 — Session Scheduler
+
 > Auto-suggest daily session structure.
 
 - [ ] **6.1** Default session structure (spec §5)
@@ -289,6 +372,7 @@ storage/         (depends on: all domain types)
 ---
 
 ## Phase 7 — Onboarding Flow
+
 > First-run experience per spec §8.
 
 - [ ] **7.1** Layout + language selection screen
@@ -301,6 +385,7 @@ storage/         (depends on: all domain types)
 ---
 
 ## Phase 8 — Session Feedback
+
 > Post-session summaries and session-level feedback — what the user sees after every session.
 
 - [ ] **8.1** Session delta card (spec §10.3)
@@ -323,6 +408,7 @@ storage/         (depends on: all domain types)
 ---
 
 ## Phase 9 — Analytics, Progress & Celebrations
+
 > Dashboards, charts, diagnostic reports, and long-term progress tracking.
 
 - [ ] **9.1** Bigram table (spec §7.1)
@@ -352,6 +438,7 @@ storage/         (depends on: all domain types)
 ---
 
 ## Phase 10 — Settings & Polish
+
 > Final touches for v1.
 
 - [ ] **10.1** Settings page
@@ -363,8 +450,8 @@ storage/         (depends on: all domain types)
 - [ ] **10.3** Responsive layout (desktop-first, per spec §11)
 - [ ] **10.4** Keyboard shortcut support for session navigation
 - [ ] **10.5** Dark mode
-- [ ] **10.6** Accessibility pass (ARIA labels, focus management during typing)
-- [ ] **10.7** Performance audit (ensure keystroke capture has zero lag)
+- [ ] **10.6** Accessibility follow-up pass (non-typing surfaces: dashboards, settings, modals — typing surface a11y lives in Phase 2.4)
+- [ ] **10.7** Performance audit (ensure keystroke capture has zero lag; re-run the Phase 2 perf spike on low-end hardware)
 
 ---
 
@@ -372,25 +459,32 @@ storage/         (depends on: all domain types)
 
 ```
 Phase 0 (Scaffolding)
-  └── Phase 1 (Domain Types & Storage)
-        ├── Phase 2 (Typing Surface) ─── standalone, no domain deps
-        │     └── Phase 2b (Bigram Analysis) ─── depends on typing/types
-        │           └── Phase 3 (Diagnostic) ─── depends on bigram/
-        │                 ├── Phase 5 (Drill + Session) ← also needs Phase 4
-        │                 │     ├── Phase 6 (Scheduler) ← also needs Phase 3
-        │                 │     └── Phase 8 (Session Feedback)
-        │                 └── Phase 7 (Onboarding) ← also needs Phase 5
-        ├── Phase 4 (Corpus) ─── independent, can parallel Phase 2
-        └── Phase 9 (Analytics & Progress) ← needs Phases 3, 5, 8
-              └── Phase 10 (Polish)
+  └── Phase 0.5 (CI & Deploy) ← green pipeline before domain code
+        └── Phase 1 (Domain Types & Storage)
+              ├── Phase 2 (Typing Surface) ─── standalone, no domain deps
+              │     └── Phase 2.5 (Walking Skeleton) ← v0.1 exit gate
+              │           └── Phase 2b (Bigram Analysis) ─── depends on typing/types
+              │                 └── Phase 3 (Diagnostic) ─── depends on bigram/
+              │                       ├── Phase 5 (Drill + Session) ← also needs Phase 4
+              │                       │     ├── Phase 6 (Scheduler) ← also needs Phase 3
+              │                       │     └── Phase 8 (Session Feedback)
+              │                       └── Phase 7 (Onboarding) ← also needs Phase 5
+              ├── Phase 4 (Corpus) ─── independent, can parallel Phase 2
+              └── Phase 9 (Analytics & Progress) ← needs Phases 3, 5, 8
+                    └── Phase 10 (Polish)
 ```
 
-Note: Phases 2 and 4 have no mutual dependency and can be built in parallel.
+Notes:
+
+- Phases 2 and 4 have no mutual dependency and can be built in parallel.
+- Phase 2.5 (Walking Skeleton) is a throwaway milestone — its summary page gets replaced once Phase 3 lands. Don't polish it.
 
 ---
 
 ## Out of Scope (v1)
+
 Per spec §11:
+
 - Multiplayer / leaderboards
 - Mobile / touchscreen support
 - Voice or audio feedback
