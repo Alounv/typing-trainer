@@ -10,77 +10,81 @@ This spec covers data models, system modules, UX flows, and session logic. It do
 
 ## 2. Core Data Models
 
-### 2.1 KeystrokeEvent
-The atomic unit collected during any typing session.
+### 2.1 Storage Strategy
+
+Keystroke events are the raw input. Bigram and word statistics are **derived aggregates**, computed in-memory during a session and persisted as summaries at session end. Raw keystroke events are only persisted for **diagnostic sessions** (needed for reclassification with updated thresholds). Drill session keystrokes are discarded after aggregates are computed.
+
+This means bigram/word aggregates cannot be retroactively recomputed for drill sessions — an acceptable tradeoff for keeping storage bounded.
+
+### 2.2 KeystrokeEvent
+
+The atomic unit collected during any typing session. Held in memory during all sessions; persisted to disk only for diagnostic sessions.
 
 ```ts
 interface KeystrokeEvent {
-  timestamp: number          // ms since session start
+  timestamp: number          // ms since session start (via performance.now())
   expected: string           // the character the user should have typed
   actual: string             // the character the user typed
   position: number           // index in the current sequence
   wordIndex: number          // index of the current word in the sequence
   positionInWord: number     // index within the current word (0 = word-initial)
-  corrected: boolean         // whether a backspace followed within 500ms
-  correctionDelay: number | null  // ms until backspace, if corrected
 }
 ```
 
-### 2.2 BigramRecord
-Derived from raw keystroke events. One record per bigram per session.
+Note: `corrected` and `correctionDelay` are computed in post-processing (they require lookahead for a subsequent backspace), not recorded on the raw event.
+
+### 2.3 BigramAggregate
+
+Derived from keystroke events at session end. One record per bigram per session. This is what gets persisted.
 
 ```ts
-interface BigramRecord {
+interface BigramAggregate {
   bigram: string             // e.g. "th"
+  sessionId: string
   occurrences: number
-  transitionTimes: number[]  // ms between keydown N and keydown N+1
-  meanTime: number
+  meanTime: number           // mean transition time in ms
   stdTime: number
   errorCount: number
   errorRate: number          // errorCount / occurrences
-  errorTypes: {
-    wrongFinger: number      // adjacent-column error
-    adjacentKey: number      // adjacent-row/column on same finger
-    transposition: number    // bigram reversed
-    omission: number         // key skipped
-    other: number
-  }
-  // Derived classification (see section 3.1)
   classification: 'healthy' | 'fluency' | 'hasty' | 'acquisition'
 }
 ```
 
-### 2.3 WordRecord
-Derived per word from keystroke events.
+### 2.4 WordAggregate
+
+Derived per word from keystroke events at session end.
 
 ```ts
-interface WordRecord {
+interface WordAggregate {
   word: string
+  sessionId: string
   occurrences: number
   meanWordTime: number           // ms from first to last keystroke of word
-  perPositionTimes: number[][]   // [position][occurrence] → transition time
-  perPositionMeanTimes: number[] // mean per position
+  perPositionMeanTimes: number[] // mean transition time per position
   errorRate: number
   compositeScore: number         // see section 3.2
-  containedBigrams: string[]
+  hasChunkingGap: boolean        // see section 3.3
 }
 ```
 
-### 2.4 UserProfile
-Persistent across sessions.
+### 2.5 UserSettings
+
+Persistent user configuration. Separated from session data.
 
 ```ts
-interface UserProfile {
+interface UserSettings {
   id: string
   layout: string               // 'bépo' | 'azerty' | 'qwerty' | 'dvorak' | ...
   language: 'fr' | 'en' | string
-  corpus: CorpusConfig
-  sessions: SessionSummary[]
-  bigramHistory: Record<string, BigramRecord[]>  // bigram → history over time
-  wordHistory: Record<string, WordRecord[]>
-  pacing: PacingProfile
+  corpusId: string             // references a CorpusConfig
 }
+```
 
+### 2.6 PacingProfile
+
+Updated during calibration sessions and periodically adjusted by the scheduler.
+
+```ts
 interface PacingProfile {
   comfortableWPM: number        // settled speed at <2% errors over a long run
   ceilingWPM: number            // max speed before errors climb above ~5%
@@ -90,19 +94,22 @@ interface PacingProfile {
 }
 ```
 
-### 2.5 CorpusConfig
+### 2.7 CorpusConfig
 
 ```ts
 interface CorpusConfig {
+  id: string
   language: string
   wordlistId: string            // e.g. 'fr-top-5000', 'en-top-1000'
   customText?: string           // optional user-supplied text
-  bigramFrequencyTable: Record<string, number>  // bigram → frequency in corpus
-  wordFrequencyTable: Record<string, number>    // word → frequency rank
 }
 ```
 
-### 2.6 SessionSummary
+Bigram and word frequency tables are derived from the corpus text at import time and recomputed on any corpus change. They are not stored as part of the config.
+
+### 2.8 SessionSummary
+
+Session metadata and aggregate results. Raw keystroke events stored separately, only for diagnostic sessions.
 
 ```ts
 interface SessionSummary {
@@ -114,7 +121,19 @@ interface SessionSummary {
   errorRate: number
   bigramsTargeted?: string[]
   wordsTargeted?: string[]
-  rawEvents: KeystrokeEvent[]
+  bigramAggregates: BigramAggregate[]
+  wordAggregates: WordAggregate[]
+}
+```
+
+### 2.9 DiagnosticRawData
+
+Persisted only for diagnostic sessions. Allows reclassification with updated thresholds.
+
+```ts
+interface DiagnosticRawData {
+  sessionId: string
+  events: KeystrokeEvent[]
 }
 ```
 
@@ -127,20 +146,23 @@ interface SessionSummary {
 Run after collecting enough occurrences (minimum 10 per bigram, ideally 20+).
 
 **Thresholds** (configurable, defaults below):
-- `FAST_THRESHOLD`: 120ms mean transition time
-- `SLOW_THRESHOLD`: 200ms mean transition time
+- `SPEED_THRESHOLD`: 150ms mean transition time
 - `HIGH_ERROR_THRESHOLD`: 0.05 (5% error rate)
 - `HIGH_VARIANCE_THRESHOLD`: std/mean > 0.4
+
+To avoid oscillation around the threshold, a **hysteresis band** applies to reclassification:
+- A bigram must drop below 140ms to be reclassified as fast (from slow)
+- A bigram must rise above 160ms to be reclassified as slow (from fast)
 
 **Classification logic:**
 
 ```
-if meanTime <= FAST_THRESHOLD AND errorRate < HIGH_ERROR_THRESHOLD → 'healthy'
-if meanTime <= FAST_THRESHOLD AND errorRate >= HIGH_ERROR_THRESHOLD → 'hasty'
-if meanTime > SLOW_THRESHOLD AND errorRate < HIGH_ERROR_THRESHOLD → 'fluency'
-if meanTime > SLOW_THRESHOLD AND errorRate >= HIGH_ERROR_THRESHOLD → 'acquisition'
-// Intermediate zone: use variance as tiebreaker
-if HIGH_VARIANCE → flag as 'unstable' sub-tag on any classification
+if meanTime <= SPEED_THRESHOLD AND errorRate < HIGH_ERROR_THRESHOLD → 'healthy'
+if meanTime <= SPEED_THRESHOLD AND errorRate >= HIGH_ERROR_THRESHOLD → 'hasty'
+if meanTime > SPEED_THRESHOLD AND errorRate < HIGH_ERROR_THRESHOLD → 'fluency'
+if meanTime > SPEED_THRESHOLD AND errorRate >= HIGH_ERROR_THRESHOLD → 'acquisition'
+// Orthogonal modifier: high variance flags inconsistent execution
+if HIGH_VARIANCE → add 'unstable' sub-tag to any classification
 ```
 
 **Each classification maps to a training prescription:**
@@ -153,7 +175,42 @@ if HIGH_VARIANCE → flag as 'unstable' sub-tag on any classification
 | `acquisition` | Program missing or wrong | Blocked slow drill, then consolidation |
 | `unstable` (sub-tag) | Inconsistent execution | Blocked repetition to stabilize first |
 
-### 3.2 Word Composite Score
+### 3.2 Bigram Lifecycle
+
+A bigram has two orthogonal dimensions of state: its **classification** (`acquisition`, `hasty`, `fluency`, `healthy`) and its **drill status** (`in-rotation`, `monitored`, `retired`).
+
+**Drill status transitions:**
+
+```
+  [unobserved] ──▶ [drilling] ──▶ [healthy]
+                       ▲              │
+                       └──────────────┘
+                        (regression)
+```
+
+- **unobserved → drilling**: first diagnostic classifies the bigram as non-healthy.
+- **drilling → healthy**: bigram classified as `healthy` at end of a diagnostic. Removed from active drills but still tracked in every session it appears in.
+- **healthy → drilling**: bigram regresses to a non-healthy classification during a diagnostic. Re-added to drills. Surfaced in the weekly report.
+
+**Classification transitions:**
+
+All classification changes happen at **diagnostic boundaries** — never mid-drill. Drill sessions produce aggregates that feed into the next diagnostic, but they don't reclassify on their own. This keeps the classification stable and avoids confusing the user with mid-week fluctuations.
+
+Valid transitions (any direction is possible, but typical progressions are):
+- `acquisition → hasty` (errors persist but speed improves)
+- `acquisition → fluency` (speed still slow but errors resolved)
+- `hasty → fluency` (user slows down, errors drop)
+- `fluency → healthy` (speed catches up)
+- `hasty → healthy` (speed was already there, errors resolved)
+- `acquisition → healthy` (skip — rare but valid, e.g. after intensive blocked drilling)
+
+Regressions (any non-healthy → worse classification, or `healthy` → any) are valid and surfaced explicitly.
+
+**Stubborn bigram rule:** if a bigram's classification has not improved after 4 consecutive diagnostics while in-rotation, flag it as "stubborn" in the UI and suggest the user review it (possible layout issue, not just a motor learning issue).
+
+**Drill session graduation vs. classification change:** graduating a drill (15 consecutive correct + timing target met) means the bigram is done *for that session*. It does not change the bigram's classification — that only happens at the next diagnostic.
+
+### 3.3 Word Composite Score
 
 Used to rank words for the word-drill phase:
 
@@ -162,7 +219,7 @@ compositeScore(word) = Σ over bigrams b in word:
   bigramBadness(b) × log(wordFrequency(word) + 1)
 
 bigramBadness(b) =
-  (meanTime(b) / SLOW_THRESHOLD) × (1 + errorRate(b) × 10)
+  (meanTime(b) / SPEED_THRESHOLD) × (1 + errorRate(b) × 10)
 ```
 
 This ensures common words with moderately bad bigrams outrank rare words with very bad bigrams.
@@ -178,10 +235,9 @@ A chunking gap means the word hasn't been compiled into a motor program — the 
 ### 3.4 Pacing Calibration Session
 
 A special session type run during onboarding and periodically (every 2 weeks suggested):
-- Present 200-300 words of real text
-- First half: user types at natural comfortable pace
-- Second half: user is prompted to push speed
-- Derive `comfortableWPM` from first half (lowest decile removed), `ceilingWPM` from second half
+- Present 300-400 words of real text
+- User is simply prompted to "type naturally" — no mention of phases or speed targets
+- Derive pacing profile from the data: `comfortableWPM` from the middle quartiles (discard slowest and fastest deciles), `ceilingWPM` from the fastest decile
 - `trainingTargetWPM` = comfortableWPM × 1.17 (adjustable)
 
 ---
@@ -246,7 +302,7 @@ A special session type run during onboarding and periodically (every 2 weeks sug
 
 Full-speed, no pacer, no guidance. Purely motivational and diagnostic of "real ceiling."
 
-- Present 100-word excerpt
+- Present 200-word excerpt (configurable: 100–500)
 - Measure gross WPM and net WPM (penalizing uncorrected errors as -1 word each)
 - Compare to previous race WPM — show delta
 - Output: updates ceilingWPM in PacingProfile if new record
@@ -270,6 +326,7 @@ The app should suggest a daily session structure rather than leaving the user to
 - After 3 consecutive sessions where a bigram is `healthy`, remove from drill rotation
 - If real-text error floor is rising (>10% increase over 3 sessions): reduce trainingTargetWPM by 5%, flag to user
 - If no improvement on a bigram after 4 drill sessions: surface it in UI as "stubborn pattern" and suggest manual attention or layout review
+- After 5 consecutive days of practice, suggest a lighter session (real-text only, no drills) or a rest day. Typing fatigue degrades motor learning — consolidation happens during rest
 
 ---
 
@@ -330,7 +387,7 @@ Pacing:
 Bigram breakdown:
   Healthy: 312 bigrams
   Fluency bottlenecks (top 5): "sc", "mp", "wr", "qu", "pl"
-  Hasty patterns (top 5): "tion", "ng", "er", "ou", "in"
+  Hasty patterns (top 5): "ti", "ng", "er", "ou", "in"
   Acquisition gaps: "wh", "ck"
 
 Priority word targets (top 10):
@@ -678,24 +735,6 @@ interface WeeklyReport {
 ---
 
 ## 11. Out of Scope (v1)
-
-- Multiplayer / leaderboards
-- Mobile / touchscreen support (this is a desktop-first tool)
-- Voice or audio feedback
-- Ergonomics / RSI guidance
-- Auto-layout detection
-
----
-
-## Appendix: Classification Quick Reference
-
-| Signal | Slow? | Errors? | Variance? | Classification | First action |
-|---|---|---|---|---|---|
-| Fast, clean, consistent | No | No | No | Healthy | Nothing |
-| Slow, clean | Yes | No | — | Fluency | Speed bursts |
-| Fast, errors | No | Yes | — | Hasty | Slow down, deliberate reps |
-| Slow, errors | Yes | Yes | — | Acquisition | Blocked slow drill |
-| Any + high variance | — | — | Yes | + Unstable tag | Stabilize before pushing speed |
 
 - Multiplayer / leaderboards
 - Mobile / touchscreen support (this is a desktop-first tool)
