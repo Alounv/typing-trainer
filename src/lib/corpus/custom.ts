@@ -1,5 +1,4 @@
 import type { CorpusConfig, CorpusData, FrequencyTable } from './types';
-import { deriveBigramFrequencies } from './loader';
 
 /** Warn boundary for "too small for reliable diagnostics" — not a hard reject. */
 export const MIN_CUSTOM_BIGRAMS = 500;
@@ -84,6 +83,26 @@ function tokenize(text: string): string[] {
 function countWords(tokens: readonly string[]): FrequencyTable {
 	const out: FrequencyTable = {};
 	for (const t of tokens) out[t] = (out[t] ?? 0) + 1;
+	return out;
+}
+
+/**
+ * Bigram frequencies for custom text: each adjacent char pair inside a word
+ * contributes the word's count. Built-in corpora use language-level tables
+ * (`data/*-bigrams.json`) instead — custom text has no such table, so we
+ * derive from the user's own tokens, which doubles as "this is the bigram
+ * distribution the user is asking us to drill on."
+ */
+function deriveBigramFrequencies(words: FrequencyTable): FrequencyTable {
+	const out: FrequencyTable = {};
+	for (const word in words) {
+		const freq = words[word];
+		if (word.length < 2) continue;
+		for (let i = 0; i < word.length - 1; i++) {
+			const bigram = word.substring(i, i + 2);
+			out[bigram] = (out[bigram] ?? 0) + freq;
+		}
+	}
 	return out;
 }
 

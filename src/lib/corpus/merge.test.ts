@@ -3,9 +3,9 @@ import { mergeCorpora } from './merge';
 import { loadCorpus } from './loader';
 import type { CorpusConfig } from './types';
 
-function corpus(id: string, language: string, text: string) {
+function corpus(id: string, language: string, text: string, bigrams: Record<string, number> = {}) {
 	const cfg: CorpusConfig = { id, language, wordlistId: id };
-	return loadCorpus(cfg, text);
+	return loadCorpus(cfg, text, bigrams);
 }
 
 describe('mergeCorpora', () => {
@@ -38,9 +38,10 @@ describe('mergeCorpora', () => {
 
 	it('sums bigram frequencies across corpora, weighted', () => {
 		// Shared bigram 'ab' appears in both inputs — after 50/50 merge,
-		// its weight should be (en_weight × en_freq) + (fr_weight × fr_freq).
-		const a = corpus('a', 'en', 'ab'); // bigram 'ab' → 1 (rank 1)
-		const b = corpus('b', 'fr', 'ab'); // bigram 'ab' → 1 (rank 1)
+		// its weight should average. Bigrams are now language-level artifacts
+		// injected into the corpus, not derived from the wordlist.
+		const a = corpus('a', 'en', 'ab', { ab: 1 });
+		const b = corpus('b', 'fr', 'ab', { ab: 1 });
 		const merged = mergeCorpora([a, b]);
 		expect(merged.bigramFrequencies['ab']).toBeCloseTo(1.0, 10);
 	});

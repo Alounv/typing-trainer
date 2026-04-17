@@ -32,7 +32,7 @@ export const TARGET_WPM_MULTIPLIER = 1.17;
  * Default word budgets — small so a session is a mini-workout (<1 min at 60 WPM)
  * and every completion is a checkpoint. Overridable via `UserSettings`.
  */
-export const DEFAULT_BIGRAM_DRILL_WORD_BUDGET = 15;
+export const DEFAULT_BIGRAM_DRILL_WORD_BUDGET = 50;
 export const DEFAULT_REAL_TEXT_WORD_BUDGET = 25;
 /** Sized for ≥15 occurrences of top-200 bigrams; one large sample not fragmented. */
-export const DEFAULT_DIAGNOSTIC_WORD_BUDGET = 200;
+export const DEFAULT_DIAGNOSTIC_WORD_BUDGET = 100;

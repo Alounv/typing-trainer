@@ -8,7 +8,13 @@ import type { CorpusData } from './types';
 
 const DEFAULT_WORD_COUNT = 12;
 
-/** Multiplier on a word's base weight when it contains a target bigram. */
+/**
+ * Multiplier on a word's base weight when it contains ≥ 1 target bigram.
+ * Saturating: a word with five targets gets the same boost as a word with one.
+ * Stacking (5× per target) let bigram-dense words like "interest" (7 top-50
+ * targets → 78125×) drown out the distribution — single-multiplier keeps
+ * the bias visible without collapsing it to a handful of words.
+ */
 const TARGET_BOOST = 5;
 
 export interface SelectionOptions {
@@ -42,7 +48,7 @@ export function selectRealTextSentence(corpus: CorpusData, options: SelectionOpt
 	return picked.join(' ');
 }
 
-// Per-word weight with stacking TARGET_BOOST per contained bigram.
+// Per-word weight with a single TARGET_BOOST if the word contains any target.
 // Case-sensitive — corpus and targets share normalized form (lowercase).
 function weightsWithTargetBoost(
 	words: readonly string[],
@@ -52,15 +58,17 @@ function weightsWithTargetBoost(
 	const out = new Array<number>(words.length);
 	for (let i = 0; i < words.length; i++) {
 		const word = words[i];
-		let weight = freqs[word] ?? 0;
-		if (targets.length > 0) {
-			for (const t of targets) {
-				if (t.length >= 2 && word.includes(t)) weight *= TARGET_BOOST;
-			}
-		}
-		out[i] = weight;
+		const base = freqs[word] ?? 0;
+		out[i] = targets.length > 0 && containsAnyTarget(word, targets) ? base * TARGET_BOOST : base;
 	}
 	return out;
+}
+
+function containsAnyTarget(word: string, targets: readonly string[]): boolean {
+	for (const t of targets) {
+		if (t.length >= 2 && word.includes(t)) return true;
+	}
+	return false;
 }
 
 // O(n) cumulative-weight walk — fine for ~1k-10k words × ~10-20 picks/sentence.

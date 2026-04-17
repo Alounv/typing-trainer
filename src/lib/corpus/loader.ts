@@ -4,15 +4,20 @@ import type { CorpusConfig, CorpusData, FrequencyTable } from './types';
 const ZIPF_EXPONENT = 1.0;
 
 /**
- * Load a frequency-ordered wordlist (MonkeyType-style) into `CorpusData`. Word
- * frequencies are Zipf-approximated from rank (raw files carry order only).
- * Bigrams are derived per-word; inter-word pairs are skipped — they're text-
- * formation dependent and picked up later by real-text selection.
+ * Load a frequency-ordered wordlist (MonkeyType-style) plus a language-level
+ * bigram frequency table into `CorpusData`. Word frequencies are Zipf-
+ * approximated from rank (raw files carry order only). Bigram frequencies
+ * come from a separate natural-language table — see `data/*-bigrams.json` —
+ * because deriving them from a top-1k wordlist under-weights mid-rank pairs
+ * and misses the rare-but-present ones entirely.
  */
-export function loadCorpus(config: CorpusConfig, rawWordlist: string): CorpusData {
+export function loadCorpus(
+	config: CorpusConfig,
+	rawWordlist: string,
+	bigramFrequencies: FrequencyTable = {}
+): CorpusData {
 	const words = tokenize(rawWordlist);
 	const wordFrequencies = zipfFrequencies(words);
-	const bigramFrequencies = deriveBigramFrequencies(wordFrequencies);
 	return { config, wordFrequencies, bigramFrequencies };
 }
 
@@ -30,24 +35,6 @@ function zipfFrequencies(orderedWords: string[]): FrequencyTable {
 		if (out[w] !== undefined) continue;
 		out[w] = 1 / Math.pow(rank, ZIPF_EXPONENT);
 		rank++;
-	}
-	return out;
-}
-
-/**
- * Derive bigram frequencies from a word table. Each adjacent char pair in a word
- * contributes the word's frequency. Chars pass through verbatim (apostrophes,
- * accents) — "d'abord" yields `d'`, `'a`, `ab`, …
- */
-export function deriveBigramFrequencies(words: FrequencyTable): FrequencyTable {
-	const out: FrequencyTable = {};
-	for (const word in words) {
-		const freq = words[word];
-		if (word.length < 2) continue;
-		for (let i = 0; i < word.length - 1; i++) {
-			const bigram = word.substring(i, i + 2);
-			out[bigram] = (out[bigram] ?? 0) + freq;
-		}
 	}
 	return out;
 }

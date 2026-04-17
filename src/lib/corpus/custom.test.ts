@@ -49,7 +49,11 @@ describe('importCustomText', () => {
 
 	it('reports missingFromBase bigrams when a base corpus is passed', () => {
 		// Base has bigrams 'th' and 'he'; custom has only 'he'. Missing: 'th'.
-		const base = loadCorpus({ id: 'base', language: 'en', wordlistId: 'base' }, 'the');
+		const base = loadCorpus(
+			{ id: 'base', language: 'en', wordlistId: 'base' },
+			'the',
+			{ th: 1, he: 1 }
+		);
 		const { missingFromBase } = importCustomText('he he', { baseForOverlap: base });
 		expect(missingFromBase).toContain('th');
 		expect(missingFromBase).not.toContain('he');

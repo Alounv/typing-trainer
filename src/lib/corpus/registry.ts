@@ -1,5 +1,25 @@
-import type { CorpusConfig, CorpusData, QuoteBank } from './types';
+import type { CorpusConfig, CorpusData, FrequencyTable, QuoteBank } from './types';
 import { loadCorpus } from './loader';
+
+/**
+ * Languages with a shipped bigram frequency table. Kept separate from
+ * `BUILTIN_CORPUS_IDS` because multiple corpora (top-1k, top-5k, top-10k)
+ * share a single language-level table — the bigram distribution is a
+ * property of the language, not the wordlist.
+ */
+export const BIGRAM_LANGUAGES = ['en', 'fr'] as const;
+export type BigramLanguage = (typeof BIGRAM_LANGUAGES)[number];
+
+const BIGRAM_LOADERS: Record<BigramLanguage, () => Promise<FrequencyTable>> = {
+	en: async () => {
+		const mod = await import('./data/english-bigrams.json');
+		return mod.default as FrequencyTable;
+	},
+	fr: async () => {
+		const mod = await import('./data/french-bigrams.json');
+		return mod.default as FrequencyTable;
+	}
+};
 
 /**
  * Canonical ids for built-in corpora. Exposed as a `const` tuple so
@@ -28,27 +48,31 @@ export type BuiltinCorpusId = (typeof BUILTIN_CORPUS_IDS)[number];
  * The callbacks return the fully computed `CorpusData` (via `loadCorpus`)
  * so consumers don't have to know about the raw-string layer below.
  */
+// Load the wordlist and the language-level bigram table in parallel, then hand
+// both to `loadCorpus`. The bigram table is a property of the language, so the
+// three English corpora share `english-bigrams.json` and the two French ones
+// share `french-bigrams.json`.
+async function loadFromSources(
+	id: BuiltinCorpusId,
+	language: BigramLanguage,
+	wordlistImport: () => Promise<{ default: string }>
+): Promise<CorpusData> {
+	const [{ default: raw }, bigramFrequencies] = await Promise.all([
+		wordlistImport(),
+		BIGRAM_LOADERS[language]()
+	]);
+	return loadCorpus(buildConfig(id, language), raw, bigramFrequencies);
+}
+
 const LOADERS: Record<BuiltinCorpusId, () => Promise<CorpusData>> = {
-	'en-top-1000': async () => {
-		const { default: raw } = await import('./data/english1k.txt?raw');
-		return loadCorpus(buildConfig('en-top-1000', 'en'), raw);
-	},
-	'en-top-5000': async () => {
-		const { default: raw } = await import('./data/english5k.txt?raw');
-		return loadCorpus(buildConfig('en-top-5000', 'en'), raw);
-	},
-	'en-top-10000': async () => {
-		const { default: raw } = await import('./data/english10k.txt?raw');
-		return loadCorpus(buildConfig('en-top-10000', 'en'), raw);
-	},
-	'fr-top-1500': async () => {
-		const { default: raw } = await import('./data/french1_5k.txt?raw');
-		return loadCorpus(buildConfig('fr-top-1500', 'fr'), raw);
-	},
-	'fr-top-10000': async () => {
-		const { default: raw } = await import('./data/french10k.txt?raw');
-		return loadCorpus(buildConfig('fr-top-10000', 'fr'), raw);
-	}
+	'en-top-1000': () => loadFromSources('en-top-1000', 'en', () => import('./data/english1k.txt?raw')),
+	'en-top-5000': () => loadFromSources('en-top-5000', 'en', () => import('./data/english5k.txt?raw')),
+	'en-top-10000': () =>
+		loadFromSources('en-top-10000', 'en', () => import('./data/english10k.txt?raw')),
+	'fr-top-1500': () =>
+		loadFromSources('fr-top-1500', 'fr', () => import('./data/french1_5k.txt?raw')),
+	'fr-top-10000': () =>
+		loadFromSources('fr-top-10000', 'fr', () => import('./data/french10k.txt?raw'))
 };
 
 function buildConfig(id: BuiltinCorpusId, language: string): CorpusConfig {
