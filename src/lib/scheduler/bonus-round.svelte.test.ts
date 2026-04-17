@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-	activateBonusRound,
-	applyBonusBaseline,
-	readActiveBaseline
-} from './bonus-round';
+import { activateBonusRound, applyBonusBaseline, readActiveBaseline } from './bonus-round';
 
 /**
  * `.svelte.test.ts` suffix routes this suite to the browser project so

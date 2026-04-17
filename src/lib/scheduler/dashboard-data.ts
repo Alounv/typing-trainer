@@ -1,11 +1,9 @@
-// Dashboard data loader. Bridges the pure planner to async storage + corpus
-// so the component only handles render. Outside the component so tests don't mount.
+// Dashboard data loader. Bridges the pure planner to async storage so the
+// component only handles render. Outside the component so tests don't mount.
 import type { DiagnosticReport } from '../diagnostic/types';
 import type { SessionSummary, SessionType } from '../session/types';
-import type { CorpusData } from '../corpus/types';
 import type { UserSettings } from '../models';
-import { generateDiagnosticReport } from '../diagnostic/engine';
-import { getDiagnosticRawData, getBigramHistory, getProfile } from '../storage/service';
+import { getBigramHistory, getProfile } from '../storage/service';
 import { findGraduatedBigrams } from './graduation-filter';
 import { planDailySessions, sliceCompletedFromPlan } from './planner';
 import { applyBonusBaseline, readActiveBaseline } from './bonus-round';
@@ -26,23 +24,19 @@ export interface DashboardData {
 
 export interface DashboardLoadInputs {
 	recentSessions: readonly SessionSummary[];
-	/** Optional corpus for corpusFit enrichment; without it, `coverageRatio: 0`. */
-	corpus?: CorpusData;
 }
 
 /**
  * Resolve everything the dashboard needs: planner + graduation filter +
- * diagnostic-report reconstruction in one await. The report is rebuilt (not
- * persisted) so tunable thresholds stay in sync with today's classification.
+ * latest-diagnostic-report lookup in one await. The report is read straight
+ * off the most recent diagnostic's summary — computed once at save time, not
+ * replayed here.
  */
 export async function loadDashboardData(inputs: DashboardLoadInputs): Promise<DashboardData> {
-	const { recentSessions, corpus } = inputs;
+	const { recentSessions } = inputs;
 
-	// Parallel: independent reads, dashboard blocks on all before first paint.
-	const [latestDiagnosticReport, userSettings] = await Promise.all([
-		reconstructLatestDiagnosticReport(recentSessions, corpus),
-		getProfile()
-	]);
+	const latestDiagnosticReport = findLatestDiagnosticReport(recentSessions);
+	const userSettings = await getProfile();
 
 	const priorityBigrams = latestDiagnosticReport?.priorityTargets.map((p) => p.bigram) ?? [];
 	const graduatedFromRotation = await findGraduatedBigrams(priorityBigrams, getBigramHistory);
@@ -86,23 +80,12 @@ function countCompletedToday(
 	return out;
 }
 
-// Rebuild the latest diagnostic's report from stored raw events. `undefined`
-// when no diagnostic on file → planner treats as "first-run".
-async function reconstructLatestDiagnosticReport(
-	recentSessions: readonly SessionSummary[],
-	corpus: CorpusData | undefined
-): Promise<DiagnosticReport | undefined> {
+// Pull the most recent diagnostic's attached report. `undefined` when no
+// diagnostic exists, or when the diagnostic predates v2 (no report persisted)
+// — planner treats both as "missing report" and schedules a fresh diagnostic.
+function findLatestDiagnosticReport(
+	recentSessions: readonly SessionSummary[]
+): DiagnosticReport | undefined {
 	const latestDiag = recentSessions.find((s) => s.type === 'diagnostic');
-	if (!latestDiag) return undefined;
-
-	const raw = await getDiagnosticRawData(latestDiag.id);
-	if (!raw) return undefined;
-
-	return generateDiagnosticReport({
-		sessionId: latestDiag.id,
-		timestamp: latestDiag.timestamp,
-		events: raw.events,
-		aggregates: latestDiag.bigramAggregates,
-		corpusBigramFrequencies: corpus?.bigramFrequencies
-	});
+	return latestDiag?.diagnosticReport;
 }

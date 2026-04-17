@@ -7,11 +7,9 @@
 	 *   - a Timer + StatsBar row
 	 *
 	 * Wiring: we build a {@link SessionRunner} from the supplied config and
-	 * feed every keystroke event into it. On each event we also consult
-	 * `runner.shouldEnd()` — if the session should stop (text complete or
-	 * all targets graduated) we finalize, persist, and redirect. Keeps all
-	 * three session routes (diagnostic, bigram-drill, real-text) from
-	 * duplicating the same ~100 lines.
+	 * feed every keystroke event into it. Once the text is fully typed we
+	 * finalize, persist, and redirect. Keeps all three session routes
+	 * (diagnostic, bigram-drill, real-text) from duplicating the same ~100 lines.
 	 */
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -19,7 +17,7 @@
 	import TypingSurface from '$lib/typing/TypingSurface.svelte';
 	import type { KeystrokeEvent } from '$lib/typing/types';
 	import type { SessionType, SessionSummary } from '$lib/session/types';
-	import type { DiagnosticRawData } from '$lib/diagnostic/types';
+	import type { DiagnosticReport } from '$lib/diagnostic/types';
 	import { SessionRunner } from '$lib/session/runner';
 	import { saveSession } from '$lib/storage/service';
 	import Timer from './Timer.svelte';
@@ -31,27 +29,22 @@
 		text: string;
 		title: string;
 		lede?: string;
-		/** Drill targets. Enables per-bigram graduation tracking when supplied. */
+		/** Drill targets, recorded on the summary for later analysis. */
 		targetBigrams?: readonly string[];
 		/**
-		 * Phase target ms per bigram transition. When set together with
-		 * `targetBigrams`, each occurrence runs through the graduation
-		 * check; targets fire `onBigramGraduated` individually.
+		 * Diagnostic routes pass a builder that turns the just-finalized summary
+		 * (plus its raw events, available in-memory only for this call) into a
+		 * `DiagnosticReport` which is attached to the summary before persistence.
+		 * Keeps the shell type-agnostic — the diagnostic route owns the corpus
+		 * frequencies the engine needs.
 		 */
-		graduationTargetMs?: number;
-		/** When true, archives raw events alongside the summary — diagnostic routes flip this on. */
-		persistRawEvents?: boolean;
+		buildDiagnosticReport?: (
+			summary: SessionSummary,
+			events: readonly KeystrokeEvent[]
+		) => DiagnosticReport;
 	}
 
-	let {
-		type,
-		text,
-		title,
-		lede,
-		targetBigrams,
-		graduationTargetMs,
-		persistRawEvents = false
-	}: Props = $props();
+	let { type, text, title, lede, targetBigrams, buildDiagnosticReport }: Props = $props();
 
 	// Reactive mirrors of runner state. The runner itself is plain TS with
 	// no reactivity; we shadow the bits the UI reads in $state so the
@@ -64,7 +57,6 @@
 	let running = $state(false);
 	let saving = $state(false);
 	let saveError = $state<string | null>(null);
-	let graduatedCount = $state(0);
 
 	// `performance.now()` anchor captured on the first keystroke, not on
 	// mount — reading / focus time shouldn't inflate the WPM denominator.
@@ -79,11 +71,7 @@
 	const runner = new SessionRunner({
 		type,
 		text,
-		targetBigrams,
-		graduationTargetMs,
-		onBigramGraduated: () => {
-			graduatedCount = runner.graduatedTargets.length;
-		}
+		targetBigrams
 	});
 
 	const progressPct = $derived(Math.round((position / text.length) * 100));
@@ -106,10 +94,8 @@
 			correctedPositions.add(event.position);
 		}
 
-		// End-on-event check: if this keystroke completed the text or
-		// graduated the final target, finalize immediately rather than
-		// waiting for the next timer tick.
-		if (runner.shouldEnd()) finalizeAndNavigate();
+		// Finalize as soon as the last char is typed rather than waiting for the next timer tick.
+		if (runner.isComplete()) finalizeAndNavigate();
 	}
 
 	async function finalizeAndNavigate() {
@@ -119,10 +105,10 @@
 		try {
 			const elapsed = performance.now() - (sessionStart ?? performance.now());
 			const summary: SessionSummary = runner.finalize(elapsed);
-			const rawData: DiagnosticRawData | undefined = persistRawEvents
-				? { sessionId: summary.id, events: [...runner.events] }
-				: undefined;
-			await saveSession(summary, rawData);
+			if (buildDiagnosticReport) {
+				summary.diagnosticReport = buildDiagnosticReport(summary, runner.events);
+			}
+			await saveSession(summary);
 			await goto(resolve('/session/[id]/summary', { id: summary.id }));
 		} catch (err) {
 			saving = false;
@@ -175,14 +161,6 @@
 	<div class="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">
 		<Timer {elapsedMs} />
 		<StatsBar {position} {elapsedMs} {errorCount} />
-		{#if targetBigrams && targetBigrams.length > 0}
-			<span class="flex items-baseline gap-1.5">
-				<span class="text-base-content/55">Graduated</span>
-				<span class="font-mono font-medium text-base-content tabular-nums">
-					{graduatedCount}<span class="text-base-content/40">/{targetBigrams.length}</span>
-				</span>
-			</span>
-		{/if}
 		{#if saving}
 			<span class="text-base-content/55">Saving…</span>
 		{/if}

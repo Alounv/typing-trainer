@@ -7,7 +7,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
 	clearAll,
 	getBigramHistory,
-	getDiagnosticRawData,
 	getProfile,
 	getProgressStore,
 	getRecentSessions,
@@ -18,7 +17,7 @@ import {
 } from './service';
 import type { SessionSummary } from '../session/types';
 import type { BigramAggregate } from '../bigram/types';
-import type { DiagnosticRawData } from '../diagnostic/types';
+import type { DiagnosticReport } from '../diagnostic/types';
 import type { UserSettings } from '../models';
 import type { ProgressStore } from '../progress/types';
 
@@ -101,28 +100,24 @@ describe('storage service — round-trip', () => {
 		expect(erHistory[0].bigram).toBe('er');
 	});
 
-	it('persists raw keystroke events only when provided (diagnostic sessions)', async () => {
-		const session = makeSession({ id: 'diag-1', type: 'diagnostic' });
-		const rawData: DiagnosticRawData = {
+	it('attaches a diagnostic report to the summary round-trip', async () => {
+		// Reports are built at save time by the diagnostic route and ride on the
+		// summary — no separate reads needed when the dashboard loads recent sessions.
+		const report: DiagnosticReport = {
 			sessionId: 'diag-1',
-			events: [
-				{
-					timestamp: 0,
-					expected: 't',
-					actual: 't',
-					position: 0,
-					wordIndex: 0,
-					positionInWord: 0
-				}
-			]
+			timestamp: 1_000,
+			baselineWPM: 60,
+			targetWPM: 70,
+			counts: { healthy: 1, fluency: 0, hasty: 0, acquisition: 0 },
+			topBottlenecks: { fluency: [], hasty: [], acquisition: [] },
+			priorityTargets: [{ bigram: 'th', score: 1.2, meanTime: 180, errorRate: 0.05 }],
+			corpusFit: { coverageRatio: 0.8, undertrained: [] },
+			aggregates: [makeAggregate()]
 		};
-		await saveSession(session, rawData);
-		expect(await getDiagnosticRawData('diag-1')).toEqual(rawData);
+		await saveSession(makeSession({ id: 'diag-1', type: 'diagnostic', diagnosticReport: report }));
 
-		// Drill sessions omit the raw-data argument — nothing should land in that table.
-		const drill = makeSession({ id: 'drill-1', type: 'bigram-drill' });
-		await saveSession(drill);
-		expect(await getDiagnosticRawData('drill-1')).toBeUndefined();
+		const roundTripped = await getSession('diag-1');
+		expect(roundTripped?.diagnosticReport).toEqual(report);
 	});
 
 	it('round-trips user settings (singleton row)', async () => {
@@ -158,16 +153,12 @@ describe('storage service — round-trip', () => {
 	});
 
 	it('clearAll wipes every table', async () => {
-		await saveSession(makeSession(), {
-			sessionId: 's1',
-			events: []
-		});
+		await saveSession(makeSession());
 		await saveProfile({ languages: ['en'], corpusIds: ['en-top-1000'] });
 
 		await clearAll();
 
 		expect(await getSession('s1')).toBeUndefined();
-		expect(await getDiagnosticRawData('s1')).toBeUndefined();
 		expect(await getBigramHistory('th')).toEqual([]);
 		expect(await getProfile()).toBeUndefined();
 		expect(await getProgressStore()).toBeUndefined();

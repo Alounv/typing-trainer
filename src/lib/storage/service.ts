@@ -1,20 +1,16 @@
 import { db, bigramRecordKey, SINGLETON_ID } from './db';
 import type { SessionSummary } from '../session/types';
 import type { BigramAggregate } from '../bigram/types';
-import type { DiagnosticRawData } from '../diagnostic/types';
 import type { UserSettings } from '../models';
 import type { ProgressStore } from '../progress/types';
 
 /**
- * Persist summary + mirrored bigram rows (+ optional raw data for diagnostics)
- * atomically — a partial write would desync `sessions` and `bigramRecords`.
- * Pass `rawData` for diagnostic sessions only; drill sessions discard theirs.
+ * Persist summary + mirrored bigram rows atomically — a partial write would
+ * desync `sessions` and `bigramRecords`. Diagnostic reports (when present)
+ * ride along on the summary itself; there's no separate table.
  */
-export async function saveSession(
-	summary: SessionSummary,
-	rawData?: DiagnosticRawData
-): Promise<void> {
-	await db.transaction('rw', db.sessions, db.bigramRecords, db.diagnosticRawData, async () => {
+export async function saveSession(summary: SessionSummary): Promise<void> {
+	await db.transaction('rw', db.sessions, db.bigramRecords, async () => {
 		await db.sessions.put(summary);
 
 		const rows = summary.bigramAggregates.map((agg) => ({
@@ -23,10 +19,6 @@ export async function saveSession(
 		}));
 		if (rows.length > 0) {
 			await db.bigramRecords.bulkPut(rows);
-		}
-
-		if (rawData) {
-			await db.diagnosticRawData.put(rawData);
 		}
 	});
 }
@@ -46,12 +38,6 @@ export async function getBigramHistory(bigram: string): Promise<BigramAggregate[
 	return rows
 		.map(({ key, ...rest }) => rest)
 		.sort((a, b) => b.sessionId.localeCompare(a.sessionId));
-}
-
-export async function getDiagnosticRawData(
-	sessionId: string
-): Promise<DiagnosticRawData | undefined> {
-	return db.diagnosticRawData.get(sessionId);
 }
 
 /** `undefined` before first save (pre-onboarding). */
@@ -75,16 +61,13 @@ export async function saveProgressStore(store: ProgressStore): Promise<void> {
 
 /** Wipe all persisted data — used by "reset" and by the test suite. */
 export async function clearAll(): Promise<void> {
-	// Dexie's positional transaction() overload tops out at 5 tables; pass an
-	// array for the 6-table case.
 	await db.transaction(
 		'rw',
-		[db.sessions, db.bigramRecords, db.diagnosticRawData, db.profile, db.progressStore],
+		[db.sessions, db.bigramRecords, db.profile, db.progressStore],
 		async () => {
 			await Promise.all([
 				db.sessions.clear(),
 				db.bigramRecords.clear(),
-				db.diagnosticRawData.clear(),
 				db.profile.clear(),
 				db.progressStore.clear()
 			]);

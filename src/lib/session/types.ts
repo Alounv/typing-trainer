@@ -1,8 +1,9 @@
 import type { BigramAggregate } from '../bigram/types';
+import type { DiagnosticReport } from '../diagnostic/types';
 
 export type SessionType = 'diagnostic' | 'bigram-drill' | 'real-text';
 
-/** Per-session metadata + aggregates. Raw events live in `diagnosticRawData` (diagnostics only). */
+/** Per-session metadata + aggregates. */
 export interface SessionSummary {
 	id: string;
 	timestamp: number;
@@ -14,6 +15,11 @@ export interface SessionSummary {
 	/** Set for `bigram-drill`, absent for `real-text` and `diagnostic`. */
 	bigramsTargeted?: string[];
 	bigramAggregates: BigramAggregate[];
+	/**
+	 * Populated only for `type === 'diagnostic'`. Computed at save time so the
+	 * dashboard can pull priority targets without replaying the raw keystroke log.
+	 */
+	diagnosticReport?: DiagnosticReport;
 }
 
 export interface SessionConfig {

@@ -1,13 +1,12 @@
 <script lang="ts">
-/**
- * Bigram drill route. Targets come from the dashboard hand-off stash.
- * Direct nav (URL paste, dev) falls back to a small stub set.
- */
+	/**
+	 * Bigram drill route. Targets come from the dashboard hand-off stash.
+	 * Direct nav (URL paste, dev) falls back to a small stub set.
+	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
 	import { loadBuiltinCorpus, isBuiltinCorpusId } from '$lib/corpus/registry';
 	import { generateBigramDrillSequence } from '$lib/drill/bigram-drill';
-	import { phaseTargetMsFromWPM } from '$lib/session/graduation';
 	import { consumePlannedSession } from '$lib/scheduler/handoff';
 	import { getProfile } from '$lib/storage/service';
 	import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from '$lib/models';
@@ -21,10 +20,6 @@
 	 * English so the drill is exercised by typical words.
 	 */
 	const FALLBACK_TARGETS = ['th', 'he', 'in', 'er', 'an'] as const;
-
-	/** Assumed baseline when no diagnostic has run. Graduation uses 60% for acquisition/hasty pacing. */
-	const DEFAULT_BASELINE_WPM = 60;
-	const PHASE_WPM = DEFAULT_BASELINE_WPM * 0.6;
 
 	type LoadState =
 		| { status: 'loading' }
@@ -77,8 +72,7 @@
 		type="bigram-drill"
 		text={state.text}
 		title="Bigram drill"
-		lede="Targeted drill on common trouble pairs. A bigram graduates after 15 clean samples at pace."
+		lede="Targeted drill on common trouble pairs."
 		targetBigrams={state.targets}
-		graduationTargetMs={phaseTargetMsFromWPM(PHASE_WPM)}
 	/>
 {/if}

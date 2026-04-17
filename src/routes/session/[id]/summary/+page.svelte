@@ -14,7 +14,6 @@
 	import { getSession, getRecentSessions } from '$lib/storage/service';
 	import type { SessionSummary, SessionType } from '$lib/session/types';
 	import type { BigramAggregate } from '$lib/bigram/types';
-	import { loadBuiltinCorpus } from '$lib/corpus/registry';
 	import { loadDashboardData } from '$lib/scheduler/dashboard-data';
 	import { stashPlannedSession } from '$lib/scheduler/handoff';
 	import { activateBonusRound } from '$lib/scheduler/bonus-round';
@@ -42,16 +41,15 @@
 			// Load the session + re-run the planner in parallel. The planner
 			// sees the just-completed session (it's in recentSessions) so the
 			// first remaining plan item *is* the real "what's next".
-			const [summary, recentSessions, corpus] = await Promise.all([
+			const [summary, recentSessions] = await Promise.all([
 				getSession(page.params.id!),
-				getRecentSessions(RECENT_WINDOW),
-				loadBuiltinCorpus('en-top-1000').catch(() => undefined)
+				getRecentSessions(RECENT_WINDOW)
 			]);
 			if (!summary) {
 				state = { status: 'missing' };
 				return;
 			}
-			const dashboard = await loadDashboardData({ recentSessions, corpus });
+			const dashboard = await loadDashboardData({ recentSessions });
 			state = {
 				status: 'ready',
 				summary,
@@ -231,10 +229,8 @@
 				</a>
 			{:else}
 				{@const completed = state.completedToday}
-				<a
-					href={resolve('/')}
-					class="btn btn-lg btn-primary"
-					data-testid="day-complete-cta">Day complete · Back to dashboard</a
+				<a href={resolve('/')} class="btn btn-lg btn-primary" data-testid="day-complete-cta"
+					>Day complete · Back to dashboard</a
 				>
 				<button
 					type="button"

@@ -7,7 +7,6 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { getRecentSessions } from '$lib/storage/service';
-	import { loadBuiltinCorpus } from '$lib/corpus/registry';
 	import { loadDashboardData, type DashboardData } from '$lib/scheduler/dashboard-data';
 	import { stashPlannedSession } from '$lib/scheduler/handoff';
 	import { activateBonusRound } from '$lib/scheduler/bonus-round';
@@ -26,13 +25,8 @@
 
 	onMount(async () => {
 		try {
-			// Corpus is optional for the planner but enriches the diagnostic
-			// report's `corpusFit` — worth the extra few KB.
-			const [recentSessions, corpus] = await Promise.all([
-				getRecentSessions(RECENT_WINDOW),
-				loadBuiltinCorpus('en-top-1000').catch(() => undefined)
-			]);
-			const data = await loadDashboardData({ recentSessions, corpus });
+			const recentSessions = await getRecentSessions(RECENT_WINDOW);
+			const data = await loadDashboardData({ recentSessions });
 			state = { status: 'ready', data };
 		} catch (err) {
 			state = {

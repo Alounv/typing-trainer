@@ -1,7 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { SessionSummary } from '../session/types';
 import type { BigramAggregate } from '../bigram/types';
-import type { DiagnosticRawData } from '../diagnostic/types';
 import type { UserSettings } from '../models';
 import type { ProgressStore } from '../progress/types';
 
@@ -23,15 +22,21 @@ export interface ProgressStoreRecord {
  *
  * `bigramRecords` duplicates data from `SessionSummary.bigramAggregates` —
  * the redundancy is worth it so per-bigram history queries don't have to
- * scan every session. `diagnosticRawData` is split off because it's heavy
- * and only needed when replaying classification thresholds.
+ * scan every session. Diagnostic reports ride along on the `SessionSummary`
+ * itself (attached at save time), so there's no separate reports table.
  *
- * To migrate: bump `version(n)` with a new `.stores(...)` — never mutate v1.
+ * v2 drops the `diagnosticRawData` table — priority targets are now computed
+ * once at save time and persisted on the summary, so the raw event log is
+ * no longer load-bearing. Orphaned rows from v1 are abandoned; any existing
+ * diagnostic without a persisted report triggers a fresh diagnostic via the
+ * planner's `missing-report-diagnostic` branch.
+ *
+ * To migrate further: bump `version(n)` with a new `.stores(...)` — never
+ * mutate an existing version.
  */
 export class TypingTrainerDB extends Dexie {
 	sessions!: EntityTable<SessionSummary, 'id'>;
 	bigramRecords!: EntityTable<BigramAggregate & { key: string }, 'key'>;
-	diagnosticRawData!: EntityTable<DiagnosticRawData, 'sessionId'>;
 	profile!: EntityTable<ProfileRecord, 'id'>;
 	progressStore!: EntityTable<ProgressStoreRecord, 'id'>;
 
@@ -43,6 +48,10 @@ export class TypingTrainerDB extends Dexie {
 			diagnosticRawData: 'sessionId',
 			profile: 'id',
 			progressStore: 'id'
+		});
+		// v2: drop diagnosticRawData. Passing `null` to `.stores()` removes the table.
+		this.version(2).stores({
+			diagnosticRawData: null
 		});
 	}
 }

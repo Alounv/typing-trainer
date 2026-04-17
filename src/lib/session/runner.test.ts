@@ -1,6 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { buildSessionSummary, SessionRunner } from './runner';
-import { phaseTargetMsFromWPM } from './graduation';
 import type { KeystrokeEvent } from '../typing/types';
 
 /**
@@ -96,92 +95,26 @@ describe('SessionRunner', () => {
 		expect(runner.position).toBe(2);
 	});
 
-	it('shouldEnd returns "complete" when every position is typed', () => {
+	it('isComplete flips to true once every position is typed', () => {
 		const runner = new SessionRunner({ type: 'diagnostic', text: 'ab' });
 		runner.recordEvent(stroke(0, 'a', 'a', 0));
-		expect(runner.shouldEnd()).toBeNull();
+		expect(runner.isComplete()).toBe(false);
 		runner.recordEvent(stroke(1, 'b', 'b', 100));
-		expect(runner.shouldEnd()).toBe('complete');
+		expect(runner.isComplete()).toBe(true);
 	});
 
-	it('retype at the same position does not form a new bigram occurrence', () => {
-		// First input sticks. A retype after backspace issues a second event at
-		// the same position; it must NOT form a phantom bigram.
+	it('preserves targetBigrams through finalize for drill summaries', () => {
+		// Targets are recorded on the summary for cross-session analysis,
+		// even though the runner itself no longer does anything with them.
 		const runner = new SessionRunner({
 			type: 'bigram-drill',
 			text: 'ab',
 			targetBigrams: ['ab']
 		});
 		runner.recordEvent(stroke(0, 'a', 'a', 0));
-		runner.recordEvent(stroke(1, 'b', 'x', 100)); // wrong first input — one occurrence
-		runner.recordEvent(stroke(1, 'b', 'b', 200)); // retype; same position, no new pair
-		// Single occurrence total — with correct=false (first-input wrong).
+		runner.recordEvent(stroke(1, 'b', 'b', 100));
 		const r = runner.finalize(1000);
 		expect(r.bigramsTargeted).toEqual(['ab']);
-	});
-
-	it('tracks graduated targets and fires onBigramGraduated once per bigram', () => {
-		// Feed 15 clean 'ab' occurrences at 200ms transitions; with phase
-		// target 200ms the graduation check should flip after the 15th.
-		const onGraduated = vi.fn();
-		const runner = new SessionRunner({
-			type: 'bigram-drill',
-			text: 'ab'.repeat(20),
-			targetBigrams: ['ab'],
-			graduationTargetMs: phaseTargetMsFromWPM(60), // 200ms
-			onBigramGraduated: onGraduated
-		});
-
-		for (let i = 0; i < 15; i++) {
-			const pos = i * 2;
-			runner.recordEvent(stroke(pos, 'a', 'a', pos * 200));
-			runner.recordEvent(stroke(pos + 1, 'b', 'b', pos * 200 + 200));
-		}
-
-		expect(runner.graduatedTargets).toEqual(['ab']);
-		expect(onGraduated).toHaveBeenCalledTimes(1);
-		expect(onGraduated).toHaveBeenCalledWith('ab');
-
-		// Further occurrences must NOT re-fire the callback.
-		const pos = 30;
-		runner.recordEvent(stroke(pos, 'a', 'a', pos * 200));
-		runner.recordEvent(stroke(pos + 1, 'b', 'b', pos * 200 + 200));
-		expect(onGraduated).toHaveBeenCalledTimes(1);
-	});
-
-	it('shouldEnd returns "all-graduated" once every target has graduated', () => {
-		// Single-target drill — once 'ab' graduates, no other targets remain.
-		const runner = new SessionRunner({
-			type: 'bigram-drill',
-			text: 'ab'.repeat(30), // generous enough to avoid hitting `complete` first
-			targetBigrams: ['ab'],
-			graduationTargetMs: phaseTargetMsFromWPM(60)
-		});
-		for (let i = 0; i < 15; i++) {
-			const pos = i * 2;
-			runner.recordEvent(stroke(pos, 'a', 'a', pos * 200));
-			runner.recordEvent(stroke(pos + 1, 'b', 'b', pos * 200 + 200));
-		}
-		expect(runner.shouldEnd()).toBe('all-graduated');
-	});
-
-	it('skips graduation tracking when graduationTargetMs is undefined', () => {
-		// Diagnostic-style: we still record events and care about bigram
-		// counts, but don't run the graduation check per-occurrence.
-		const onGraduated = vi.fn();
-		const runner = new SessionRunner({
-			type: 'diagnostic',
-			text: 'ab'.repeat(20),
-			targetBigrams: ['ab'], // present but no graduationTargetMs
-			onBigramGraduated: onGraduated
-		});
-		for (let i = 0; i < 20; i++) {
-			const pos = i * 2;
-			runner.recordEvent(stroke(pos, 'a', 'a', pos * 200));
-			runner.recordEvent(stroke(pos + 1, 'b', 'b', pos * 200 + 200));
-		}
-		expect(onGraduated).not.toHaveBeenCalled();
-		expect(runner.graduatedTargets).toEqual([]);
 	});
 
 	it('finalize produces a summary with the accumulated events', () => {

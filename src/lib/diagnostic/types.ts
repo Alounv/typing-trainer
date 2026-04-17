@@ -1,11 +1,4 @@
-import type { KeystrokeEvent } from '../typing/types';
 import type { BigramAggregate } from '../bigram/types';
-
-/** Full keystroke log; persisted so threshold tuning can replay past diagnostics. */
-export interface DiagnosticRawData {
-	sessionId: string;
-	events: KeystrokeEvent[];
-}
 
 /** Structured output of a diagnostic session. */
 export interface DiagnosticReport {

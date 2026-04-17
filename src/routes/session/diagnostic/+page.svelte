@@ -1,12 +1,16 @@
 <script lang="ts">
 	/**
-	 * Diagnostic session route. Generates a ~500–800 keystroke passage biased
-	 * toward the top-50 corpus bigrams. Raw events persisted for threshold replay.
+	 * Diagnostic session route. Generates a passage biased toward the top-50
+	 * corpus bigrams, then (on finish) builds a `DiagnosticReport` from the
+	 * in-memory events + aggregates and attaches it to the persisted summary.
+	 * No raw events are kept — priority targets travel with the summary.
 	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
 	import { loadBuiltinCorpus, isBuiltinCorpusId } from '$lib/corpus/registry';
 	import { sampleDiagnosticPassage } from '$lib/diagnostic/sampler';
+	import { generateDiagnosticReport } from '$lib/diagnostic/engine';
+	import type { FrequencyTable } from '$lib/corpus/types';
 	import { getProfile } from '$lib/storage/service';
 	import { DEFAULT_DIAGNOSTIC_WORD_BUDGET } from '$lib/models';
 
@@ -21,7 +25,7 @@
 
 	type LoadState =
 		| { status: 'loading' }
-		| { status: 'ready'; text: string }
+		| { status: 'ready'; text: string; corpusBigramFrequencies: FrequencyTable }
 		| { status: 'error'; message: string };
 
 	let state = $state<LoadState>({ status: 'loading' });
@@ -42,7 +46,11 @@
 			const passage = sampleDiagnosticPassage(corpus, {
 				targetChars: wordBudget * CHARS_PER_WORD
 			});
-			state = { status: 'ready', text: passage.text };
+			state = {
+				status: 'ready',
+				text: passage.text,
+				corpusBigramFrequencies: corpus.bigramFrequencies
+			};
 		} catch (err) {
 			state = {
 				status: 'error',
@@ -57,11 +65,19 @@
 {:else if state.status === 'error'}
 	<p class="mx-auto max-w-3xl text-error" role="alert">{state.message}</p>
 {:else}
+	{@const corpusBigramFrequencies = state.corpusBigramFrequencies}
 	<SessionShell
 		type="diagnostic"
 		text={state.text}
 		title="Diagnostic"
 		lede="Type the passage below. Errors are recorded but not blocked — just keep going."
-		persistRawEvents
+		buildDiagnosticReport={(summary, events) =>
+			generateDiagnosticReport({
+				sessionId: summary.id,
+				timestamp: summary.timestamp,
+				events,
+				aggregates: summary.bigramAggregates,
+				corpusBigramFrequencies
+			})}
 	/>
 {/if}

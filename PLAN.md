@@ -379,7 +379,7 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
   - Language / corpus selection
   - Threshold configuration (for advanced users)
   - Per-session word budget preferences (drill / real-text / diagnostic)
-- [x] **6.5.2** Settings should be saved without button 
+- [x] **6.5.2** Settings should be saved without button
 
 ---
 
