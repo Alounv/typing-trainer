@@ -45,8 +45,7 @@ function report(priorityBigrams: string[]): DiagnosticReport {
 		counts: { healthy: 0, fluency: 0, hasty: 0, acquisition: 0 },
 		topBottlenecks: { fluency: [], hasty: [], acquisition: [] },
 		priorityTargets: priorityBigrams.map(priorityTarget),
-		corpusFit: { coverageRatio: 1, undertrained: [] },
-		aggregates: []
+		corpusFit: { coverageRatio: 1, undertrained: [] }
 	};
 }
 
@@ -157,24 +156,6 @@ describe('planDailySessions — default daily structure', () => {
 });
 
 describe('planDailySessions — session config shape', () => {
-	it('drill session enables the pacer', () => {
-		const plan = planDailySessions({
-			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report(['th'])
-		});
-		const drill = plan.find((p) => p.config.type === 'bigram-drill');
-		expect(drill?.config.pacerEnabled).toBe(true);
-	});
-
-	it('real-text session enables the pacer', () => {
-		const plan = planDailySessions({
-			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report(['th'])
-		});
-		const rt = plan.find((p) => p.config.type === 'real-text');
-		expect(rt?.config.pacerEnabled).toBe(true);
-	});
-
 	it('diagnostic session has no targeted bigrams', () => {
 		const plan = planDailySessions({ recentSessions: [] });
 		expect(plan[0].config.bigramsTargeted).toBeUndefined();

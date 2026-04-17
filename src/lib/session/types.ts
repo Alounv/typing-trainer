@@ -27,9 +27,8 @@ export interface SessionConfig {
 	/**
 	 * Total words the runner targets. Small on purpose — a drill/real-text mini-session
 	 * is ≤1 min at 60 WPM, so abandoning loses at most a minute and every completion
-	 * is a checkpoint. May end earlier on graduation.
+	 * is a checkpoint.
 	 */
 	wordBudget: number;
 	bigramsTargeted?: string[];
-	pacerEnabled?: boolean;
 }

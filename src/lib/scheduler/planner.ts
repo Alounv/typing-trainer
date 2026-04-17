@@ -151,8 +151,7 @@ function drillPlan(targets: string[], wordBudget: number): PlannedSession {
 	const config: SessionConfig = {
 		type: 'bigram-drill',
 		wordBudget,
-		bigramsTargeted: targets,
-		pacerEnabled: true
+		bigramsTargeted: targets
 	};
 	return {
 		config,
@@ -188,8 +187,7 @@ export function sliceCompletedFromPlan(
 function realtextPlan(wordBudget: number, hint?: 'no-targets-left'): PlannedSession {
 	const config: SessionConfig = {
 		type: 'real-text',
-		wordBudget,
-		pacerEnabled: true
+		wordBudget
 	};
 	return {
 		config,

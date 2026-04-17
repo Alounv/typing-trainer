@@ -199,7 +199,7 @@ describe('generateDiagnosticReport', () => {
 		expect(r.corpusFit.undertrained).toEqual(['high', 'med', 'low']);
 	});
 
-	it('passes through sessionId, timestamp, and aggregates snapshot', () => {
+	it('passes through sessionId and timestamp', () => {
 		const aggregates = [agg({ bigram: 'xy', classification: 'hasty', errorRate: 0.5 })];
 		const r = generateDiagnosticReport({
 			sessionId: 'session-xyz',
@@ -209,8 +209,5 @@ describe('generateDiagnosticReport', () => {
 		});
 		expect(r.sessionId).toBe('session-xyz');
 		expect(r.timestamp).toBe(12345);
-		// Snapshot — caller shouldn't be able to mutate internal state.
-		expect(r.aggregates).toEqual(aggregates);
-		expect(r.aggregates).not.toBe(aggregates);
 	});
 });

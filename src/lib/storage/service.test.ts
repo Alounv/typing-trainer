@@ -108,8 +108,7 @@ describe('storage service — round-trip', () => {
 			counts: { healthy: 1, fluency: 0, hasty: 0, acquisition: 0 },
 			topBottlenecks: { fluency: [], hasty: [], acquisition: [] },
 			priorityTargets: [{ bigram: 'th', score: 1.2, meanTime: 180, errorRate: 0.05 }],
-			corpusFit: { coverageRatio: 0.8, undertrained: [] },
-			aggregates: [makeAggregate()]
+			corpusFit: { coverageRatio: 0.8, undertrained: [] }
 		};
 		await saveSession(makeSession({ id: 'diag-1', type: 'diagnostic', diagnosticReport: report }));
 

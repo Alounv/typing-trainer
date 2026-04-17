@@ -58,8 +58,7 @@ export function generateDiagnosticReport(input: DiagnosticReportInput): Diagnost
 		counts,
 		topBottlenecks,
 		priorityTargets,
-		corpusFit,
-		aggregates: [...input.aggregates]
+		corpusFit
 	};
 }
 

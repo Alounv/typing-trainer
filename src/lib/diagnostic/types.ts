@@ -1,5 +1,3 @@
-import type { BigramAggregate } from '../bigram/types';
-
 /** Structured output of a diagnostic session. */
 export interface DiagnosticReport {
 	sessionId: string;
@@ -26,7 +24,6 @@ export interface DiagnosticReport {
 		coverageRatio: number;
 		undertrained: string[];
 	};
-	aggregates: BigramAggregate[];
 }
 
 /** One entry in the diagnostic priority list. */
