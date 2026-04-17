@@ -45,10 +45,7 @@ export interface SelectionOptions {
  * Throws on empty corpus — a silent empty-string return would mask a
  * real configuration bug.
  */
-export function selectRealTextSentence(
-	corpus: CorpusData,
-	options: SelectionOptions = {}
-): string {
+export function selectRealTextSentence(corpus: CorpusData, options: SelectionOptions = {}): string {
 	const words = Object.keys(corpus.wordFrequencies);
 	if (words.length === 0) throw new Error('selectRealTextSentence: corpus has no words');
 

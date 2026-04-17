@@ -56,14 +56,8 @@ describe('buildSessionSummary', () => {
 	it('errorRate counts first-input wrongs only; retypes do not rescue', () => {
 		// Position 0: wrong first input, then retyped correctly.
 		// Position 1: correct first input.
-		const events = [
-			stroke(0, 'a', 'b', 0),
-			stroke(0, 'a', 'a', 100),
-			stroke(1, 'b', 'b', 200)
-		];
-		const summary = buildSessionSummary(
-			makeInput({ events, textLength: 2, durationMs: 1_000 })
-		);
+		const events = [stroke(0, 'a', 'b', 0), stroke(0, 'a', 'a', 100), stroke(1, 'b', 'b', 200)];
+		const summary = buildSessionSummary(makeInput({ events, textLength: 2, durationMs: 1_000 }));
 		// 1 wrong out of 2 positions — spec §2.2 first-input-sticks.
 		expect(summary.errorRate).toBe(0.5);
 	});
@@ -76,9 +70,7 @@ describe('buildSessionSummary', () => {
 			stroke(2, 'a', 'a', 200),
 			stroke(3, 'b', 'b', 300)
 		];
-		const summary = buildSessionSummary(
-			makeInput({ events, textLength: 4, durationMs: 1_000 })
-		);
+		const summary = buildSessionSummary(makeInput({ events, textLength: 4, durationMs: 1_000 }));
 		const ab = summary.bigramAggregates.find((b) => b.bigram === 'ab');
 		expect(ab).toBeDefined();
 		expect(ab!.sessionId).toBe(FIXED_ID);

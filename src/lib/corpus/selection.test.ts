@@ -44,10 +44,7 @@ describe('selectRealTextSentence', () => {
 	it('boosts target-bigram-containing words in sampling', () => {
 		// Corpus has 10 words, one of which ("the") contains target bigram "th".
 		// Over many samples, "the" should appear much more than 1/10 of the time.
-		const c = loadCorpus(
-			CONFIG,
-			'alpha beta gamma delta epsilon zeta eta theta iota the'
-		);
+		const c = loadCorpus(CONFIG, 'alpha beta gamma delta epsilon zeta eta theta iota the');
 		let thCount = 0;
 		const N = 200;
 		// Deterministic-ish: use a sequence of fractional picks.

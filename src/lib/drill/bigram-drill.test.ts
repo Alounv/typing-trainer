@@ -70,13 +70,11 @@ describe('generateBigramDrillSequence', () => {
 		// With wordCount large enough, target/filler should sit near the 70/30 split.
 		const seq = generateBigramDrillSequence({
 			targetBigrams: ['th'],
-			corpus: corpus(
-				'the of to and a in is it you that he was for on are with as his they be'
-			),
+			corpus: corpus('the of to and a in is it you that he was for on are with as his they be'),
 			options: {
 				wordCount: 100,
 				// Deterministic uniform over [0, 1): i / 100 covers the range.
-				// eslint-disable-next-line no-plusplus
+
 				rng: (() => {
 					let i = 0;
 					return () => (i++ % 100) / 100;

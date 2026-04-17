@@ -72,11 +72,9 @@
 			stable (matters when these update from re-renders or retakes).
 		-->
 		<section class="space-y-3">
-			<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
-				Raw WPM
-			</p>
+			<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">Raw WPM</p>
 			<p
-				class="font-mono text-7xl font-medium leading-none tabular-nums text-base-content"
+				class="font-mono text-7xl leading-none font-medium text-base-content tabular-nums"
 				data-testid="wpm-value"
 			>
 				{s.wpm.toFixed(1)}
@@ -86,13 +84,13 @@
 			<dl class="flex flex-wrap gap-x-6 gap-y-2 pt-3 text-sm">
 				<div class="flex items-baseline gap-2">
 					<dt class="text-base-content/55">Errors</dt>
-					<dd class="font-mono font-medium tabular-nums text-base-content/90">
+					<dd class="font-mono font-medium text-base-content/90 tabular-nums">
 						{(s.errorRate * 100).toFixed(1)}%
 					</dd>
 				</div>
 				<div class="flex items-baseline gap-2">
 					<dt class="text-base-content/55">Duration</dt>
-					<dd class="font-mono font-medium tabular-nums text-base-content/90">
+					<dd class="font-mono font-medium text-base-content/90 tabular-nums">
 						{(s.durationMs / 1000).toFixed(1)}s
 					</dd>
 				</div>
@@ -109,9 +107,7 @@
 		<section class="space-y-4">
 			<div class="flex items-baseline justify-between">
 				<h2 class="text-xl font-semibold tracking-tight">Slowest transitions</h2>
-				<p class="text-xs tracking-wide text-base-content/50 uppercase">
-					Top 5 by mean time
-				</p>
+				<p class="text-xs tracking-wide text-base-content/50 uppercase">Top 5 by mean time</p>
 			</div>
 			{#if slowest.length === 0}
 				<p class="text-base-content/70">
@@ -134,11 +130,11 @@
 								{b.bigram === ' ' ? '␣' : b.bigram.replace(/ /g, '␣')}
 							</span>
 							<div class="flex items-baseline justify-between text-xs">
-								<span class="font-mono tabular-nums text-base-content/80">
+								<span class="font-mono text-base-content/80 tabular-nums">
 									{b.meanTime.toFixed(0)}<span class="text-base-content/40"> ms</span>
 								</span>
 								{#if b.errorRate > 0}
-									<span class="font-mono tabular-nums text-error">
+									<span class="font-mono text-error tabular-nums">
 										{(b.errorRate * 100).toFixed(0)}%
 									</span>
 								{:else}
@@ -157,7 +153,7 @@
 			which is the correct thing to do after reviewing a session.
 		-->
 		<div class="flex flex-wrap items-center gap-6 pt-2">
-			<a href="/session/diagnostic" class="btn btn-primary btn-lg">Run another session</a>
+			<a href="/session/diagnostic" class="btn btn-lg btn-primary">Run another session</a>
 			<a
 				href="/"
 				class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"

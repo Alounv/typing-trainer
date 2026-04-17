@@ -34,7 +34,10 @@ export interface MergeOptions {
  * (re-wrapped with the merged id), useful when the caller doesn't know
  * in advance whether the user picked one language or many.
  */
-export function mergeCorpora(corpora: readonly CorpusData[], options: MergeOptions = {}): CorpusData {
+export function mergeCorpora(
+	corpora: readonly CorpusData[],
+	options: MergeOptions = {}
+): CorpusData {
 	if (corpora.length === 0) throw new Error('mergeCorpora: no corpora provided');
 
 	const weights = normalizeWeights(corpora.length, options.weights);

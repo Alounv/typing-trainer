@@ -31,16 +31,15 @@
 			Practice the pairs that slow you down.
 		</h1>
 		<p class="max-w-xl text-base text-base-content/70">
-			A diagnostic records every keystroke, classifies each character pair
-			by speed and error rate, then prescribes drills for the pairs that
-			actually hold your typing back.
+			A diagnostic records every keystroke, classifies each character pair by speed and error rate,
+			then prescribes drills for the pairs that actually hold your typing back.
 		</p>
 	</header>
 
 	<section class="space-y-4">
 		<a
 			href="/session/diagnostic"
-			class="btn btn-primary btn-lg tracking-wide"
+			class="btn tracking-wide btn-lg btn-primary"
 			data-testid="start-diagnostic"
 		>
 			Start diagnostic
@@ -60,10 +59,10 @@
 			class="flex flex-wrap items-baseline gap-x-6 gap-y-2 border-t border-base-300 pt-6 text-sm"
 		>
 			<p class="text-base-content/55">Last session</p>
-			<p class="font-mono tabular-nums text-base-content/90">
+			<p class="font-mono text-base-content/90 tabular-nums">
 				{lastSession.wpm.toFixed(1)}<span class="text-base-content/40"> WPM</span>
 			</p>
-			<p class="font-mono tabular-nums text-base-content/90">
+			<p class="font-mono text-base-content/90 tabular-nums">
 				{(lastSession.errorRate * 100).toFixed(1)}<span class="text-base-content/40"> % err</span>
 			</p>
 			<a

@@ -41,7 +41,7 @@
 		selected but a click does nothing.
 	-->
 	<select
-		class="select select-sm select-ghost w-auto font-sans"
+		class="select w-auto select-ghost select-sm font-sans"
 		aria-label="Choose theme"
 		value={themeStore.choice}
 		onchange={onChange}

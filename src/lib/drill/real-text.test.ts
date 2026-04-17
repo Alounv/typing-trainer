@@ -31,11 +31,7 @@ describe('generateRealTextSequence', () => {
 	});
 
 	it('uses the quote bank when available', () => {
-		const qb = bank([
-			quote(1, 'first quote'),
-			quote(2, 'second quote'),
-			quote(3, 'third quote')
-		]);
+		const qb = bank([quote(1, 'first quote'), quote(2, 'second quote'), quote(3, 'third quote')]);
 		const out = generateRealTextSequence({
 			quoteBank: qb,
 			options: { targetLengthChars: 20, rng: () => 0 }

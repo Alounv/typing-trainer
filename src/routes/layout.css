@@ -17,8 +17,7 @@
 @theme {
 	--font-sans:
 		'Spline Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-	--font-mono:
-		'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
+	--font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
 	--font-display: 'Spline Sans', ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -36,5 +35,7 @@ html {
    via Tailwind's `tabular-nums` utility on metric nodes. Defined here
    as a reusable alias so mono numerics in prose can opt in too. */
 .num-tabular {
-	font-feature-settings: 'tnum' 1, 'lnum' 1;
+	font-feature-settings:
+		'tnum' 1,
+		'lnum' 1;
 }

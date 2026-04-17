@@ -68,10 +68,7 @@ export function selectQuote(bank: QuoteBank, options: SelectQuoteOptions = {}): 
  * `[min, max]` inclusive length filter. Matches the bank's own `groups`
  * convention.
  */
-function filterByLength(
-	quotes: readonly Quote[],
-	group?: QuoteLengthGroup
-): Quote[] {
+function filterByLength(quotes: readonly Quote[], group?: QuoteLengthGroup): Quote[] {
 	if (!group) return [...quotes];
 	const [min, max] = group;
 	return quotes.filter((q) => q.length >= min && q.length <= max);

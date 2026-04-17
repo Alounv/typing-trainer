@@ -91,8 +91,7 @@ export function generateBigramDrillSequence(input: BigramDrillInput): BigramDril
 	const distinctTargets = new Set<string>();
 
 	for (let i = 0; i < wordCount; i++) {
-		const useTarget =
-			(targets.length > 0 && rng() < ratio) || fillers.length === 0;
+		const useTarget = (targets.length > 0 && rng() < ratio) || fillers.length === 0;
 		const pool = useTarget ? targets : fillers;
 		const picked = pickWeighted(pool, rng);
 		words.push(picked);

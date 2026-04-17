@@ -61,10 +61,7 @@ export interface ImportOptions {
  * merges are scalar-scaled so mixing raw counts with Zipf-approximated
  * built-ins is fine.
  */
-export function importCustomText(
-	text: string,
-	options: ImportOptions = {}
-): CustomCorpusImport {
+export function importCustomText(text: string, options: ImportOptions = {}): CustomCorpusImport {
 	const tokens = tokenize(text);
 	const wordFrequencies = countWords(tokens);
 	const bigramFrequencies = deriveBigramFrequencies(wordFrequencies);

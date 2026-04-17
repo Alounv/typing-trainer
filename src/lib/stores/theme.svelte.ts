@@ -125,8 +125,7 @@ export function setTheme(choice: ThemeChoice): void {
  * inline FOUC script (in app.html) and this module agree on semantics.
  */
 function applyResolvedTheme(): void {
-	const resolved =
-		themeStore.choice === 'system' ? resolveSystemTheme() : themeStore.choice;
+	const resolved = themeStore.choice === 'system' ? resolveSystemTheme() : themeStore.choice;
 	themeStore.resolved = resolved;
 	if (typeof document !== 'undefined') {
 		document.documentElement.dataset.theme = resolved;
