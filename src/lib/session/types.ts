@@ -2,10 +2,7 @@ import type { BigramAggregate } from '../bigram/types';
 
 export type SessionType = 'diagnostic' | 'bigram-drill' | 'real-text';
 
-/**
- * Per-session metadata + aggregates (spec §2.7). Raw keystroke events live
- * in `diagnosticRawData` and only for diagnostic sessions.
- */
+/** Per-session metadata + aggregates. Raw events live in `diagnosticRawData` (diagnostics only). */
 export interface SessionSummary {
 	id: string;
 	timestamp: number;
@@ -22,11 +19,9 @@ export interface SessionSummary {
 export interface SessionConfig {
 	type: SessionType;
 	/**
-	 * Total words the runner targets. The generator pre-sizes text to
-	 * roughly this many words; the runner may end earlier on graduation
-	 * (spec §4.1). Kept intentionally small for drill/real-text — a
-	 * session is a mini-workout (≤1 min at 60 WPM) so abandoning loses
-	 * at most a minute of data and every completion is a checkpoint.
+	 * Total words the runner targets. Small on purpose — a drill/real-text mini-session
+	 * is ≤1 min at 60 WPM, so abandoning loses at most a minute and every completion
+	 * is a checkpoint. May end earlier on graduation.
 	 */
 	wordBudget: number;
 	bigramsTargeted?: string[];

@@ -1,7 +1,6 @@
 /**
- * Atomic unit captured during any session. Persisted only for diagnostics
- * (so thresholds can be replayed later — spec §2.1). `corrected` and
- * `correctionDelay` are derived in post-processing, not stored here.
+ * Atomic keystroke unit. Persisted only for diagnostics (so thresholds can be
+ * replayed). `corrected`/`correctionDelay` are derived in post-processing.
  */
 export interface KeystrokeEvent {
 	/** Ms since session start, via `performance.now()`. */

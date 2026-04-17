@@ -1,9 +1,8 @@
 import type { KeystrokeEvent } from './types';
 
 /**
- * Keystroke event after correction lookahead. Only the first input at each
- * position appears here — subsequent retypes collapse into the annotations
- * on that first-input event (spec §2.2).
+ * Keystroke event after correction lookahead. One per position (the first input);
+ * retypes collapse into the annotations on that event.
  */
 export interface AnnotatedKeystrokeEvent extends KeystrokeEvent {
 	/** True if the user retyped a correct character at this position later. */
@@ -13,22 +12,11 @@ export interface AnnotatedKeystrokeEvent extends KeystrokeEvent {
 }
 
 /**
- * Collapse raw capture events into first-input-per-position annotated events.
- *
- * - Groups events by `position`, keeps only the earliest per group (the "first
- *   input" that counts for error rate and bigram timing).
- * - If any later event at the same position matches `expected`, marks the
- *   first input as `corrected` and records `correctionDelay` relative to the
- *   earliest correcting retype.
- * - The original raw log is untouched — this is a pure transform.
- *
- * Note: we don't use the 500ms correction window here. It's reserved for the
- * UI-level "treat this backspace as a live correction" cue; for offline
- * analytics we want to credit corrections regardless of how long they took.
+ * Collapse raw events into first-input-per-position annotations. Pure.
+ * The 500ms correction window is UI-only; offline analytics credit any
+ * correction regardless of delay.
  */
 export function annotateFirstInputs(events: readonly KeystrokeEvent[]): AnnotatedKeystrokeEvent[] {
-	// Bucket by position. Using an array keyed by position (cheap for the
-	// expected range — positions are small ints) beats a Map here.
 	const buckets = new Map<number, KeystrokeEvent[]>();
 	for (const e of events) {
 		let bucket = buckets.get(e.position);
@@ -41,8 +29,7 @@ export function annotateFirstInputs(events: readonly KeystrokeEvent[]): Annotate
 
 	const annotated: AnnotatedKeystrokeEvent[] = [];
 	for (const [, bucket] of buckets) {
-		// Ensure chronological order — capture already emits in order, but
-		// explicit sort is cheap insurance against future callers.
+		// Defensive sort — capture emits in order, but callers may not.
 		bucket.sort((a, b) => a.timestamp - b.timestamp);
 		const first = bucket[0];
 

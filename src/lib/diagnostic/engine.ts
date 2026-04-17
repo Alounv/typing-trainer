@@ -26,26 +26,15 @@ export interface DiagnosticReportInput {
 	thresholds?: ClassificationThresholds;
 }
 
-/** Top-N size for the per-class "bottlenecks" list in the report (spec §7.3). */
+/** Top-N per-class "bottlenecks" shown in the report. */
 const BOTTLENECKS_TOP_N = 5;
-/** How many priority targets we surface, total (spec §7.3). */
+/** Total priority targets surfaced in the report. */
 const PRIORITY_TARGETS_TOP_N = 10;
 
-/**
- * How much weight an error contributes to badness scoring relative to
- * slowness. Empirically: a 10% error rate should feel roughly equivalent
- * to a 100% over-threshold slowdown. That ratio is what lets slow-and-
- * clean vs. fast-and-wrong compete meaningfully in the priority list.
- * Kept as a constant so tuning is visible and testable.
- */
+/** Error weight vs. slowness in badness scoring: 10% errors ≈ 100% over-threshold slowdown. */
 const ERROR_PENALTY = 10;
 
-/**
- * Generate a structured diagnostic report (spec §7.3).
- *
- * Pure: no IO, no Date.now() calls — `timestamp` is passed in so the
- * caller controls when "now" is and test fixtures stay reproducible.
- */
+/** Generate a structured diagnostic report. Pure: timestamp injected by caller. */
 export function generateDiagnosticReport(input: DiagnosticReportInput): DiagnosticReport {
 	const thresholds = input.thresholds ?? DEFAULT_THRESHOLDS;
 
@@ -74,11 +63,8 @@ export function generateDiagnosticReport(input: DiagnosticReportInput): Diagnost
 	};
 }
 
-/**
- * Bucket aggregates by classification. `unclassified` is dropped — the
- * report only surfaces the four-way set the spec talks about. The
- * undertrained story is handled separately via corpus coverage.
- */
+// `unclassified` is dropped — the report surfaces only the four-way set;
+// undertrained coverage is reported separately via corpus fit.
 function countByClassification(aggregates: readonly BigramAggregate[]): DiagnosticReport['counts'] {
 	const counts = { healthy: 0, fluency: 0, hasty: 0, acquisition: 0 };
 	for (const a of aggregates) {
@@ -88,12 +74,8 @@ function countByClassification(aggregates: readonly BigramAggregate[]): Diagnost
 	return counts;
 }
 
-/**
- * Top-5 per non-healthy class, ranked by class-specific badness:
- * - fluency → slowest by meanTime (errors are low by definition, timing is the story)
- * - hasty → most error-prone (speed is fine, errors are the story)
- * - acquisition → combined: slow AND error-prone, ranked by a unified badness
- */
+// Top-N per non-healthy class, ranked by class-specific badness: fluency→meanTime,
+// hasty→errors, acquisition→combined (the signal that matters for each class).
 function buildBottlenecks(
 	aggregates: readonly BigramAggregate[]
 ): DiagnosticReport['topBottlenecks'] {

@@ -97,7 +97,7 @@ describe('generateDiagnosticReport', () => {
 		expect(r.topBottlenecks.hasty).toEqual(['bb', 'cc', 'aa']);
 	});
 
-	it('topBottlenecks cap each class at 5 entries (spec §7.3)', () => {
+	it('topBottlenecks cap each class at 5 entries', () => {
 		const aggregates = Array.from({ length: 8 }, (_, i) =>
 			agg({ bigram: `f${i}`, classification: 'fluency', meanTime: 300 + i })
 		);
@@ -128,7 +128,7 @@ describe('generateDiagnosticReport', () => {
 		expect(r.priorityTargets[0].score).toBeGreaterThan(r.priorityTargets[1].score);
 	});
 
-	it('priorityTargets cap at 10 (spec §7.3)', () => {
+	it('priorityTargets cap at 10', () => {
 		const aggregates = Array.from({ length: 15 }, (_, i) =>
 			agg({ bigram: `b${i}`, classification: 'fluency', meanTime: 500 + i })
 		);
@@ -168,7 +168,7 @@ describe('generateDiagnosticReport', () => {
 		expect(r.corpusFit).toEqual({ coverageRatio: 0, undertrained: [] });
 	});
 
-	it('corpusFit coverageRatio reflects the MIN_OCCURRENCES floor (10, spec §3.1)', () => {
+	it('corpusFit coverageRatio reflects the MIN_OCCURRENCES floor (10)', () => {
 		// Corpus has 4 bigrams. We've observed 'aa' 10×, 'bb' 100×, 'cc' 5× (under),
 		// 'dd' 0× (unobserved). Coverage = 2/4 = 0.5.
 		const aggregates = [

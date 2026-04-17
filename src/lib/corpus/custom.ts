@@ -1,38 +1,23 @@
 import type { CorpusConfig, CorpusData, FrequencyTable } from './types';
 import { deriveBigramFrequencies } from './loader';
 
-/**
- * Minimum unique bigrams below which a custom corpus is flagged as
- * "too small for reliable diagnostics" (spec §6.3). 500 is the spec's
- * number; the threshold is the warn-boundary, not a hard reject —
- * callers decide whether to block or just surface a warning.
- */
+/** Warn boundary for "too small for reliable diagnostics" — not a hard reject. */
 export const MIN_CUSTOM_BIGRAMS = 500;
 
 /** Result of importing a block of user text. */
 export interface CustomCorpusImport {
 	data: CorpusData;
 	stats: {
-		/** Count of tokens *after* tokenization (may be less than whitespace-split
-		 * count if punctuation was stripped). */
+		/** Tokens after tokenization; may differ from whitespace-split if punctuation was stripped. */
 		tokenCount: number;
-		/** Unique words in the imported text. */
 		uniqueWordCount: number;
-		/** Unique bigrams — the metric that gates "too small" per spec §6.3. */
+		/** Unique bigrams — gates the "too small" warning. */
 		uniqueBigramCount: number;
-		/**
-		 * True when `uniqueBigramCount < MIN_CUSTOM_BIGRAMS`. UI should show
-		 * a warning rather than reject — some users deliberately drill
-		 * narrow domains.
-		 */
+		/** UI should warn (not reject) — users may deliberately drill narrow domains. */
 		tooSmall: boolean;
 	};
 	/**
-	 * Bigrams the custom corpus *does not* contain that the caller-supplied
-	 * base corpus *does*. Useful for overlap analysis (spec §6.3) — a
-	 * custom corpus that misses many common bigrams is one to merge with
-	 * base, not replace.
-	 *
+	 * Bigrams in base but not custom. Informs merge-vs-replace decisions.
 	 * `undefined` when no base corpus was passed.
 	 */
 	missingFromBase?: string[];
@@ -43,23 +28,14 @@ export interface ImportOptions {
 	id?: string;
 	/** Language label; `'custom'` when unknown. */
 	language?: string;
-	/** Optional base corpus used to compute missing-bigram overlap (spec §6.3). */
+	/** Optional base corpus for missing-bigram overlap analysis. */
 	baseForOverlap?: CorpusData;
 }
 
 /**
- * Build a `CorpusData` from user-supplied free text (spec §6.3).
- *
- * Tokenization picks "letters + internal apostrophes", lowercased. That's
- * deliberately narrow — we're deriving typing-practice frequencies, not
- * doing NLP. Numbers, punctuation, URLs, and code tokens are dropped;
- * counting them would skew the bigram table with symbols the user
- * probably doesn't want to drill by default.
- *
- * Word frequencies come out as raw counts (not Zipf-approximated) —
- * with actual text we have real counts, so we use them. Downstream
- * merges are scalar-scaled so mixing raw counts with Zipf-approximated
- * built-ins is fine.
+ * Build `CorpusData` from user text. Tokenizes letter-sequences + internal
+ * apostrophes, lowercased (numbers/punctuation/URLs dropped — typing practice,
+ * not NLP). Word frequencies are raw counts, not Zipf-approximated.
  */
 export function importCustomText(text: string, options: ImportOptions = {}): CustomCorpusImport {
 	const tokens = tokenize(text);
@@ -92,14 +68,8 @@ export function importCustomText(text: string, options: ImportOptions = {}): Cus
 	};
 }
 
-/**
- * Extract letter-sequence tokens: Unicode letters plus in-word
- * apostrophes (so "d'abord" survives as one token, but "hello!" → "hello").
- * Lowercased for case-insensitive aggregation.
- *
- * `\p{L}` covers the full Unicode letter category — important for French
- * accented characters and any future language addition.
- */
+// Letter-sequence tokens + in-word apostrophes ("d'abord" stays one token, "hello!" → "hello").
+// `\p{L}` covers the full Unicode letter category for accented and non-Latin scripts.
 function tokenize(text: string): string[] {
 	const out: string[] = [];
 	// Match letter sequences that may contain one-or-more internal apostrophes.
@@ -117,10 +87,7 @@ function countWords(tokens: readonly string[]): FrequencyTable {
 	return out;
 }
 
-/**
- * Keys of `base` that don't appear in `compare`. Ordered by `base` frequency
- * descending so the first entries are the most-common-you're-missing.
- */
+// Keys of `base` not in `compare`, ordered by `base` frequency desc.
 function diffBigrams(base: FrequencyTable, compare: FrequencyTable): string[] {
 	const missing: { bigram: string; freq: number }[] = [];
 	for (const bigram in base) {

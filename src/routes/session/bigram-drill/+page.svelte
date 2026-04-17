@@ -1,10 +1,8 @@
 <script lang="ts">
-	/**
-	 * Bigram drill route. Receives its target bigrams from the dashboard
-	 * via the hand-off stash (spec §5). Falls back to a small stub set
-	 * when invoked directly (URL paste, dev nav) so the route always
-	 * has *something* to drill.
-	 */
+/**
+ * Bigram drill route. Targets come from the dashboard hand-off stash.
+ * Direct nav (URL paste, dev) falls back to a small stub set.
+ */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
 	import { loadBuiltinCorpus, isBuiltinCorpusId } from '$lib/corpus/registry';
@@ -24,11 +22,7 @@
 	 */
 	const FALLBACK_TARGETS = ['th', 'he', 'in', 'er', 'an'] as const;
 
-	/**
-	 * Assumed baseline when no diagnostic has ever run. Graduation uses
-	 * 60% of this for acquisition/hasty-style pacing (spec §4.1); real
-	 * drills will read baseline from the progress store.
-	 */
+	/** Assumed baseline when no diagnostic has run. Graduation uses 60% for acquisition/hasty pacing. */
 	const DEFAULT_BASELINE_WPM = 60;
 	const PHASE_WPM = DEFAULT_BASELINE_WPM * 0.6;
 

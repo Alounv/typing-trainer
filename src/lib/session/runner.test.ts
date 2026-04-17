@@ -59,7 +59,7 @@ describe('buildSessionSummary', () => {
 		// Position 1: correct first input.
 		const events = [stroke(0, 'a', 'b', 0), stroke(0, 'a', 'a', 100), stroke(1, 'b', 'b', 200)];
 		const summary = buildSessionSummary(makeInput({ events, textLength: 2, durationMs: 1_000 }));
-		// 1 wrong out of 2 positions — spec §2.2 first-input-sticks.
+		// 1 wrong out of 2 positions — first-input sticks.
 		expect(summary.errorRate).toBe(0.5);
 	});
 
@@ -105,9 +105,8 @@ describe('SessionRunner', () => {
 	});
 
 	it('retype at the same position does not form a new bigram occurrence', () => {
-		// Spec §2.2: first input sticks. A retype after backspace issues a
-		// second event at the same position; it must NOT form a phantom
-		// bigram with the surrounding chars.
+		// First input sticks. A retype after backspace issues a second event at
+		// the same position; it must NOT form a phantom bigram.
 		const runner = new SessionRunner({
 			type: 'bigram-drill',
 			text: 'ab',

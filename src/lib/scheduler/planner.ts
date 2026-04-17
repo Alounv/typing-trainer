@@ -1,26 +1,7 @@
 /**
- * Daily session planner (spec §5). Pure, synchronous, and side-effect
- * free: given a snapshot of recent sessions, the latest diagnostic
- * report, and the set of bigrams graduated out of rotation, decide
- * what the user should do *next*.
- *
- * Shape of the decision tree:
- *
- *   no sessions yet                     → [first-run diagnostic]
- *   no diagnostic report on file        → [catch-up diagnostic]
- *   ≥ DIAGNOSTIC_INTERVAL non-diag      → [cadence diagnostic]
- *     sessions since last diagnostic
- *   otherwise                           → N interleaved [drill, real-text]
- *                                         mini-sessions
- *
- * "Mini-session" is the v2 unit: short (~15–25 words), self-contained,
- * each completion is its own checkpoint. Chained together the user
- * gets the equivalent of a longer workout with natural save points
- * between.
- *
- * The planner intentionally stays shallow: one decision per call. The
- * dashboard re-plans after each completed session so multi-day state
- * ("streaks", weekly schedules) lives elsewhere.
+ * Daily session planner. Pure: given recent sessions, the latest diagnostic, and
+ * graduated bigrams, decides the next single session — diagnostic or N interleaved
+ * drill/real-text mini-sessions. The dashboard re-plans on each completion.
  */
 import type { SessionConfig, SessionType } from '../session/types';
 import type { SchedulerInput, PlannedSession, PlannedSessionReason } from './types';
@@ -31,12 +12,8 @@ import {
 	type UserSettings
 } from '../models';
 
-/**
- * Extract a word-budget trio from a user settings blob, filling
- * missing entries from the factory defaults. Kept near the planner
- * because the planner is the only caller that needs all three at
- * once; each session route only needs its own type.
- */
+// Word-budget trio from user settings with factory defaults. Only the planner needs
+// all three at once; session routes each need only their own type.
 function resolveWordBudgets(settings?: UserSettings) {
 	return {
 		bigramDrill: settings?.wordBudgets?.bigramDrill ?? DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
@@ -46,21 +23,15 @@ function resolveWordBudgets(settings?: UserSettings) {
 }
 
 /**
- * Run a full diagnostic every N non-diagnostic sessions (spec §5).
- * Scaled up from 7 (v1) to 28: a daily plan now emits 8 mini-sessions
- * instead of 2, so keeping weekly-ish diagnostic cadence means counting
- * 4× more non-diagnostic sessions. Settings will eventually tune this.
+ * Run a full diagnostic every N non-diagnostic sessions. 28 (not 7) because a
+ * daily plan now emits 8 mini-sessions; keeping ~weekly cadence means 4× the count.
  */
 export const DIAGNOSTIC_INTERVAL = 28;
 
 /** Default "top N" priority bigrams to drill per session. */
 export const DEFAULT_DRILL_TARGET_COUNT = 10;
 
-/**
- * Mini-sessions per daily plan, per phase. `PAIRS_PER_DAY = 4` means
- * the non-diagnostic plan emits 4 drill + 4 real-text sessions
- * interleaved — a full workout with save points between each.
- */
+/** 4 drill + 4 real-text sessions interleaved — a full workout with save points between. */
 export const PAIRS_PER_DAY = 4;
 
 export function planDailySessions(input: SchedulerInput): PlannedSession[] {
@@ -74,23 +45,20 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 
 	const budgets = resolveWordBudgets(userSettings);
 
-	// 1. First-run: user has never completed a session. Onboarding needs
-	//    a diagnostic before it can compute baseline WPM (spec §7.2).
+	// 1. First-run: user has never completed a session. Need a diagnostic
+	//    before we can compute baseline WPM.
 	if (recentSessions.length === 0) {
 		return [diagnosticPlan('first-run-diagnostic', undefined, budgets.diagnostic)];
 	}
 
-	// 2. We have sessions but no diagnostic report on file — can happen
-	//    if the user deleted the diagnostic session manually, or
-	//    migrated from an older schema. Fail safe with a fresh
-	//    diagnostic so the drill has priority targets to pull from.
+	// 2. Sessions exist but no diagnostic report — manual deletion or schema
+	//    migration. Fail safe with a fresh diagnostic so drill has targets.
 	if (!latestDiagnosticReport) {
 		return [diagnosticPlan('missing-report-diagnostic', undefined, budgets.diagnostic)];
 	}
 
-	// 3. Cadence rule: every DIAGNOSTIC_INTERVAL non-diagnostic sessions,
-	//    re-run the diagnostic so thresholds and priority targets stay
-	//    current (spec §5).
+	// 3. Cadence: every DIAGNOSTIC_INTERVAL non-diagnostic sessions, re-run
+	//    so thresholds and priority targets stay current.
 	const since = sessionsSinceLastDiagnostic(recentSessions);
 	if (since >= DIAGNOSTIC_INTERVAL) {
 		return [diagnosticPlan('cadence-diagnostic', since, budgets.diagnostic)];
@@ -103,18 +71,15 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 		drillTargetCount
 	);
 
-	// If every priority target has graduated out of rotation, skip the
-	// drill phase entirely and jump to real text — there's nothing to
-	// drill on. The user has "arrived" at the current target roster.
+	// All priority targets graduated → skip drill, go straight to real text.
 	if (drillTargets.length === 0) {
 		return Array.from({ length: PAIRS_PER_DAY }, () =>
 			realtextPlan(budgets.realText, 'no-targets-left')
 		);
 	}
 
-	// Interleave drill + real-text mini-sessions so variety breaks up a
-	// long daily workout. Each pair is independent: the user can stop
-	// after any pair and the next run re-plans from scratch.
+	// Interleave drill + real-text; each pair is independent so the user can
+	// stop after any pair and the next run re-plans.
 	const plan: PlannedSession[] = [];
 	for (let i = 0; i < PAIRS_PER_DAY; i++) {
 		plan.push(drillPlan(drillTargets, budgets.bigramDrill));
@@ -123,13 +88,8 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	return plan;
 }
 
-/**
- * How many non-diagnostic sessions sit between "now" and the most
- * recent diagnostic in `recentSessions`. `recentSessions` is newest-
- * first; we walk until we hit a diagnostic row and count everything
- * above it. If no diagnostic is in the window, we return `Infinity`
- * — the caller treats that as "definitely due".
- */
+// Count of non-diagnostic sessions between now and the most recent diagnostic.
+// `recentSessions` is newest-first. Returns Infinity if none found → "definitely due".
 function sessionsSinceLastDiagnostic(recent: readonly { type: string }[]): number {
 	for (let i = 0; i < recent.length; i++) {
 		if (recent[i].type === 'diagnostic') return i;
@@ -137,11 +97,7 @@ function sessionsSinceLastDiagnostic(recent: readonly { type: string }[]): numbe
 	return Number.POSITIVE_INFINITY;
 }
 
-/**
- * Strip graduated bigrams from the priority list and cap at `count`.
- * Order-preserving so the highest-priority survivors stay first —
- * mirrors `DiagnosticReport.priorityTargets` ordering.
- */
+// Strip graduated bigrams from the priority list; cap at `count`. Order-preserving.
 function selectDrillTargets(
 	priorityBigrams: readonly string[],
 	graduated: ReadonlySet<string> | undefined,
@@ -207,17 +163,9 @@ function drillPlan(targets: string[], wordBudget: number): PlannedSession {
 }
 
 /**
- * Drop already-completed-today items off the front of a plan, matched
- * by session type. Used by the dashboard/summary layer so the plan
- * visibly shrinks as the user works through it, and so the post-session
- * "Next session" CTA can pick the true next step.
- *
- * Walks the plan in order; for each item, if the matching completed
- * count is positive, it consumes one credit and skips the item,
- * otherwise the item survives. This keeps the interleaved
- * drill/real-text ordering intact — a user who completed 2 drills and
- * 1 real-text ends up with [drill, real-text, drill, real-text, drill]
- * remaining (the real-text before the second drill is gone).
+ * Drop completed-today items from the front of a plan, matched by session type.
+ * Preserves interleaving: 2 drills + 1 real-text completed from
+ * [drill, rt, drill, rt, drill, rt] leaves [drill, rt, drill, rt, drill].
  */
 export function sliceCompletedFromPlan(
 	plan: readonly PlannedSession[],

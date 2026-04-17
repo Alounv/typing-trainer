@@ -1,30 +1,17 @@
 import type { CorpusData } from '../corpus/types';
 
 /**
- * Bigram drill sequence generation (spec §4.1).
- *
- * Given a set of target bigrams and a loaded corpus, emits an ordered
- * list of real words interleaving target-bearing words (70%) with
- * filler words from the rest of the corpus (30%). The ratio comes from
- * the spec; the function accepts an override for tuning.
- *
- * This module is pure — no timing, no UI, no pacing. The session runner
- * consumes the generated sequence and applies per-classification pacing
- * at drill-time.
+ * Bigram drill sequence: target-bearing words (70%) interleaved with filler (30%).
+ * Pure — no timing or pacing. Session runner handles those at drill-time.
  */
 
-/** Spec §4.1 default: 70% target-bearing, 30% filler. */
+/** Default: 70% target-bearing, 30% filler. */
 const DEFAULT_TARGET_RATIO = 0.7;
 /** Default sequence length — enough for a 5-minute session at ~50–80 WPM. */
 const DEFAULT_WORD_COUNT = 80;
 
 export interface BigramDrillInput {
-	/**
-	 * Ranked list of bigrams the user should drill (spec §4.1). Ranking
-	 * itself isn't used directly here — the caller is responsible for
-	 * choosing which targets to pass. Passing an empty array is an error:
-	 * without targets there's no drill to generate.
-	 */
+	/** Bigrams to drill. Caller has already ranked/filtered; empty array throws. */
 	targetBigrams: readonly string[];
 	corpus: CorpusData;
 	options?: BigramDrillOptions;
@@ -33,11 +20,7 @@ export interface BigramDrillInput {
 export interface BigramDrillOptions {
 	/** Total words to generate. Defaults to {@link DEFAULT_WORD_COUNT}. */
 	wordCount?: number;
-	/**
-	 * Target-word ratio. Default 0.7 per spec. Accepts [0, 1]; values
-	 * outside that range are clamped rather than throwing — callers
-	 * shouldn't crash on a stray slider input.
-	 */
+	/** Target-word ratio, default 0.7. Clamped to [0, 1] — tolerant of stray slider input. */
 	targetRatio?: number;
 	/** Injectable RNG for tests. Defaults to `Math.random`. */
 	rng?: () => number;
@@ -48,24 +31,14 @@ export interface BigramDrillSequence {
 	text: string;
 	/** Same content as `text`, split into individual words. */
 	words: string[];
-	/**
-	 * How many words ended up in each bucket. Useful for sanity checks
-	 * and for UI to report "30 target words / 15 filler" in a debug view.
-	 */
+	/** Bucket counts for debug/sanity view ("30 target / 15 filler"). */
 	stats: { targetWords: number; fillerWords: number; distinctTargets: number };
 }
 
 /**
- * Generate a bigram drill sequence.
- *
- * Weight scheme:
- * - **Target-word** pool: word frequency × count of target bigrams the word
- *   contains. So "thing" contributes to pool with weight `freq × 2` if both
- *   "th" and "ng" are targets. That rewards words that stress multiple
- *   targets at once, which is the whole point of the drill.
- * - **Filler-word** pool: word frequency only. Filler exists to keep the
- *   mechanical rhythm realistic (pure target-word drills feel drilling-like,
- *   which is the anti-pattern the 70/30 ratio is designed to break).
+ * Weight scheme: target words = `freq × distinct-targets-contained` (rewards words
+ * stressing multiple targets). Filler = freq only — filler exists to keep
+ * mechanical rhythm realistic, which 70/30 is designed to protect.
  */
 export function generateBigramDrillSequence(input: BigramDrillInput): BigramDrillSequence {
 	if (input.targetBigrams.length === 0) {
@@ -78,9 +51,7 @@ export function generateBigramDrillSequence(input: BigramDrillInput): BigramDril
 
 	const { targets, fillers } = partitionCorpus(input.corpus, input.targetBigrams);
 
-	// Edge: a very narrow corpus + broad targets could leave filler empty,
-	// or unusual targets could leave target pool empty. Fall back gracefully
-	// so the caller still gets a usable sequence.
+	// Narrow corpus / unusual targets → one pool may be empty. Fall back gracefully.
 	if (targets.length === 0 && fillers.length === 0) {
 		throw new Error('generateBigramDrillSequence: corpus produced no usable words');
 	}
@@ -121,11 +92,7 @@ interface WeightedWord {
 	weight: number;
 }
 
-/**
- * Walk the corpus's word frequency table once, splitting each word into
- * the target-bearing or filler pool. Weights are baked in so the sampler
- * doesn't have to re-check bigram membership on every pick.
- */
+// One-pass split into target-bearing / filler pools with weights baked in.
 function partitionCorpus(
 	corpus: CorpusData,
 	targetBigrams: readonly string[]
@@ -137,9 +104,8 @@ function partitionCorpus(
 		const freq = corpus.wordFrequencies[word];
 		if (freq <= 0) continue;
 
-		// Count distinct target bigrams present in this word. We count per
-		// target (not per occurrence) so a word with lots of the same bigram
-		// doesn't run away — "the" with target "th" gets weight × 1, not × 10.
+		// Count distinct targets present, not occurrences — prevents runaway
+		// weights ("the" with target "th" → ×1, not ×10).
 		let hits = 0;
 		for (const t of targetBigrams) {
 			if (t.length >= 2 && word.includes(t)) hits++;

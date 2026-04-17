@@ -1,13 +1,10 @@
-/**
- * User-selectable corpus (spec §2.6). Frequency tables are derived from the
- * text on load — not stored on the config — so recomputing is cheap.
- */
+/** Frequency tables are derived from text on load, not stored — recomputing is cheap. */
 export interface CorpusConfig {
 	id: string;
 	language: string;
 	/** Built-in wordlist reference, e.g. `"en-top-1000"`. */
 	wordlistId: string;
-	/** User-supplied text for custom corpora (spec §6.3). */
+	/** User-supplied text for custom corpora. */
 	customText?: string;
 }
 
@@ -21,11 +18,7 @@ export interface CorpusData {
 	bigramFrequencies: FrequencyTable;
 }
 
-/**
- * One quote — short prose excerpt with attribution. Used as the atomic
- * unit for real-text sessions (spec §4.2) when a quote bank is available
- * for the session's language.
- */
+/** Short prose excerpt with attribution; atomic unit for real-text sessions. */
 export interface Quote {
 	id: number;
 	text: string;
@@ -34,18 +27,10 @@ export interface Quote {
 	length: number;
 }
 
-/**
- * `[minInclusive, maxInclusive]` length bucket. The bank ships an ordered
- * array of these so the UI can show canonical "short / medium / long /
- * very long" filters without hard-coding numbers.
- */
+/** `[minInclusive, maxInclusive]` length bucket — UI gets filters without hard-coded numbers. */
 export type QuoteLengthGroup = readonly [number, number];
 
-/**
- * A language's full quote bank (spec §4.2). Groups are length buckets;
- * quotes themselves carry `length` so filtering is a constant-time check
- * rather than a re-measurement.
- */
+/** Quote bank. Quotes pre-carry `length` so filtering is constant-time. */
 export interface QuoteBank {
 	language: string;
 	groups: readonly QuoteLengthGroup[];

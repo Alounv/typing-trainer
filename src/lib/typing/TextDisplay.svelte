@@ -20,7 +20,7 @@
 		text: string;
 		/** Index of the next character to be typed (cursor sits here). */
 		position: number;
-		/** Positions whose first-input was wrong (spec §2.2 — first-input sticks). */
+		/** Positions whose first-input was wrong (first-input sticks). */
 		errorPositions?: ReadonlySet<number>;
 		/** Subset of `errorPositions` where the user later typed the correct char. */
 		correctedPositions?: ReadonlySet<number>;
@@ -67,10 +67,8 @@
 		'typed-correct': 'text-base-content/75',
 		// Uncorrected error: solid red tint — the mistake is still standing.
 		'typed-error': 'text-error-content bg-error/30 rounded-sm',
-		// Corrected error: reads like typed-correct, but a thin dotted amber
-		// underline marks where the user stumbled. No background, no
-		// strikethrough — the correction should feel like recovery, not
-		// punishment. The data still records it for analytics (spec §2.2).
+		// Corrected error: reads like typed-correct with a thin dotted amber
+		// underline marking the stumble. Recovery, not punishment.
 		'typed-error-corrected':
 			'text-base-content/75 underline decoration-dotted decoration-warning underline-offset-4',
 		// Current char: text-only inversion. The saturated primary block

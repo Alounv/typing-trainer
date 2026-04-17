@@ -1,37 +1,15 @@
 /**
- * Diagnostic passage generator (spec §2.5 / §2.8).
- *
- * Builds the text a diagnostic session types through. Two properties
- * matter more than length:
- *
- *  1. **Bigram coverage** — the diagnostic must surface enough bigrams
- *     (top 50 in particular) that the downstream report can classify
- *     them confidently. The spec asks for ≥15 occurrences of top-50
- *     bigrams; this is best-effort here — we bias the sampler toward
- *     those bigrams rather than hard-guaranteeing each one.
- *  2. **Stable output** — an injectable RNG lets tests pin sequences,
- *     and (future) replay of a diagnostic won't drift.
- *
- * The output piggybacks on `generateRealTextSequence`'s synth path:
- * same corpus, same biased weighted-random sampler, just a shorter
- * char target and the top-50 corpus bigrams pre-wired as
- * `targetBigrams`.
+ * Diagnostic passage generator. Biases toward top-50 corpus bigrams so the
+ * downstream report can classify them confidently. RNG is injectable for tests.
+ * Piggybacks on `generateRealTextSequence`'s synth path with a shorter target.
  */
 import type { CorpusData, QuoteBank } from '../corpus/types';
 import { generateRealTextSequence } from '../drill/real-text';
 
-/**
- * Default target passage length. Spec §2.5 says ~500–800 keystrokes,
- * roughly 5–8 minutes of typing. 700 chars is the comfortable middle
- * — gives enough rope for top-50 coverage without dragging.
- */
+/** ~5–8 min of typing; enough rope for top-50 coverage without dragging. */
 export const DEFAULT_DIAGNOSTIC_CHAR_TARGET = 700;
 
-/**
- * How many of the top corpus bigrams we explicitly bias toward.
- * Matches the "top 50" cohort the spec singles out for guaranteed
- * coverage. Higher would dilute the boost; lower would undercover.
- */
+/** How many top corpus bigrams to bias toward. Higher dilutes boost; lower undercovers. */
 export const DIAGNOSTIC_COVERAGE_TOP_N = 50;
 
 export interface DiagnosticSamplerOptions {
@@ -42,11 +20,9 @@ export interface DiagnosticSamplerOptions {
 	/** Injectable RNG so tests and replay can pin output. */
 	rng?: () => number;
 	/**
-	 * Optional quote bank. When present, the sampler prefers real prose
-	 * and only falls back to word-synth for the tail. Quote prose gives
-	 * the diagnostic a more natural feel but doesn't necessarily cover
-	 * top bigrams — pass `undefined` to force the synth path, which has
-	 * the target-bigram boost.
+	 * Optional quote bank. When present, prefers real prose and only falls
+	 * back to synth for the tail. Pass `undefined` to force the synth path
+	 * (which has the target-bigram boost).
 	 */
 	quoteBank?: QuoteBank;
 }
@@ -62,12 +38,8 @@ export interface DiagnosticPassage {
 	};
 }
 
-/**
- * Produce a diagnostic passage from a loaded corpus. The corpus must
- * already be loaded (via `loadBuiltinCorpus`) — this function is sync
- * on purpose so routes can generate during load without additional
- * awaits.
- */
+// Produce a diagnostic passage from a loaded corpus. Sync on purpose so
+// routes can generate during load without extra awaits.
 export function sampleDiagnosticPassage(
 	corpus: CorpusData,
 	options: DiagnosticSamplerOptions = {}
@@ -95,12 +67,7 @@ export function sampleDiagnosticPassage(
 	};
 }
 
-/**
- * Return the top-N bigrams from a frequency table, descending by
- * frequency. Ties broken alphabetically so output is deterministic
- * even before RNG-seeding. Exported primarily for tests; production
- * callers use {@link sampleDiagnosticPassage} directly.
- */
+// Top-N bigrams by frequency, ties broken alphabetically for determinism.
 export function topBigramsByFrequency(
 	frequencies: Readonly<Record<string, number>>,
 	count: number

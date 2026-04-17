@@ -1,11 +1,7 @@
 <script lang="ts">
 	/**
-	 * Diagnostic session route. Generates a passage sized for spec §2.5
-	 * (~500–800 keystrokes) that biases toward the top-50 corpus bigrams
-	 * so the downstream report has enough observations to classify each.
-	 *
-	 * Shell-driven: raw events persisted so thresholds can be replayed
-	 * later (spec §2.8).
+	 * Diagnostic session route. Generates a ~500–800 keystroke passage biased
+	 * toward the top-50 corpus bigrams. Raw events persisted for threshold replay.
 	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
@@ -14,7 +10,7 @@
 	import { getProfile } from '$lib/storage/service';
 	import { DEFAULT_DIAGNOSTIC_WORD_BUDGET } from '$lib/models';
 
-	/** 5 chars ≈ 1 word (spec §2.3) — translates the user's word budget into the sampler's char target. */
+	/** 5 chars ≈ 1 word — translates word budget into the sampler's char target. */
 	const CHARS_PER_WORD = 5;
 
 	/**

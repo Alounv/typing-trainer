@@ -1,9 +1,7 @@
 <script lang="ts">
 	/**
-	 * Real-text session route. Loads the English quote bank + fallback
-	 * corpus, generates a short passage sized to the planned word budget
-	 * (spec §5). Each session is a self-contained mini-workout; the
-	 * dashboard chains several of them together for a full daily plan.
+	 * Real-text session route. Loads quote bank + fallback corpus, generates a
+	 * passage sized to the planned word budget. Self-contained mini-workout.
 	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
@@ -18,7 +16,7 @@
 	import { getProfile } from '$lib/storage/service';
 	import { DEFAULT_REAL_TEXT_WORD_BUDGET } from '$lib/models';
 
-	/** 5 chars ≈ 1 word (spec §2.3). Used to size text from a word budget. */
+	/** 5 chars ≈ 1 word. Used to size text from a word budget. */
 	const CHARS_PER_WORD = 5;
 
 	/** Corpus used when the profile is absent or its id isn't a known built-in. */

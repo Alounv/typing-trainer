@@ -1,20 +1,17 @@
 import type { KeystrokeEvent } from '../typing/types';
 import type { BigramAggregate } from '../bigram/types';
 
-/**
- * Full keystroke log for a diagnostic (spec §2.8). Persisted so tuning the
- * classification thresholds later can replay past diagnostics.
- */
+/** Full keystroke log; persisted so threshold tuning can replay past diagnostics. */
 export interface DiagnosticRawData {
 	sessionId: string;
 	events: KeystrokeEvent[];
 }
 
-/** Structured output of a diagnostic session (spec §7.3). */
+/** Structured output of a diagnostic session. */
 export interface DiagnosticReport {
 	sessionId: string;
 	timestamp: number;
-	/** Middle quartiles of session WPM (spec §3.3). */
+	/** Middle quartiles of session WPM. */
 	baselineWPM: number;
 	/** `baselineWPM × TARGET_WPM_MULTIPLIER`. */
 	targetWPM: number;
@@ -32,7 +29,7 @@ export interface DiagnosticReport {
 	};
 	priorityTargets: PriorityBigram[];
 	corpusFit: {
-		/** Fraction of corpus bigrams with ≥10 observations (spec §9). */
+		/** Fraction of corpus bigrams with ≥10 observations. */
 		coverageRatio: number;
 		undertrained: string[];
 	};

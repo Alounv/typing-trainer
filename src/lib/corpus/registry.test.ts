@@ -28,8 +28,8 @@ describe('loadBuiltinCorpus', () => {
 		// "the" is by far the most frequent English word — should be rank 1 with weight 1.
 		expect(c.wordFrequencies['the']).toBe(1);
 		// 1k English words yields a few hundred unique bigrams — not the 500
-		// floor spec §6.3 requires of *custom* corpora, but comfortably above
-		// a toy threshold that would catch "no bigrams at all" regressions.
+		// floor required of *custom* corpora, but comfortably above a toy
+		// threshold that would catch "no bigrams at all" regressions.
 		expect(Object.keys(c.bigramFrequencies).length).toBeGreaterThanOrEqual(100);
 	});
 

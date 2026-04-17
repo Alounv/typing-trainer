@@ -7,12 +7,9 @@ import type { SessionSummary, SessionType } from './types';
 import { checkBigramGraduation, type BigramOccurrence } from './graduation';
 
 /**
- * Inputs needed to turn a finished capture into a persistable summary.
- *
- * `events` is the raw log straight from `keystrokeCapture` — retypes and all.
- * The runner is responsible for collapsing them via `annotateFirstInputs`
- * before feeding the bigram extractor; upstream callers shouldn't have to
- * remember that invariant.
+ * Inputs for turning a finished capture into a persistable summary.
+ * `events` is the raw log (retypes included); this function annotates them
+ * before bigram extraction so callers don't have to remember that.
  */
 export interface BuildSessionSummaryInput {
 	events: readonly KeystrokeEvent[];
@@ -22,7 +19,7 @@ export interface BuildSessionSummaryInput {
 	/** `performance.now()` relative duration of the session in ms. */
 	durationMs: number;
 	bigramsTargeted?: string[];
-	/** Override the default classification thresholds (spec §3.1). */
+	/** Override the default classification thresholds. */
 	thresholds?: ClassificationThresholds;
 	/** Injectable for tests; defaults to `uuid()` + `Date.now()`. */
 	idGenerator?: () => string;
@@ -30,14 +27,9 @@ export interface BuildSessionSummaryInput {
 }
 
 /**
- * Pure transform: raw keystroke log → persistable `SessionSummary`.
- *
- * No Svelte, no IO. The only non-determinism is the session id and timestamp,
- * both injectable for tests. Caller decides whether to persist the result.
- *
- * Bigram timings use the annotated (first-input-only) events so retypes never
- * inflate the occurrence count; raw events are still what upstream would
- * archive for a diagnostic session.
+ * Pure transform: raw keystroke log → persistable `SessionSummary`. Id and
+ * timestamp are the only non-determinism, both injectable for tests.
+ * Bigram timings use first-input-only events; raw events are archived separately.
  */
 export function buildSessionSummary(input: BuildSessionSummaryInput): SessionSummary {
 	const id = (input.idGenerator ?? uuid)();
@@ -58,12 +50,9 @@ export function buildSessionSummary(input: BuildSessionSummaryInput): SessionSum
 }
 
 /**
- * Raw WPM — never smoothed (smoothing lives in `progress/`). Spec convention:
- * 5 characters = 1 word. Uses `textLength` rather than typed-event count so
- * aborted sessions don't inflate the rate.
- *
- * Returns 0 for a zero-duration session — caller decides whether that's a
- * meaningful save or a discard.
+ * Raw WPM — smoothing lives in `progress/`. 5 chars = 1 word. Uses `textLength`
+ * (not event count) so aborted sessions don't inflate the rate. Returns 0 for
+ * zero-duration sessions.
  */
 function computeWPM(textLength: number, durationMs: number): number {
 	if (durationMs <= 0) return 0;
@@ -71,11 +60,7 @@ function computeWPM(textLength: number, durationMs: number): number {
 	return textLength / 5 / minutes;
 }
 
-/**
- * Fraction of first-input positions where the user typed the wrong char.
- * Retypes don't count — the first input sticks (spec §2.2). 0 for an empty
- * event log.
- */
+/** Fraction of first-input positions where the user typed the wrong char. Retypes don't count. */
 function computeErrorRate(annotated: readonly { expected: string; actual: string }[]): number {
 	if (annotated.length === 0) return 0;
 	let errors = 0;
@@ -83,23 +68,12 @@ function computeErrorRate(annotated: readonly { expected: string; actual: string
 	return errors / annotated.length;
 }
 
-/* -----------------------------------------------------------------------
- * SessionRunner — in-flight session lifecycle manager.
- *
- * Plain TS, no Svelte. The UI wraps the runner's getter output in its
- * own reactive state ($state/$derived) — the runner emits callbacks at
- * notable moments, but doesn't push reactivity through itself.
- * --------------------------------------------------------------------- */
+// SessionRunner: plain TS lifecycle manager for an in-flight session.
+// UI wraps getter output in its own reactive state.
 
 /**
- * Why a session ended. `null` in `shouldEnd` means "keep going".
- *
- * There's no `'timeout'` reason: all session types run until their
- * (pre-sized) text is complete. Drills additionally short-circuit when
- * every target bigram has graduated. The text length is the time budget
- * — caller derives it from the user's baseline WPM × desired minutes,
- * so a slow typist gets a longer stretch of wall-clock time from the
- * same word count and nothing feels arbitrarily cut short.
+ * Why a session ended; `null` in `shouldEnd` means "keep going". No `'timeout'`:
+ * sessions run until text completes, or (drill only) every target graduates.
  */
 export type SessionEndReason = 'complete' | 'all-graduated';
 
@@ -123,21 +97,16 @@ export interface SessionRunnerConfig {
 	idGenerator?: () => string;
 	/** Injectable so tests get deterministic timestamps for `finalize`. */
 	timestampProvider?: () => number;
-	/** Fired each time a target bigram satisfies spec §4.1 graduation. */
+	/** Fired each time a target bigram satisfies graduation. */
 	onBigramGraduated?: (bigram: string) => void;
 	/** Override classification thresholds for the final summary. */
 	thresholds?: ClassificationThresholds;
 }
 
 /**
- * Manages one running session. The UI calls `recordEvent` per keystroke
- * and polls `shouldEnd(elapsedMs)` per tick. When ready to persist, call
- * `finalize(elapsedMs)` to get a {@link SessionSummary} and route to the
- * summary page.
- *
- * The runner does NOT own the clock — UI decides the tick cadence and
- * pushes `elapsedMs` in. Keeps the runner pure (no timer side-effects)
- * and lets tests fast-forward synthetic time without timers.
+ * In-flight session manager (pure TS; no timers). UI calls `recordEvent` per
+ * keystroke, `shouldEnd()` when done, and `finalize(elapsedMs)` to persist.
+ * The runner doesn't own the clock — tests fast-forward synthetic time freely.
  */
 export class SessionRunner {
 	private readonly config: SessionRunnerConfig;
@@ -148,32 +117,27 @@ export class SessionRunner {
 
 	constructor(config: SessionRunnerConfig) {
 		this.config = config;
-		// Pre-create the occurrence buckets so tests can inspect the set of
-		// tracked bigrams even before any events arrive.
+		// Pre-create occurrence buckets so tests can inspect tracked bigrams
+		// before any events arrive.
 		for (const t of config.targetBigrams ?? []) {
 			this.targetOccurrences.set(t, []);
 		}
 	}
 
 	/**
-	 * Record a keystroke event from the typing surface. Appends to the
-	 * event log, updates the position, and (for drill sessions) updates
-	 * per-target occurrence lists and checks graduation.
+	 * Record a keystroke. Appends to the log, advances position, and (for drill
+	 * sessions) updates per-target occurrences + checks graduation.
 	 */
 	recordEvent(event: KeystrokeEvent): void {
 		this.events_.push(event);
-		// Event position is the slot where the keystroke landed; the cursor
-		// advances to the slot immediately after. `Math.max` defends against
-		// a replay-style caller feeding events out of order — position
-		// should only move forward from the runner's view.
+		// `Math.max` defends against out-of-order events; position only moves forward.
 		this.position_ = Math.max(this.position_, event.position + 1);
 
 		if (this.events_.length < 2) return;
 		const prev = this.events_[this.events_.length - 2];
-		// Only adjacent (left, right) pairs form a bigram occurrence. A
-		// retype at the same position (after backspace) has `prev.position
-		// === event.position`, so it produces no new occurrence — matches
-		// the "first input sticks" rule (spec §2.2).
+		// Only adjacent (left, right) pairs form a bigram. A retype at the same
+		// position after backspace has `prev.position === event.position`, so it
+		// produces no new occurrence — matches "first input sticks".
 		if (prev.position !== event.position - 1) return;
 
 		const bigram = prev.expected + event.expected;
@@ -197,11 +161,7 @@ export class SessionRunner {
 		}
 	}
 
-	/**
-	 * Decide whether the session should end. Called by the UI on every
-	 * event (and optionally per timer tick). Takes no time argument —
-	 * nothing here is time-gated any more.
-	 */
+	/** Should the session end now? Called after each event. No time-gating. */
 	shouldEnd(): SessionEndReason | null {
 		if (this.position_ >= this.config.text.length) return 'complete';
 		if (

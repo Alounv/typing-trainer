@@ -43,7 +43,7 @@ function word(
 }
 
 describe('computeTargetWPM', () => {
-	it('multiplies baseline by the spec §3.3 constant', () => {
+	it('multiplies baseline by the target-WPM constant', () => {
 		expect(computeTargetWPM(60)).toBeCloseTo(60 * TARGET_WPM_MULTIPLIER, 5);
 	});
 
@@ -107,7 +107,7 @@ describe('deriveBaselineWPM', () => {
 		expect(baseline).toBeCloseTo(150, 5);
 	});
 
-	it('trims top and bottom deciles at ≥10 samples (spec §3.3)', () => {
+	it('trims top and bottom deciles at ≥10 samples', () => {
 		// 10 words: 9 clustered around ~100 WPM, 1 extreme outlier at ~600 WPM.
 		// Bottom-decile (slowest) cut drops the slowest. Top-decile cut drops the
 		// outlier. Remaining 8 samples mean ≈ normal cluster mean, not polluted

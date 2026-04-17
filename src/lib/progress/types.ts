@@ -1,9 +1,6 @@
 import type { BigramClassification } from '../bigram/types';
 
-/**
- * A bigram moved classification between diagnostics (spec §10.2). The most
- * trustworthy progress signal — immune to session noise.
- */
+/** A bigram moved classification between diagnostics — the most noise-resistant progress signal. */
 export interface GraduationEvent {
 	bigram: string;
 	from: BigramClassification;
@@ -12,10 +9,7 @@ export interface GraduationEvent {
 	timestamp: number;
 }
 
-/**
- * Distribution of active bigrams across the four classifications. Recorded
- * per session so we can diff today vs. 4 weeks ago (spec §10.6).
- */
+/** Per-session distribution across the four classifications — enables today-vs-past diffs. */
 export interface ClassificationSnapshot {
 	timestamp: number;
 	healthy: number;
@@ -25,10 +19,7 @@ export interface ClassificationSnapshot {
 	total: number;
 }
 
-/**
- * Rolling minimum error rate over the last 10 sessions (spec §10.2). Only
- * moves on genuine improvement; immune to noisy high-error sessions.
- */
+/** Rolling minimum error rate over last 10 sessions; moves only on genuine improvement. */
 export interface ErrorFloorHistory {
 	values: { sessionId: string; floor: number }[];
 	current: number;
@@ -38,8 +29,8 @@ export interface ErrorFloorHistory {
 }
 
 /**
- * Slowest-Decile Mean — average transition time of the bottom 10% of bigrams
- * (spec §10.2). Leading indicator: drops 2–3 weeks before WPM catches up.
+ * Slowest-Decile Mean: avg transition time of the bottom 10% of bigrams.
+ * Leading indicator — drops 2–3 weeks before WPM catches up.
  */
 export interface SDMHistory {
 	values: { sessionId: string; sdm: number }[];
@@ -49,7 +40,7 @@ export interface SDMHistory {
 	delta30d: number;
 }
 
-/** Per-session WPM with rolling stats pre-computed at write time (spec §10.7). */
+/** Per-session WPM with rolling stats pre-computed at write time. */
 export interface WPMHistoryEntry {
 	sessionId: string;
 	/** Raw — never displayed alone. */
@@ -61,7 +52,7 @@ export interface WPMHistoryEntry {
 	ceiling: number;
 }
 
-/** Per-diagnostic "what got better / what's stubborn" report (spec §10.7). */
+/** Per-diagnostic "what got better / what's stubborn" report. */
 export interface DiagnosticProgressReport {
 	diagnosticSessionId: string;
 	timestamp: number;
@@ -73,7 +64,7 @@ export interface DiagnosticProgressReport {
 	priorityBigrams: string[];
 }
 
-/** The singleton row backing every long-term progress view (spec §10.7). */
+/** The singleton row backing every long-term progress view. */
 export interface ProgressStore {
 	graduationHistory: GraduationEvent[];
 	classificationSnapshots: ClassificationSnapshot[];

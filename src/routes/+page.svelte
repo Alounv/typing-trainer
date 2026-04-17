@@ -1,13 +1,8 @@
 <script lang="ts">
 	/**
-	 * Dashboard (spec §5 / Phase 6). Reads recent sessions + the latest
-	 * diagnostic report, asks the scheduler what to do next, renders the
-	 * plan as a stack of quick-start cards. No stat-grid, no placeholder
-	 * charts — the spec calls for a single deliberate path forward, not
-	 * an analytics cockpit.
-	 *
-	 * Progress charts and trend sparklines live on `/analytics` (Phase 9).
-	 * This page is about "now what?", not "how am I doing over time?".
+	 * Dashboard. Reads recent sessions + latest diagnostic, asks the scheduler
+	 * what to do next, renders the plan as quick-start cards. Progress charts
+	 * and sparklines live on `/analytics` — this page is "now what?", not trends.
 	 */
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -92,11 +87,9 @@
 		{#if data.allDoneForToday}
 			{@const completed = data.completedToday}
 			<!--
-				All mini-sessions done today. Deliberately quiet — no confetti,
-				no streak counter (spec §10.4 restricts celebration to structural
-				change). "Start another round" is the escape hatch for users who
-				want to keep going: it snapshots today's completions as the new
-				baseline so the planner re-emits a full plan on reload.
+				Day done. Deliberately quiet — celebration is reserved for structural
+				change. "Start another round" snapshots today's completions as the
+				new baseline so the planner re-emits a full plan on reload.
 			-->
 			<section class="space-y-3" data-testid="day-complete">
 				<h2 class="text-2xl font-semibold text-base-content">Today's plan is done.</h2>
@@ -175,11 +168,7 @@
 			{/each}
 		</section>
 
-		<!--
-			Override row. The planner's choice is right most of the time, but
-			the user can always drop into a specific session kind — spec §5
-			leaves "or on demand" explicit for diagnostics.
-		-->
+		<!-- Override row: planner's usually right, but user can drop into a specific kind. -->
 		<section class="flex flex-wrap items-center gap-3 border-t border-base-300 pt-6 text-sm">
 			<p class="text-base-content/55">Or run something specific:</p>
 			<a

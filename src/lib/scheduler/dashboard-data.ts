@@ -1,11 +1,5 @@
-/**
- * Dashboard data loader. Bridges the scheduler's pure planner to the
- * async storage + corpus layer so `+page.svelte` only has to deal with
- * its own render logic.
- *
- * Kept outside the Svelte component so tests can exercise the full
- * load path without mounting.
- */
+// Dashboard data loader. Bridges the pure planner to async storage + corpus
+// so the component only handles render. Outside the component so tests don't mount.
 import type { DiagnosticReport } from '../diagnostic/types';
 import type { SessionSummary, SessionType } from '../session/types';
 import type { CorpusData } from '../corpus/types';
@@ -18,23 +12,11 @@ import { applyBonusBaseline, readActiveBaseline } from './bonus-round';
 import type { PlannedSession } from './types';
 
 export interface DashboardData {
-	/**
-	 * Plan with already-completed-today items stripped off the front.
-	 * Empty array means the user has finished today's workout.
-	 */
+	/** Plan with completed-today items stripped. Empty = done for today. */
 	plan: PlannedSession[];
-	/**
-	 * True when the full day's plan has been completed. Distinct from
-	 * `plan.length === 0` only in theory (they always agree here), but
-	 * surfaced as a named boolean so UI code can branch on intent
-	 * rather than array-length arithmetic.
-	 */
+	/** Named boolean so UI branches on intent, not array-length arithmetic. */
 	allDoneForToday: boolean;
-	/**
-	 * Raw completed-today counts by session type. Exposed so the
-	 * dashboard's "Start another round" button can snapshot the current
-	 * baseline when activating a bonus round.
-	 */
+	/** Raw completed-today counts — needed for "Start another round" bonus baseline. */
 	completedToday: Partial<Record<SessionType, number>>;
 	lastSession?: SessionSummary;
 	latestDiagnosticReport?: DiagnosticReport;
@@ -44,30 +26,19 @@ export interface DashboardData {
 
 export interface DashboardLoadInputs {
 	recentSessions: readonly SessionSummary[];
-	/**
-	 * Loaded corpus for enriching the diagnostic report's corpusFit.
-	 * Optional — the report works without it, just with `coverageRatio: 0`.
-	 */
+	/** Optional corpus for corpusFit enrichment; without it, `coverageRatio: 0`. */
 	corpus?: CorpusData;
 }
 
 /**
- * Resolve everything the dashboard needs to render the "today's plan"
- * card plus last-session chip. Composes planner + graduation filter +
- * diagnostic-report reconstruction into one await.
- *
- * Why reconstruct the report instead of persisting it: the raw events
- * are already stored (spec §2.8) and classification thresholds are
- * tunable — re-running `generateDiagnosticReport` keeps the report in
- * sync with whatever the thresholds say today, not what they said at
- * diagnostic time.
+ * Resolve everything the dashboard needs: planner + graduation filter +
+ * diagnostic-report reconstruction in one await. The report is rebuilt (not
+ * persisted) so tunable thresholds stay in sync with today's classification.
  */
 export async function loadDashboardData(inputs: DashboardLoadInputs): Promise<DashboardData> {
 	const { recentSessions, corpus } = inputs;
 
-	// Profile read runs in parallel with the diagnostic-report
-	// rebuild: they're independent reads, and the dashboard blocks on
-	// all of them before first paint anyway.
+	// Parallel: independent reads, dashboard blocks on all before first paint.
 	const [latestDiagnosticReport, userSettings] = await Promise.all([
 		reconstructLatestDiagnosticReport(recentSessions, corpus),
 		getProfile()
@@ -83,12 +54,9 @@ export async function loadDashboardData(inputs: DashboardLoadInputs): Promise<Da
 		userSettings
 	});
 
-	// Strip already-done-today items so the dashboard only shows what's
-	// left. Planner is stateless and always emits a full day; the "what
-	// the user has already done" filter lives here, at the async edge
-	// that knows about clocks and storage. If a bonus round is active,
-	// its baseline is subtracted first so today's earlier completions
-	// are "forgiven" and the user gets a fresh plan to work through.
+	// Strip done-today from the planner's stateless full-day output. Bonus
+	// round (if active) subtracts its baseline first → earlier completions
+	// are "forgiven" and the user gets a fresh plan.
 	const completedToday = countCompletedToday(recentSessions);
 	const effectiveCompleted = applyBonusBaseline(completedToday, readActiveBaseline());
 	const plan = sliceCompletedFromPlan(fullPlan, effectiveCompleted);
@@ -104,12 +72,8 @@ export async function loadDashboardData(inputs: DashboardLoadInputs): Promise<Da
 	};
 }
 
-/**
- * Count how many of each session type the user has already finished
- * today. "Today" = local calendar day (via `Date.toDateString()`) —
- * matches user intuition better than a rolling 24h window, which would
- * e.g. keep yesterday's 11pm session counted against tomorrow's plan.
- */
+// Count sessions per type finished today. "Today" = local calendar day — a rolling
+// 24h window would keep yesterday's late session counted against tomorrow's plan.
 function countCompletedToday(
 	sessions: readonly SessionSummary[]
 ): Partial<Record<SessionType, number>> {
@@ -122,11 +86,8 @@ function countCompletedToday(
 	return out;
 }
 
-/**
- * Pull the most-recent diagnostic's raw events back out of storage and
- * rebuild its report. Returns `undefined` when there is no diagnostic
- * on file — the planner treats that as "first-run, issue a diagnostic".
- */
+// Rebuild the latest diagnostic's report from stored raw events. `undefined`
+// when no diagnostic on file → planner treats as "first-run".
 async function reconstructLatestDiagnosticReport(
 	recentSessions: readonly SessionSummary[],
 	corpus: CorpusData | undefined

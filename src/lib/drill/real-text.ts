@@ -3,47 +3,22 @@ import { selectQuote } from '../corpus/quotes';
 import { selectRealTextSentence } from '../corpus/selection';
 
 /**
- * Real-text session sequence generation (spec §4.2).
- *
- * Given a quote bank (preferred) and/or a fallback wordlist corpus,
- * emits a concatenated passage long enough to fill a session. Callers
- * either supply `targetLengthChars` (a character target — roughly
- * matches WPM × duration) or accept the default.
- *
- * Output is a plain string the typing surface consumes. A richer shape
- * (per-quote boundaries, source attribution) is also returned so future
- * UI can render attribution between chunks without re-parsing.
+ * Real-text passage generation. Prefers a quote bank (real prose with
+ * attribution); falls back to word-synth when unavailable.
  */
 
-/**
- * Separator between concatenated segments. Kept at a single space so
- * synth-path sentences (which are themselves space-joined words) don't
- * produce jarring double-spaces at sentence boundaries in the typing
- * surface — an effect users were noticing on the diagnostic.
- */
+/** Single space — double-space would look jarring between synth sentences. */
 const QUOTE_SEPARATOR = ' ';
 
-/**
- * Default character target. 1400 chars ≈ 5 minutes at 60 WPM (60 × 5 =
- * 300 words × ~5 chars + spaces). The session runner can ask for
- * whatever it wants — this is purely a default for callers that don't
- * care.
- */
+/** 1400 chars ≈ 5 min at 60 WPM. */
 const DEFAULT_TARGET_LENGTH_CHARS = 1400;
 
 export interface RealTextInput {
-	/**
-	 * Preferred source: a quote bank for the session's language. When
-	 * supplied, selection pulls real prose chunks with attribution.
-	 */
+	/** Preferred source: a quote bank for the session's language. */
 	quoteBank?: QuoteBank;
-	/**
-	 * Fallback source: a loaded wordlist corpus. Used only when no quote
-	 * bank is available (e.g. custom corpus or an unsupported language).
-	 * If both are omitted, the generator throws.
-	 */
+	/** Fallback when no quote bank. Both omitted → throws. */
 	fallbackCorpus?: CorpusData;
-	/** Target-bigram bias for both paths (spec §4.2 heuristic). */
+	/** Target-bigram bias for both paths. */
 	targetBigrams?: readonly string[];
 	options?: RealTextOptions;
 }
@@ -53,10 +28,7 @@ export interface RealTextOptions {
 	targetLengthChars?: number;
 	/** Length-bucket filter for the quote path. Ignored by the word-synth fallback. */
 	quoteLengthGroup?: QuoteLengthGroup;
-	/**
-	 * How many words per synthesized "sentence" in the fallback path.
-	 * Ignored by the quote path.
-	 */
+	/** Words per synth sentence. Ignored by the quote path. */
 	synthWordsPerSentence?: number;
 	/** Max chunks (quotes or synth sentences) to concatenate — safety valve. */
 	maxChunks?: number;
@@ -81,17 +53,8 @@ export interface RealTextSequence {
 }
 
 /**
- * Generate a real-text sequence.
- *
- * Selection preference:
- *   1. Quote bank — picks prose chunks via `selectQuote` until the
- *      character target is met, rotating through the bank without
- *      repeating an id within a single call.
- *   2. Fallback corpus — synthesizes sentences via
- *      `selectRealTextSentence` until the target is met.
- *
- * Throws when neither source is supplied. That's a programming bug, not
- * a user-facing condition.
+ * Generate a real-text sequence. Quote bank first (no id repeats within a call);
+ * fallback synth until char target is met. Throws when neither is supplied.
  */
 export function generateRealTextSequence(input: RealTextInput): RealTextSequence {
 	if (!input.quoteBank && !input.fallbackCorpus) {
@@ -141,14 +104,12 @@ function buildFromQuotes(
 	const usedIds = new Set<number>();
 	let charCount = 0;
 
-	// Don't walk the whole bank trying to avoid already-used ids if we've
-	// exhausted available quotes — bail and either synth-pad or stop.
 	while (charCount < opts.targetLen && segments.length < opts.maxChunks) {
+		// Bail when the bank is exhausted instead of looping forever looking
+		// for unused ids.
 		if (usedIds.size >= bank.quotes.length) break;
 
-		// Tight retry loop to skip already-picked ids. `selectQuote` doesn't
-		// support exclusion; sampling with rejection is fine at typical
-		// usage (a session needs ~10 quotes out of thousands).
+		// Rejection sampling — fine at ~10 quotes out of thousands per session.
 		const quote = pickUnusedQuote(bank, usedIds, opts);
 		if (!quote) break;
 		usedIds.add(quote.id);
@@ -156,9 +117,7 @@ function buildFromQuotes(
 		charCount += quote.text.length;
 	}
 
-	// Quote bank exhausted before we hit the length target — optionally
-	// pad with synthesized sentences if a fallback corpus is available.
-	// Otherwise return what we have.
+	// Quote bank short of target → pad with synth if fallback corpus present.
 	let source: RealTextSequence['stats']['source'] = 'quote-bank';
 	if (charCount < opts.targetLen && opts.synthFallback) {
 		source = 'quote-bank-exhausted';
@@ -180,10 +139,7 @@ function buildFromQuotes(
 	};
 }
 
-/**
- * Try up to a few attempts to pull a quote with a fresh id. Returns
- * `null` if we can't find one after many tries — caller bails out.
- */
+// Up to 30 samples for a fresh id, then linear scan as a last resort.
 function pickUnusedQuote(
 	bank: QuoteBank,
 	used: Set<number>,
@@ -202,9 +158,7 @@ function pickUnusedQuote(
 		});
 		if (!used.has(q.id)) return q;
 	}
-	// Rare: targetBigrams biased the bank so hard that the first few
-	// matches repeat. Find any unused quote by linear scan as a last
-	// resort — guaranteed to succeed if any unused quote exists at all.
+	// Fallback: strong targetBigrams bias may keep returning the same matches.
 	for (const q of bank.quotes) if (!used.has(q.id)) return q;
 	return null;
 }

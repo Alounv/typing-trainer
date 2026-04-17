@@ -1,12 +1,7 @@
 <script lang="ts">
 	/**
-	 * Visual pace indicator (spec §4.1). While `running` is true the pacer
-	 * advances a ghost position at `targetWPM` (5 chars = 1 word, spec §3.3)
-	 * and reports whether the user is on pace, slightly behind, or far behind.
-	 *
-	 * Kept deliberately standalone — no overlay on TextDisplay — so it can sit
-	 * anywhere in the session layout. A fancier ghost-cursor overlay is a
-	 * later polish item.
+	 * Visual pace indicator. Advances a ghost position at `targetWPM` (5 chars = 1 word)
+	 * and reports on-pace / behind / far-behind. Standalone, not overlaid.
 	 */
 	type PaceState = 'idle' | 'on-pace' | 'behind' | 'far-behind';
 
@@ -67,9 +62,8 @@
 		'far-behind': 'badge-error'
 	};
 
-	// Drive `elapsedMs` while running. Ticks at 100ms — fast enough that the
-	// user sees smooth state transitions, slow enough to not thrash rendering.
-	// `performance.now()` for precision (spec §9).
+	// Drive `elapsedMs` while running. Ticks at 100ms — smooth transitions
+	// without thrashing renders. `performance.now()` for precision.
 	$effect(() => {
 		if (!running) return;
 		const anchor = performance.now() - elapsedMs;

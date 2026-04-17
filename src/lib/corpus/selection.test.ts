@@ -17,7 +17,7 @@ describe('selectRealTextSentence', () => {
 		expect(() => selectRealTextSentence(empty)).toThrow();
 	});
 
-	it('enforces spec §4.2 minimum word count (≥8) even when caller asks for less', () => {
+	it('enforces minimum word count (≥8) even when caller asks for less', () => {
 		const c = loadCorpus(CONFIG, 'the of and a to in that is it');
 		// Asking for 3 should clamp up to 8.
 		const sentence = selectRealTextSentence(c, { wordCount: 3, rng: () => 0 });

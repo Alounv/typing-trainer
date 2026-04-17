@@ -39,12 +39,7 @@
 		 * check; targets fire `onBigramGraduated` individually.
 		 */
 		graduationTargetMs?: number;
-		/**
-		 * Diagnostic sessions archive their raw event log (spec §2.8) so
-		 * thresholds can be replayed later. `true` → we persist
-		 * {@link DiagnosticRawData} alongside the summary. Defaults to
-		 * `false`; diagnostic routes flip it on.
-		 */
+		/** When true, archives raw events alongside the summary — diagnostic routes flip this on. */
 		persistRawEvents?: boolean;
 	}
 

@@ -3,25 +3,10 @@ import type { BigramAggregate } from './types';
 import { classifyBigram, type ClassificationThresholds } from './classification';
 
 /**
- * Turn a first-input-per-position event stream into per-bigram aggregates.
- *
- * **Precondition**: input events are first-inputs only (one per position)
- * — typically the output of `annotateFirstInputs`. Passing the raw capture
- * log with retypes would double-count. The function sorts defensively by
- * `position` but does not dedupe.
- *
- * For each adjacent pair (position i, position i+1):
- * - `bigram` keyed on the _expected_ characters (what should have been typed)
- * - `occurrences` counts every pair encountered
- * - `errorCount` counts first-input errors on the **right-hand char** (i+1) —
- *   standard convention; prevents double-counting a wrong char across the
- *   two bigrams it participates in
- * - `meanTime` / `stdTime` draw only from pairs where **both** first inputs
- *   matched expected (clean samples). Error samples pollute the motor-program
- *   timing signal; we exclude them.
- *
- * Non-consecutive positions (e.g. gaps from aborted sessions) are skipped
- * rather than forming a spurious bigram.
+ * First-input event stream → per-bigram aggregates. Precondition: `events` is
+ * first-inputs only (use `annotateFirstInputs`); retypes would double-count.
+ * Errors are counted on the right-hand char to avoid double-counting across
+ * adjacent bigrams. Timing draws only from clean (both-correct) samples.
  */
 export function extractBigramAggregates(
 	events: readonly KeystrokeEvent[],

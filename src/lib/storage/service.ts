@@ -40,7 +40,7 @@ export async function getRecentSessions(limit: number): Promise<SessionSummary[]
 	return db.sessions.orderBy('timestamp').reverse().limit(limit).toArray();
 }
 
-/** All aggregates for one bigram, newest first. Powers sparklines (spec §10.6). */
+/** All aggregates for one bigram, newest first. Powers sparklines. */
 export async function getBigramHistory(bigram: string): Promise<BigramAggregate[]> {
 	const rows = await db.bigramRecords.where('bigram').equals(bigram).toArray();
 	return rows

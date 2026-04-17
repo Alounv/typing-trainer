@@ -21,18 +21,12 @@ const MODIFIER_KEYS = new Set(['Control', 'Shift', 'Alt', 'Meta', 'CapsLock']);
 /**
  * Svelte attachment that captures typing on the attached element.
  *
- * Design notes:
- * - The event buffer is a **plain array**, never `$state`. Pushing to a
- *   reactive array on every keystroke would force Svelte to re-render the
- *   display. Consumers get a single `number` signal via `onPositionChange`
- *   and render from that — one reactive read per keystroke, not a diff of a
- *   growing array.
- * - Backspace moves the cursor but does **not** delete prior events. The
- *   spec says the first input at each position counts for error rate
- *   (spec §2.2); retypes are recorded as additional events at the same
- *   position and resolved in post-processing.
- * - The attached node must be focusable (`tabindex="0"`) and focused for
- *   keydown events to arrive. That's the caller's responsibility.
+ * - Event buffer is a plain array (not `$state`) so the display doesn't re-render
+ *   on every keystroke; consumers subscribe via `onPositionChange` instead.
+ * - Backspace moves the cursor but does NOT delete prior events — the first
+ *   input at each position is what counts; retypes are separate events resolved
+ *   in post-processing.
+ * - Node must be focusable and focused (`tabindex="0"`).
  */
 export function keystrokeCapture(
 	config: CaptureConfig,
@@ -43,13 +37,11 @@ export function keystrokeCapture(
 		const events: KeystrokeEvent[] = [];
 		const startTime = performance.now();
 
-		// Pre-compute word indexing so the per-keystroke path does no scanning.
-		// Space counts as a regular character for bigrams (spec §2.2) but also
-		// triggers the word boundary: it gets the previous word's index, then
-		// the next non-space character starts a new word at positionInWord=0.
+		// Pre-compute word indexing so the hot path does no scanning. Spaces
+		// get the previous word's index; the next non-space starts a new word
+		// at positionInWord=0.
 		//
 		//   text:             t  h  e  ␣  c  a  t  ␣  s  a  t
-		//   position:         0  1  2  3  4  5  6  7  8  9  10
 		//   wordIndex:        0  0  0  0  1  1  1  1  2  2  2
 		//   positionInWord:   0  1  2  3  0  1  2  3  0  1  2
 		const wordIndexByPosition: number[] = [];

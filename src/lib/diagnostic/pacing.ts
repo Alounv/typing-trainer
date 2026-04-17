@@ -2,10 +2,8 @@ import type { KeystrokeEvent } from '../typing/types';
 import { TARGET_WPM_MULTIPLIER } from '../models';
 
 /**
- * Middle-quantile trim ratio: discard the slowest and fastest deciles
- * (spec §3.3). Keeping 80% of per-word samples trims outliers — a typo-
- * riddled word or a mid-text pause — without letting a handful of
- * unusually quick or slow words dominate the baseline.
+ * Discard slowest/fastest deciles. Keeping 80% trims outliers (typo-riddled
+ * words, mid-text pauses) without letting a few unusually-fast words dominate.
  */
 const TRIM_DECILE = 0.1;
 
@@ -24,22 +22,9 @@ export interface WordWPMSample {
 }
 
 /**
- * Baseline WPM from diagnostic event stream (spec §3.3).
- *
- * Approach:
- *   1. Bucket first-input events by `wordIndex`.
- *   2. For each word with ≥2 keystrokes, compute per-word WPM.
- *   3. Sort, discard the top and bottom decile, mean the rest.
- *
- * Returns 0 for an empty/unusable input — a baseline that we can't trust
- * should be a hard zero the UI can short-circuit on, not a misleading
- * small number.
- *
- * NOTE: callers should pass the raw diagnostic events straight from the
- * session capture. We intentionally work off the raw log (not
- * `annotateFirstInputs` output) — retypes happen within a word and we
- * care about wall-clock duration of finishing the word, not the clean-
- * samples path used by bigram timing.
+ * Baseline WPM: bucket events by word, compute per-word WPM, trim deciles,
+ * mean the rest. Returns 0 when unusable (UI short-circuits on exact zero).
+ * Pass raw events — retypes contribute to the word's wall-clock duration.
  */
 export function deriveBaselineWPM(events: readonly KeystrokeEvent[]): number {
 	const samples = perWordWPM(events);
@@ -54,29 +39,16 @@ export function deriveBaselineWPM(events: readonly KeystrokeEvent[]): number {
 	return sum / trimmed.length;
 }
 
-/**
- * `targetWPM = baselineWPM × TARGET_WPM_MULTIPLIER` (spec §3.3).
- *
- * Deliberately a separate function rather than collapsing into
- * `deriveBaselineWPM` — the multiplier is spec-tunable and callers
- * (progress store, UI) sometimes want the raw baseline.
- */
+/** `targetWPM = baselineWPM × TARGET_WPM_MULTIPLIER`. Separate because callers sometimes want the raw baseline. */
 export function computeTargetWPM(baseline: number): number {
 	return baseline * TARGET_WPM_MULTIPLIER;
 }
 
-/**
- * Slice events into word-aligned buckets and compute a WPM per word.
- *
- * Visible for testing (re-exported for harness use) — not needed by
- * consumers. If you find yourself importing this from app code,
- * prefer `deriveBaselineWPM`.
- */
+/** Per-word WPM samples. Prefer `deriveBaselineWPM` in app code. */
 export function perWordWPM(events: readonly KeystrokeEvent[]): WordWPMSample[] {
 	if (events.length === 0) return [];
 
-	// Group by wordIndex preserving original ordering. Events may arrive
-	// unsorted after replay-style callers concat chunks — defensive sort.
+	// Defensive sort — replay-style callers may concat chunks out of order.
 	const sorted = [...events].sort((a, b) => a.timestamp - b.timestamp);
 	const buckets = new Map<number, KeystrokeEvent[]>();
 	for (const e of sorted) {
@@ -90,8 +62,7 @@ export function perWordWPM(events: readonly KeystrokeEvent[]): WordWPMSample[] {
 
 	const samples: WordWPMSample[] = [];
 	for (const [, bucket] of buckets) {
-		// Need at least 2 keystrokes to derive a duration. Single-char
-		// "words" (accidents of the spec text) contribute nothing.
+		// Need ≥2 keystrokes to derive duration; single-char words contribute nothing.
 		if (bucket.length < 2) continue;
 
 		const first = bucket[0];
@@ -108,13 +79,8 @@ export function perWordWPM(events: readonly KeystrokeEvent[]): WordWPMSample[] {
 	return samples;
 }
 
-/**
- * Drop the bottom and top deciles, keep the middle 80%. Pure — doesn't
- * mutate input. Samples fewer than 10 elements degrade to "no trim"
- * rather than clipping to empty; a short diagnostic would otherwise
- * return 0 and read as "no baseline yet" when we actually have usable
- * data.
- */
+// Drop top/bottom deciles, keep middle 80%. <10 elements: no trim (a short
+// diagnostic would otherwise clip to empty and misread as "no baseline yet").
 function trimDeciles(values: number[]): number[] {
 	if (values.length < 10) return [...values];
 	const sorted = [...values].sort((a, b) => a - b);
