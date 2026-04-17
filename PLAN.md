@@ -220,18 +220,18 @@ storage/         (depends on: all domain types)
 
 > Define types co-located with their domains, and implement the persistence layer.
 
-- [ ] **1.1** Define `typing/types.ts` — `KeystrokeEvent`, `CaptureConfig`
-- [ ] **1.2** Define `bigram/types.ts` — `BigramAggregate`, `BigramClassification`
-- [ ] **1.3** Define `session/types.ts` — `SessionSummary`, `SessionConfig`
-- [ ] **1.4** Define `diagnostic/types.ts` — `DiagnosticRawData`
-- [ ] **1.5** Define `corpus/types.ts` — `CorpusConfig`, `FrequencyTable`
-- [ ] **1.6** Define `progress/types.ts` — `GraduationEvent`, `ClassificationSnapshot`, `ErrorFloorHistory`, `SDMHistory`, `ProgressStore`, `DiagnosticProgressReport`
-- [ ] **1.7** Define `models/` — cross-cutting types only (`UserSettings`, shared enums)
-- [ ] **1.8** Create Dexie database schema in `storage/db.ts`
-  - Tables: `sessions`, `bigramRecords`, `profile`, `progressStore`
-- [ ] **1.9** Implement storage service with CRUD operations
-- [ ] **1.10** Implement JSON export/import for backup (spec §9)
-- [ ] **1.11** Write unit tests for storage layer
+- [x] **1.1** Define `typing/types.ts` — `KeystrokeEvent`, `CaptureConfig`
+- [x] **1.2** Define `bigram/types.ts` — `BigramAggregate`, `BigramClassification`
+- [x] **1.3** Define `session/types.ts` — `SessionSummary`, `SessionConfig`
+- [x] **1.4** Define `diagnostic/types.ts` — `DiagnosticRawData`, `DiagnosticReport`
+- [x] **1.5** Define `corpus/types.ts` — `CorpusConfig`, `FrequencyTable`
+- [x] **1.6** Define `progress/types.ts` — `GraduationEvent`, `ClassificationSnapshot`, `ErrorFloorHistory`, `SDMHistory`, `ProgressStore`, `DiagnosticProgressReport`
+- [x] **1.7** Define `models/` — cross-cutting types only (`UserSettings`, shared enums)
+- [x] **1.8** Create Dexie database schema in `storage/db.ts`
+  - Tables: `sessions`, `bigramRecords`, `diagnosticRawData`, `profile`, `progressStore` (5 tables — `diagnosticRawData` split off per spec §2.1 / §2.8)
+- [x] **1.9** Implement storage service with CRUD operations
+- [x] **1.11** Write unit tests for storage layer
+- ~~**1.10** Implement JSON export/import for backup (spec §9)~~ — deferred to Phase 10.2, where the UI actually needs it
 
 ---
 
@@ -446,7 +446,7 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
   - Language / corpus selection
   - Threshold configuration (for advanced users)
   - Session duration preferences
-- [ ] **10.2** Data export/import UI
+- [ ] **10.2** Data export/import — JSON serialize/deserialize logic (`storage/export.ts`) + UI (deferred from Phase 1.10)
 - [ ] **10.3** Responsive layout (desktop-first, per spec §11)
 - [ ] **10.4** Keyboard shortcut support for session navigation
 - [ ] **10.5** Dark mode
@@ -495,8 +495,9 @@ Per spec §11:
 
 ## Key Implementation Notes
 
-1. **Timing precision**: All keystroke timestamps via `performance.now()`. No debouncing during capture — record raw, filter in post-processing.
-2. **Minimum data**: Each bigram needs ≥10 occurrences for classification, ≥20 for stability. Diagnostic sessions must guarantee ≥15 occurrences of top 200 corpus bigrams.
-3. **Never show raw WPM alone**: Always alongside smoothed trend.
-4. **Interpretive messaging**: Every metric must answer "so what?" — the app provides conclusions, not just numbers.
-5. **Celebration restraint**: Celebrate structural change (graduations, milestones), never effort (session completion, streaks of days).
+1. **Code readability**: Favor comments that make the code easy to read. Explain the _why_ on anything non-obvious — domain constants, threshold choices, algorithmic decisions, workarounds, invariants. Type fields and tunable constants should carry a short comment when the name alone doesn't make the intent clear. The default elsewhere is "no comments unless necessary"; in this project the default is "comment for the next reader".
+2. **Timing precision**: All keystroke timestamps via `performance.now()`. No debouncing during capture — record raw, filter in post-processing.
+3. **Minimum data**: Each bigram needs ≥10 occurrences for classification, ≥20 for stability. Diagnostic sessions must guarantee ≥15 occurrences of top 200 corpus bigrams.
+4. **Never show raw WPM alone**: Always alongside smoothed trend.
+5. **Interpretive messaging**: Every metric must answer "so what?" — the app provides conclusions, not just numbers.
+6. **Celebration restraint**: Celebrate structural change (graduations, milestones), never effort (session completion, streaks of days).
