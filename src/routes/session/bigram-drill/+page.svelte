@@ -1,22 +1,23 @@
 <script lang="ts">
 	/**
-	 * Bigram drill route. Loads a built-in corpus and generates a
-	 * sequence targeting a stub set of common-trouble bigrams until the
-	 * Phase 6 scheduler can supply real priority targets from the most
-	 * recent diagnostic.
+	 * Bigram drill route. Receives its target bigrams from the dashboard
+	 * via the hand-off stash (spec §5). Falls back to a small stub set
+	 * when invoked directly (URL paste, dev nav) so the route always
+	 * has *something* to drill.
 	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
 	import { loadBuiltinCorpus } from '$lib/corpus/registry';
 	import { generateBigramDrillSequence } from '$lib/drill/bigram-drill';
 	import { phaseTargetMsFromWPM } from '$lib/session/graduation';
+	import { consumePlannedSession } from '$lib/scheduler/handoff';
 
 	/**
-	 * Placeholder target bigrams. Phase 6 will swap these for the priority
-	 * list from the latest DiagnosticReport. Chosen for frequency in
+	 * Fallback targets. Only used when the user lands here without a
+	 * dashboard hand-off (direct URL, dev). Chosen for frequency in
 	 * English so the drill is exercised by typical words.
 	 */
-	const STUB_TARGETS = ['th', 'he', 'in', 'er', 'an'] as const;
+	const FALLBACK_TARGETS = ['th', 'he', 'in', 'er', 'an'] as const;
 
 	/**
 	 * Assumed baseline when no diagnostic has ever run. Graduation uses
@@ -28,19 +29,25 @@
 
 	type LoadState =
 		| { status: 'loading' }
-		| { status: 'ready'; text: string }
+		| { status: 'ready'; text: string; targets: readonly string[] }
 		| { status: 'error'; message: string };
 
 	let state = $state<LoadState>({ status: 'loading' });
 
 	onMount(async () => {
 		try {
+			const planned = consumePlannedSession('bigram-drill');
+			const targets =
+				planned?.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0
+					? planned.config.bigramsTargeted
+					: (FALLBACK_TARGETS as readonly string[]);
+
 			const corpus = await loadBuiltinCorpus('en-top-1000');
 			const seq = generateBigramDrillSequence({
-				targetBigrams: STUB_TARGETS,
+				targetBigrams: targets,
 				corpus
 			});
-			state = { status: 'ready', text: seq.text };
+			state = { status: 'ready', text: seq.text, targets };
 		} catch (err) {
 			state = {
 				status: 'error',
@@ -60,7 +67,7 @@
 		text={state.text}
 		title="Bigram drill"
 		lede="Targeted drill on common trouble pairs. A bigram graduates after 15 clean samples at pace."
-		targetBigrams={STUB_TARGETS}
+		targetBigrams={state.targets}
 		graduationTargetMs={phaseTargetMsFromWPM(PHASE_WPM)}
 	/>
 {/if}

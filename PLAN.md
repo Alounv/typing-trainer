@@ -449,7 +449,7 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 - [ ] **10.2** Data export/import — JSON serialize/deserialize logic (`storage/export.ts`) + UI (deferred from Phase 1.10)
 - [ ] **10.3** Responsive layout (desktop-first, per spec §11)
 - [ ] **10.4** Keyboard shortcut support for session navigation
-- [ ] **10.5** Dark mode
+- [X] **10.5** Dark mode
 - [ ] **10.6** Accessibility follow-up pass (non-typing surfaces: dashboards, settings, modals — typing surface a11y lives in Phase 2.4)
 - [ ] **10.7** Performance audit (ensure keystroke capture has zero lag; re-run the Phase 2 perf spike on low-end hardware)
 

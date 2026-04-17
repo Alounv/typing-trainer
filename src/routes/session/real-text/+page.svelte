@@ -9,6 +9,7 @@
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
 	import { loadBuiltinCorpus, loadQuoteBank } from '$lib/corpus/registry';
 	import { generateRealTextSequence } from '$lib/drill/real-text';
+	import { consumePlannedSession } from '$lib/scheduler/handoff';
 
 	const DEFAULT_BASELINE_WPM = 60;
 	const TARGET_MINUTES = 10;
@@ -16,7 +17,7 @@
 	 * 5 chars = 1 word (spec). Text length = wordsPerMin × minutes × 5.
 	 * At 60 WPM × 10 min → 3000 chars, which is ~15-25 typical quotes.
 	 */
-	const TARGET_CHARS = DEFAULT_BASELINE_WPM * TARGET_MINUTES * 5;
+	const DEFAULT_TARGET_CHARS = DEFAULT_BASELINE_WPM * TARGET_MINUTES * 5;
 
 	type LoadState =
 		| { status: 'loading' }
@@ -27,6 +28,14 @@
 
 	onMount(async () => {
 		try {
+			// Dashboard hand-off: if the scheduler picked a duration for this
+			// session, honor it — users with smaller target WPM get a
+			// shorter text so they still cover the intended minute count.
+			const planned = consumePlannedSession('real-text');
+			const targetChars = planned
+				? Math.round((planned.config.durationMs / 60_000) * DEFAULT_BASELINE_WPM * 5)
+				: DEFAULT_TARGET_CHARS;
+
 			// Quote bank is the primary source; corpus is the synth fallback
 			// when the bank runs out of quotes before hitting target chars.
 			const [bank, corpus] = await Promise.all([
@@ -36,7 +45,7 @@
 			const seq = generateRealTextSequence({
 				quoteBank: bank,
 				fallbackCorpus: corpus,
-				options: { targetLengthChars: TARGET_CHARS }
+				options: { targetLengthChars: targetChars }
 			});
 			state = { status: 'ready', text: seq.text };
 		} catch (err) {
