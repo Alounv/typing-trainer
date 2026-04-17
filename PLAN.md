@@ -307,25 +307,25 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 
 - [ ] **4.1** Source and build built-in corpus data files (spec §6.1) — this is a real chunk of work, not a checkbox
   - [ ] **4.1a** Identify permissively licensed sources for each language (see Risks & Spikes) and record license terms in repo
-  - [ ] **4.1b** English top-1000 word list with frequencies
-  - [ ] **4.1c** French top-1000 word list with frequencies
+  - [x] **4.1b** English top-1000 word list with frequencies _(MonkeyType-style ordered wordlist; also 5k + 10k sizes)_
+  - [x] **4.1c** French top-1000 word list with frequencies _(actually 1500 words; also 10k size)_
   - [ ] **4.1d** English prose excerpts (length target: enough for §4.2 sentence selection)
   - [ ] **4.1e** French prose excerpts
-  - [ ] **4.1f** Precomputed bigram frequency table per corpus (offline script checked into repo)
+  - [ ] **4.1f** Precomputed bigram frequency table per corpus (offline script checked into repo) _(currently derived at load time via Zipf approximation — no explicit counts in source data)_
   - [ ] **4.1g** Validation fixtures: hand-verified frequencies for ~20 sentinel words / bigrams per corpus to catch build-script regressions
-- [ ] **4.2** Corpus loader — parse and validate corpus files
-- [ ] **4.3** Mixed-language corpus merging (spec §6.2)
+- [x] **4.2** Corpus loader — parse and validate corpus files
+- [x] **4.3** Mixed-language corpus merging (spec §6.2)
   - Weighted merge of word frequency tables across languages
   - Merged bigram frequency table computation
   - Interleaved text selection from both languages
-- [ ] **4.4** Custom corpus import (spec §6.3)
+- [x] **4.4** Custom corpus import (spec §6.3)
   - Text tokenization
   - Bigram/word frequency computation
   - Overlap analysis with built-in corpus
   - Size validation (≥500 unique bigrams)
   - Weighted merge with base corpus
-- [ ] **4.5** Sentence selection algorithm for real-text sessions (spec §4.2)
-- [ ] **4.6** Tests for corpus processing
+- [x] **4.5** Sentence selection algorithm for real-text sessions (spec §4.2)
+- [x] **4.6** Tests for corpus processing
 
 ---
 
