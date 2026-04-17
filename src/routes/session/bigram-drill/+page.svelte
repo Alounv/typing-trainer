@@ -8,18 +8,24 @@
 	import { loadBuiltinCorpus, isBuiltinCorpusId } from '$lib/corpus/registry';
 	import { generateBigramDrillSequence } from '$lib/drill/bigram-drill';
 	import { consumePlannedSession } from '$lib/scheduler/handoff';
-	import { getProfile } from '$lib/storage/service';
+	import { findGraduatedBigrams } from '$lib/scheduler/graduation-filter';
+	import { DEFAULT_DRILL_TARGET_COUNT } from '$lib/scheduler/planner';
+	import { getBigramHistory, getProfile, getRecentSessions } from '$lib/storage/service';
 	import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from '$lib/models';
 
 	/** Corpus used when the profile is absent or its id isn't a known built-in. */
 	const FALLBACK_CORPUS_ID = 'en';
 
 	/**
-	 * Fallback targets. Only used when the user lands here without a
-	 * dashboard hand-off (direct URL, dev). Chosen for frequency in
-	 * English so the drill is exercised by typical words.
+	 * Seed targets used only when no diagnostic has ever run (and therefore
+	 * nothing in storage to prioritize). Once a diagnostic exists, drill
+	 * targets always come from its priority list — even on direct nav /
+	 * refresh, to stay consistent with what the dashboard would pick.
 	 */
-	const FALLBACK_TARGETS = ['th', 'he', 'in', 'er', 'an'] as const;
+	const SEED_TARGETS = ['th', 'he', 'in', 'er', 'an'] as const;
+
+	/** Mirrors dashboard-data.ts so direct nav matches dashboard-sourced nav. */
+	const RECENT_WINDOW = 20;
 
 	type LoadState =
 		| { status: 'loading' }
@@ -31,14 +37,9 @@
 	onMount(async () => {
 		try {
 			const planned = consumePlannedSession('bigram-drill');
-			const targets =
-				planned?.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0
-					? planned.config.bigramsTargeted
-					: (FALLBACK_TARGETS as readonly string[]);
-			// Profile drives both word budget and corpus language/size.
-			// Planned sessions already had the budget chosen upstream; we
-			// always read the profile for corpus so a French user's drill
-			// uses French even when navigating from a plan card.
+			// Profile drives word budget and corpus language. Planned sessions
+			// already had the budget chosen upstream; we always read the profile
+			// for corpus so a French user's drill uses French even from a plan card.
 			const profile = await getProfile();
 			const wordBudget =
 				planned?.config.wordBudget ??
@@ -46,6 +47,11 @@
 				DEFAULT_BIGRAM_DRILL_WORD_BUDGET;
 			const pickedId = profile?.corpusIds?.[0];
 			const corpusId = pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
+
+			const targets =
+				planned?.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0
+					? planned.config.bigramsTargeted
+					: await resolveDirectNavTargets();
 
 			const corpus = await loadBuiltinCorpus(corpusId);
 			const seq = generateBigramDrillSequence({
@@ -61,6 +67,24 @@
 			};
 		}
 	});
+
+	/**
+	 * Pick drill targets without a dashboard hand-off. Mirrors the planner:
+	 * latest diagnostic's `priorityTargets`, minus any bigrams that the
+	 * cross-session graduation filter has retired. Falls back to SEED_TARGETS
+	 * only when there's no diagnostic on file (first-run / reset).
+	 */
+	async function resolveDirectNavTargets(): Promise<readonly string[]> {
+		const recent = await getRecentSessions(RECENT_WINDOW);
+		const latestDiag = recent.find((s) => s.type === 'diagnostic');
+		const report = latestDiag?.diagnosticReport;
+		if (!report) return SEED_TARGETS;
+
+		const priority = report.priorityTargets.map((p) => p.bigram);
+		const graduated = await findGraduatedBigrams(priority, getBigramHistory);
+		const active = priority.filter((b) => !graduated.has(b)).slice(0, DEFAULT_DRILL_TARGET_COUNT);
+		return active.length > 0 ? active : SEED_TARGETS;
+	}
 </script>
 
 {#if state.status === 'loading'}
