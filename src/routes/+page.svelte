@@ -15,6 +15,7 @@
 	import { loadBuiltinCorpus } from '$lib/corpus/registry';
 	import { loadDashboardData, type DashboardData } from '$lib/scheduler/dashboard-data';
 	import { stashPlannedSession } from '$lib/scheduler/handoff';
+	import { activateBonusRound } from '$lib/scheduler/bonus-round';
 	import type { PlannedSession } from '$lib/scheduler/types';
 	import type { SessionType } from '$lib/session/types';
 
@@ -89,14 +90,30 @@
 		{@const data = state.data}
 
 		{#if data.allDoneForToday}
+			{@const completed = data.completedToday}
 			<!--
 				All mini-sessions done today. Deliberately quiet — no confetti,
 				no streak counter (spec §10.4 restricts celebration to structural
-				change). The override row below still lets the user run a one-off.
+				change). "Start another round" is the escape hatch for users who
+				want to keep going: it snapshots today's completions as the new
+				baseline so the planner re-emits a full plan on reload.
 			-->
-			<section class="space-y-2" data-testid="day-complete">
+			<section class="space-y-3" data-testid="day-complete">
 				<h2 class="text-2xl font-semibold text-base-content">Today's plan is done.</h2>
 				<p class="text-base-content/65">Rest is part of the work. Come back tomorrow.</p>
+				<button
+					type="button"
+					class="btn btn-sm"
+					onclick={() => {
+						activateBonusRound(completed);
+						// Full reload so `loadDashboardData` re-reads the baseline
+						// and the UI state matches the fresh plan from scratch.
+						window.location.reload();
+					}}
+					data-testid="start-another-round"
+				>
+					Start another round
+				</button>
 			</section>
 		{/if}
 

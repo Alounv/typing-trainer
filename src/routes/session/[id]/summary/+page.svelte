@@ -17,11 +17,18 @@
 	import { loadBuiltinCorpus } from '$lib/corpus/registry';
 	import { loadDashboardData } from '$lib/scheduler/dashboard-data';
 	import { stashPlannedSession } from '$lib/scheduler/handoff';
+	import { activateBonusRound } from '$lib/scheduler/bonus-round';
 	import type { PlannedSession } from '$lib/scheduler/types';
 
 	type LoadState =
 		| { status: 'loading' }
-		| { status: 'ready'; summary: SessionSummary; next: PlannedSession | undefined }
+		| {
+				status: 'ready';
+				summary: SessionSummary;
+				next: PlannedSession | undefined;
+				/** Snapshot for `activateBonusRound` when the user starts another round from here. */
+				completedToday: Partial<Record<SessionType, number>>;
+		  }
 		| { status: 'missing' }
 		| { status: 'error'; message: string };
 
@@ -45,7 +52,12 @@
 				return;
 			}
 			const dashboard = await loadDashboardData({ recentSessions, corpus });
-			state = { status: 'ready', summary, next: dashboard.plan[0] };
+			state = {
+				status: 'ready',
+				summary,
+				next: dashboard.plan[0],
+				completedToday: dashboard.completedToday
+			};
 		} catch (err) {
 			state = {
 				status: 'error',
@@ -71,6 +83,14 @@
 		// session route can read its targets / word budget on mount.
 		stashPlannedSession(planned);
 		window.location.href = routeFor(planned.config.type);
+	}
+
+	function startAnotherRound(completedToday: Partial<Record<SessionType, number>>) {
+		// Mirrors the dashboard's "Start another round" button: snapshot
+		// today's completions as the new baseline, then land on the
+		// dashboard where the freshly-re-planned pair of cards is waiting.
+		activateBonusRound(completedToday);
+		window.location.href = resolve('/');
 	}
 
 	/**
@@ -210,11 +230,20 @@
 					Back to dashboard
 				</a>
 			{:else}
+				{@const completed = state.completedToday}
 				<a
 					href={resolve('/')}
 					class="btn btn-lg btn-primary"
 					data-testid="day-complete-cta">Day complete · Back to dashboard</a
 				>
+				<button
+					type="button"
+					class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
+					onclick={() => startAnotherRound(completed)}
+					data-testid="summary-start-another-round"
+				>
+					Start another round
+				</button>
 			{/if}
 		</div>
 	{/if}

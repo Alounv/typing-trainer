@@ -14,6 +14,7 @@ import { generateDiagnosticReport } from '../diagnostic/engine';
 import { getDiagnosticRawData, getBigramHistory, getProfile } from '../storage/service';
 import { findGraduatedBigrams } from './graduation-filter';
 import { planDailySessions, sliceCompletedFromPlan } from './planner';
+import { applyBonusBaseline, readActiveBaseline } from './bonus-round';
 import type { PlannedSession } from './types';
 
 export interface DashboardData {
@@ -29,6 +30,12 @@ export interface DashboardData {
 	 * rather than array-length arithmetic.
 	 */
 	allDoneForToday: boolean;
+	/**
+	 * Raw completed-today counts by session type. Exposed so the
+	 * dashboard's "Start another round" button can snapshot the current
+	 * baseline when activating a bonus round.
+	 */
+	completedToday: Partial<Record<SessionType, number>>;
 	lastSession?: SessionSummary;
 	latestDiagnosticReport?: DiagnosticReport;
 	graduatedFromRotation: ReadonlySet<string>;
@@ -79,13 +86,17 @@ export async function loadDashboardData(inputs: DashboardLoadInputs): Promise<Da
 	// Strip already-done-today items so the dashboard only shows what's
 	// left. Planner is stateless and always emits a full day; the "what
 	// the user has already done" filter lives here, at the async edge
-	// that knows about clocks and storage.
+	// that knows about clocks and storage. If a bonus round is active,
+	// its baseline is subtracted first so today's earlier completions
+	// are "forgiven" and the user gets a fresh plan to work through.
 	const completedToday = countCompletedToday(recentSessions);
-	const plan = sliceCompletedFromPlan(fullPlan, completedToday);
+	const effectiveCompleted = applyBonusBaseline(completedToday, readActiveBaseline());
+	const plan = sliceCompletedFromPlan(fullPlan, effectiveCompleted);
 
 	return {
 		plan,
 		allDoneForToday: plan.length === 0 && fullPlan.length > 0,
+		completedToday,
 		lastSession: recentSessions[0],
 		latestDiagnosticReport,
 		graduatedFromRotation,
