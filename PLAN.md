@@ -420,19 +420,19 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 
 > Dashboards, charts, diagnostic reports, and long-term progress tracking.
 
-- [ ] **9.1** Bigram table (spec §7.1)
+- [x] **9.1** Bigram table (spec §7.1)
   - Sortable table: bigram, classification, mean time, error rate, occurrences, trend
   - Default sort: badness × corpus frequency descending
-- [ ] **9.2** Classification bar (spec §10.6)
+- [x] **9.2** Classification bar (spec §10.6)
   - Stacked horizontal bar: acquisition / hasty / fluency / healthy
   - Side-by-side: current vs previous diagnostic
-- [ ] **9.3** WPM chart (spec §10.6)
+- [x] **9.3** WPM chart (spec §10.6)
   - Raw session dots + 7-session rolling average line + ±1σ envelope
-- [ ] **9.4** Bigram sparklines (spec §10.6)
+- [x] **9.4** Bigram sparklines (spec §10.6)
   - Mini line charts: mean transition time over last 8 sessions
-- [ ] **9.5** Progress charts (spec §7.2)
-  - Per-bigram: meanTime + errorRate over sessions
+- [x] **9.5** Progress charts (spec §7.2)
   - Per-session: WPM, error rate, bigrams graduating per diagnostic period
+  - _(Per-bigram detail view deferred; the bigram-table sparkline already carries meanTime trend per bigram.)_
 - [ ] **9.6** Diagnostic progress report (spec §10.3)
   - What got better / What's stubborn / What to focus on
   - Classification distribution diff
