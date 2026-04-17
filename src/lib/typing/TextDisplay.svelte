@@ -73,10 +73,11 @@
 		// punishment. The data still records it for analytics (spec §2.2).
 		'typed-error-corrected':
 			'text-base-content/75 underline decoration-dotted decoration-warning underline-offset-4',
-		// Current char: solid saturated block + thicker primary rule. Must
-		// out-weight the pacer ghost (below) — cursor is the user's anchor,
-		// pacer is peripheral.
-		current: 'text-primary-content bg-primary/70 rounded-sm'
+		// Current char: text-only inversion. The saturated primary block
+		// behind it is drawn by the animated cursor overlay below (see
+		// `cursorRect`) so motion between keystrokes is a lateral slide
+		// rather than a discrete class swap.
+		current: 'text-primary-content'
 	};
 
 	/**
@@ -99,18 +100,40 @@
 	 */
 	let lastLineTop = -1;
 
+	/**
+	 * Cursor bar geometry in viewport-local coordinates. A CSS-transition
+	 * on `transform` slides the bar laterally as `position` advances,
+	 * which reads much calmer than swapping a background class between
+	 * discrete spans (the previous approach jumped character-to-character
+	 * and felt abrupt).
+	 */
+	let cursorRect = $state({ x: 0, y: 0, w: 0, h: 0, ready: false });
+
 	$effect(() => {
 		// Re-run when position changes. Relies on the viewport being
 		// `position: relative` so the span's `offsetTop` is measured from
 		// the viewport itself (not whatever ancestor happens to be
 		// positioned).
 		if (!viewportEl) return;
-		// Constant-time lookup by child index. The each-block renders one
-		// span per char in order, so `children[position]` is always the
-		// current char's span. Avoids a per-keystroke `querySelector` scan,
-		// which on long texts walks thousands of spans.
-		const currentSpan = viewportEl.children[position] as HTMLElement | undefined;
+		// `getElementsByTagName` returns a live collection of spans,
+		// skipping the absolutely-positioned cursor overlay element —
+		// that's why we can't just index into `viewportEl.children` any
+		// more. Still O(1) on access after the initial layout.
+		const spans = viewportEl.getElementsByTagName('span');
+		const currentSpan = spans[position] as HTMLElement | undefined;
 		if (!currentSpan) return;
+
+		// Update cursor rect every tick so the animated bar follows the
+		// current character exactly. The transition lives in the template
+		// `style` binding — the only thing to do here is push the target.
+		cursorRect = {
+			x: currentSpan.offsetLeft,
+			y: currentSpan.offsetTop,
+			w: currentSpan.offsetWidth,
+			h: currentSpan.offsetHeight,
+			ready: true
+		};
+
 		const lineTop = currentSpan.offsetTop;
 		if (lineTop === lastLineTop) return;
 		lastLineTop = lineTop;
@@ -144,11 +167,24 @@
 	class="relative max-h-[18rem] overflow-y-hidden font-mono text-2xl leading-loose tracking-wide break-normal whitespace-pre-wrap"
 	aria-label="Drill text"
 >
+	<!--
+		Animated cursor bar. Positioned absolutely inside the viewport and
+		translated via `transform` so the browser promotes it to its own
+		compositor layer and the slide is GPU-accelerated. `opacity` guards
+		against a one-frame flash at (0,0) before the first layout measure
+		populates `cursorRect`.
+	-->
+	<div
+		class="pointer-events-none absolute top-0 left-0 rounded-sm bg-primary/70 transition-[transform,width,height,opacity] duration-100 ease-out motion-reduce:transition-none"
+		style="transform: translate({cursorRect.x}px, {cursorRect.y}px); width: {cursorRect.w}px; height: {cursorRect.h}px; opacity: {cursorRect.ready ? 1 : 0}"
+		aria-hidden="true"
+	></div>
+
 	{#each text as char, i (i)}
 		{@const state = stateFor(i, position, errorPositions, correctedPositions)}
 		{@const ghost = ghostPosition !== undefined && i === ghostPosition && i > position}
 		<span
-			class="transition-colors duration-75 motion-reduce:transition-none {stateClasses[
+			class="relative transition-colors duration-75 motion-reduce:transition-none {stateClasses[
 				state
 			]} {ghost ? 'rounded-sm border-b border-secondary/60 bg-secondary/15' : ''}"
 			data-state={state}
