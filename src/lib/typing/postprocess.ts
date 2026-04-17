@@ -26,9 +26,7 @@ export interface AnnotatedKeystrokeEvent extends KeystrokeEvent {
  * UI-level "treat this backspace as a live correction" cue; for offline
  * analytics we want to credit corrections regardless of how long they took.
  */
-export function annotateFirstInputs(
-	events: readonly KeystrokeEvent[]
-): AnnotatedKeystrokeEvent[] {
+export function annotateFirstInputs(events: readonly KeystrokeEvent[]): AnnotatedKeystrokeEvent[] {
 	// Bucket by position. Using an array keyed by position (cheap for the
 	// expected range — positions are small ints) beats a Map here.
 	const buckets = new Map<number, KeystrokeEvent[]>();
