@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { buildSessionSummary } from './runner';
+import { describe, expect, it, vi } from 'vitest';
+import { buildSessionSummary, SessionRunner } from './runner';
+import { phaseTargetMsFromWPM } from './graduation';
 import type { KeystrokeEvent } from '../typing/types';
 
 /**
@@ -83,5 +84,122 @@ describe('buildSessionSummary', () => {
 			makeInput({ type: 'bigram-drill', bigramsTargeted: ['th', 'he'] })
 		);
 		expect(summary.bigramsTargeted).toEqual(['th', 'he']);
+	});
+});
+
+describe('SessionRunner', () => {
+	it('accumulates events and advances position', () => {
+		const runner = new SessionRunner({ type: 'diagnostic', text: 'abc' });
+		runner.recordEvent(stroke(0, 'a', 'a', 100));
+		runner.recordEvent(stroke(1, 'b', 'b', 200));
+		expect(runner.events).toHaveLength(2);
+		expect(runner.position).toBe(2);
+	});
+
+	it('shouldEnd returns "complete" when every position is typed', () => {
+		const runner = new SessionRunner({ type: 'diagnostic', text: 'ab' });
+		runner.recordEvent(stroke(0, 'a', 'a', 0));
+		expect(runner.shouldEnd()).toBeNull();
+		runner.recordEvent(stroke(1, 'b', 'b', 100));
+		expect(runner.shouldEnd()).toBe('complete');
+	});
+
+	it('retype at the same position does not form a new bigram occurrence', () => {
+		// Spec §2.2: first input sticks. A retype after backspace issues a
+		// second event at the same position; it must NOT form a phantom
+		// bigram with the surrounding chars.
+		const runner = new SessionRunner({
+			type: 'bigram-drill',
+			text: 'ab',
+			targetBigrams: ['ab']
+		});
+		runner.recordEvent(stroke(0, 'a', 'a', 0));
+		runner.recordEvent(stroke(1, 'b', 'x', 100)); // wrong first input — one occurrence
+		runner.recordEvent(stroke(1, 'b', 'b', 200)); // retype; same position, no new pair
+		// Single occurrence total — with correct=false (first-input wrong).
+		const r = runner.finalize(1000);
+		expect(r.bigramsTargeted).toEqual(['ab']);
+	});
+
+	it('tracks graduated targets and fires onBigramGraduated once per bigram', () => {
+		// Feed 15 clean 'ab' occurrences at 200ms transitions; with phase
+		// target 200ms the graduation check should flip after the 15th.
+		const onGraduated = vi.fn();
+		const runner = new SessionRunner({
+			type: 'bigram-drill',
+			text: 'ab'.repeat(20),
+			targetBigrams: ['ab'],
+			graduationTargetMs: phaseTargetMsFromWPM(60), // 200ms
+			onBigramGraduated: onGraduated
+		});
+
+		for (let i = 0; i < 15; i++) {
+			const pos = i * 2;
+			runner.recordEvent(stroke(pos, 'a', 'a', pos * 200));
+			runner.recordEvent(stroke(pos + 1, 'b', 'b', pos * 200 + 200));
+		}
+
+		expect(runner.graduatedTargets).toEqual(['ab']);
+		expect(onGraduated).toHaveBeenCalledTimes(1);
+		expect(onGraduated).toHaveBeenCalledWith('ab');
+
+		// Further occurrences must NOT re-fire the callback.
+		const pos = 30;
+		runner.recordEvent(stroke(pos, 'a', 'a', pos * 200));
+		runner.recordEvent(stroke(pos + 1, 'b', 'b', pos * 200 + 200));
+		expect(onGraduated).toHaveBeenCalledTimes(1);
+	});
+
+	it('shouldEnd returns "all-graduated" once every target has graduated', () => {
+		// Single-target drill — once 'ab' graduates, no other targets remain.
+		const runner = new SessionRunner({
+			type: 'bigram-drill',
+			text: 'ab'.repeat(30), // generous enough to avoid hitting `complete` first
+			targetBigrams: ['ab'],
+			graduationTargetMs: phaseTargetMsFromWPM(60)
+		});
+		for (let i = 0; i < 15; i++) {
+			const pos = i * 2;
+			runner.recordEvent(stroke(pos, 'a', 'a', pos * 200));
+			runner.recordEvent(stroke(pos + 1, 'b', 'b', pos * 200 + 200));
+		}
+		expect(runner.shouldEnd()).toBe('all-graduated');
+	});
+
+	it('skips graduation tracking when graduationTargetMs is undefined', () => {
+		// Diagnostic-style: we still record events and care about bigram
+		// counts, but don't run the graduation check per-occurrence.
+		const onGraduated = vi.fn();
+		const runner = new SessionRunner({
+			type: 'diagnostic',
+			text: 'ab'.repeat(20),
+			targetBigrams: ['ab'], // present but no graduationTargetMs
+			onBigramGraduated: onGraduated
+		});
+		for (let i = 0; i < 20; i++) {
+			const pos = i * 2;
+			runner.recordEvent(stroke(pos, 'a', 'a', pos * 200));
+			runner.recordEvent(stroke(pos + 1, 'b', 'b', pos * 200 + 200));
+		}
+		expect(onGraduated).not.toHaveBeenCalled();
+		expect(runner.graduatedTargets).toEqual([]);
+	});
+
+	it('finalize produces a summary with the accumulated events', () => {
+		const runner = new SessionRunner({
+			type: 'bigram-drill',
+			text: 'ab',
+			targetBigrams: ['ab'],
+			idGenerator: () => FIXED_ID,
+			timestampProvider: () => FIXED_TS
+		});
+		runner.recordEvent(stroke(0, 'a', 'a', 0));
+		runner.recordEvent(stroke(1, 'b', 'b', 500));
+		const summary = runner.finalize(1_000);
+		expect(summary.id).toBe(FIXED_ID);
+		expect(summary.bigramsTargeted).toEqual(['ab']);
+		expect(summary.durationMs).toBe(1_000);
+		// 2-char text / 5 / (1 / 60) = 24 WPM.
+		expect(summary.wpm).toBeCloseTo(24, 5);
 	});
 });

@@ -346,13 +346,13 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 
 ### Session orchestration (`session/`)
 
-- [ ] **5.4** `runner.ts` — session lifecycle manager
+- [x] **5.4** `runner.ts` — session lifecycle manager
   - Start → feed text to `typing/` → collect KeystrokeEvent[] → pass to `bigram/extraction` → persist via `storage/`
   - Manages timer, session end conditions
-- [ ] **5.5** `graduation.ts` — in-session graduation check
-  - Follow spec §4.1: 14/15 recent correct AND last 5 within 20% of phase speed target, or 5 min timeout
-- [ ] **5.6** Session UI chrome (`session/components/`) — timer, stats bar
-- [ ] **5.7** Tests for session runner and graduation logic
+- [x] **5.5** `graduation.ts` — in-session graduation check
+  - Follow spec §4.1: 14/15 recent correct AND last 5 within 20% of phase speed target. (No 5-min timeout — sessions are pre-sized from baseline WPM × target minutes, so text exhaustion is the natural end.)
+- [x] **5.6** Session UI chrome (`session/components/`) — timer, stats bar
+- [x] **5.7** Tests for session runner and graduation logic
 
 ---
 

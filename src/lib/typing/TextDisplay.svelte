@@ -81,10 +81,66 @@
 		// pacer is peripheral.
 		current: 'text-primary-content bg-primary/70 rounded-sm'
 	};
+
+	/**
+	 * Windowed viewport: drill text is clipped to exactly 6 lines and
+	 * line-locked-scrolled so the current line stays near the top. Keeps
+	 * long sessions (real-text, several thousand chars) from presenting
+	 * as a wall; short drills (diagnostic) fit inside the cap and render
+	 * naturally.
+	 *
+	 * We scroll the container, not the document, so the header and
+	 * stats row stay fixed in view.
+	 */
+	let viewportEl: HTMLDivElement | null = $state(null);
+
+	/**
+	 * `offsetTop` of the span on the last scroll decision. Same-line
+	 * keystrokes don't shift offsetTop (the browser only wraps on word
+	 * boundaries), so the skip avoids re-issuing `scrollTo` with the
+	 * same target on every char. Scroll fires exactly once per line.
+	 */
+	let lastLineTop = -1;
+
+	$effect(() => {
+		// Re-run when position changes. Relies on the viewport being
+		// `position: relative` so the span's `offsetTop` is measured from
+		// the viewport itself (not whatever ancestor happens to be
+		// positioned).
+		if (!viewportEl) return;
+		const currentSpan = viewportEl.querySelector<HTMLElement>(`[data-pos="${position}"]`);
+		if (!currentSpan) return;
+		const lineTop = currentSpan.offsetTop;
+		if (lineTop === lastLineTop) return;
+		lastLineTop = lineTop;
+
+		viewportEl.scrollTo({
+			top: lineTop,
+			behavior: prefersReducedMotion() ? 'instant' : 'smooth'
+		});
+	});
+
+	/**
+	 * Respect `prefers-reduced-motion`. Smooth scrolling on every line
+	 * change can feel queasy for motion-sensitive users. Checked at call
+	 * time so an OS setting toggle mid-session is honored without reload.
+	 */
+	function prefersReducedMotion(): boolean {
+		if (typeof window === 'undefined') return false;
+		return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	}
 </script>
 
+<!--
+	Viewport height snaps to an exact line count so nothing gets clipped
+	mid-character. At `text-2xl` (1.5rem) × `leading-loose` (2) each line
+	is 3rem tall; 6 lines = 18rem. Change the line count here if the
+	type scale ever changes. `overflow-y-hidden` hides the scrollbar;
+	programmatic `scrollTo` still works in modern browsers.
+-->
 <div
-	class="font-mono text-2xl leading-loose tracking-wide break-normal whitespace-pre-wrap"
+	bind:this={viewportEl}
+	class="relative max-h-[18rem] overflow-y-hidden font-mono text-2xl leading-loose tracking-wide break-normal whitespace-pre-wrap"
 	aria-label="Drill text"
 >
 	{#each chars as { char, state, ghost }, i (i)}
@@ -93,6 +149,7 @@
 				state
 			]} {ghost ? 'rounded-sm border-b border-secondary/60 bg-secondary/15' : ''}"
 			data-state={state}
+			data-pos={i}
 			data-ghost={ghost || undefined}>{char}</span
 		>
 	{/each}
