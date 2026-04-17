@@ -9,8 +9,9 @@
 import type { DiagnosticReport } from '../diagnostic/types';
 import type { SessionSummary } from '../session/types';
 import type { CorpusData } from '../corpus/types';
+import type { UserSettings } from '../models';
 import { generateDiagnosticReport } from '../diagnostic/engine';
-import { getDiagnosticRawData, getBigramHistory } from '../storage/service';
+import { getDiagnosticRawData, getBigramHistory, getProfile } from '../storage/service';
 import { findGraduatedBigrams } from './graduation-filter';
 import { planDailySessions } from './planner';
 import type { PlannedSession } from './types';
@@ -20,6 +21,7 @@ export interface DashboardData {
 	lastSession?: SessionSummary;
 	latestDiagnosticReport?: DiagnosticReport;
 	graduatedFromRotation: ReadonlySet<string>;
+	userSettings?: UserSettings;
 }
 
 export interface DashboardLoadInputs {
@@ -45,7 +47,13 @@ export interface DashboardLoadInputs {
 export async function loadDashboardData(inputs: DashboardLoadInputs): Promise<DashboardData> {
 	const { recentSessions, corpus } = inputs;
 
-	const latestDiagnosticReport = await reconstructLatestDiagnosticReport(recentSessions, corpus);
+	// Profile read runs in parallel with the diagnostic-report
+	// rebuild: they're independent reads, and the dashboard blocks on
+	// all of them before first paint anyway.
+	const [latestDiagnosticReport, userSettings] = await Promise.all([
+		reconstructLatestDiagnosticReport(recentSessions, corpus),
+		getProfile()
+	]);
 
 	const priorityBigrams = latestDiagnosticReport?.priorityTargets.map((p) => p.bigram) ?? [];
 	const graduatedFromRotation = await findGraduatedBigrams(priorityBigrams, getBigramHistory);
@@ -53,14 +61,16 @@ export async function loadDashboardData(inputs: DashboardLoadInputs): Promise<Da
 	const plan = planDailySessions({
 		recentSessions,
 		latestDiagnosticReport,
-		graduatedFromRotation
+		graduatedFromRotation,
+		userSettings
 	});
 
 	return {
 		plan,
 		lastSession: recentSessions[0],
 		latestDiagnosticReport,
-		graduatedFromRotation
+		graduatedFromRotation,
+		userSettings
 	};
 }
 

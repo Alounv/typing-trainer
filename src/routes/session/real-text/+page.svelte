@@ -10,6 +10,7 @@
 	import { loadBuiltinCorpus, loadQuoteBank } from '$lib/corpus/registry';
 	import { generateRealTextSequence } from '$lib/drill/real-text';
 	import { consumePlannedSession } from '$lib/scheduler/handoff';
+	import { getProfile } from '$lib/storage/service';
 	import { DEFAULT_REAL_TEXT_WORD_BUDGET } from '$lib/models';
 
 	/** 5 chars ≈ 1 word (spec §2.3). Used to size text from a word budget. */
@@ -25,9 +26,16 @@
 	onMount(async () => {
 		try {
 			// Dashboard hand-off: the scheduler chooses the word budget for
-			// a planned session. Direct nav falls back to the default.
+			// a planned session. Direct nav (override row or URL paste)
+			// falls back to the user's profile setting, then to the factory
+			// default — so a setting change takes effect even when the user
+			// jumps in via the override rather than the plan card.
 			const planned = consumePlannedSession('real-text');
-			const wordBudget = planned?.config.wordBudget ?? DEFAULT_REAL_TEXT_WORD_BUDGET;
+			const profile = planned ? undefined : await getProfile();
+			const wordBudget =
+				planned?.config.wordBudget ??
+				profile?.wordBudgets?.realText ??
+				DEFAULT_REAL_TEXT_WORD_BUDGET;
 			const targetChars = wordBudget * CHARS_PER_WORD;
 
 			// Quote bank is the primary source; corpus is the synth fallback

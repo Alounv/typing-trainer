@@ -16,13 +16,12 @@ import { selectRealTextSentence } from '../corpus/selection';
  */
 
 /**
- * Separator between concatenated quotes. Two spaces rather than one is
- * deliberate: the typing surface renders the break as a short visual
- * pause without inventing punctuation the original quote doesn't own.
- * A newline would force the user to type a literal \n which isn't in
- * any of our corpora.
+ * Separator between concatenated segments. Kept at a single space so
+ * synth-path sentences (which are themselves space-joined words) don't
+ * produce jarring double-spaces at sentence boundaries in the typing
+ * surface — an effect users were noticing on the diagnostic.
  */
-const QUOTE_SEPARATOR = '  ';
+const QUOTE_SEPARATOR = ' ';
 
 /**
  * Default character target. 1400 chars ≈ 5 minutes at 60 WPM (60 × 5 =

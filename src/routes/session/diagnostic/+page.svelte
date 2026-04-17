@@ -11,6 +11,11 @@
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
 	import { loadBuiltinCorpus } from '$lib/corpus/registry';
 	import { sampleDiagnosticPassage } from '$lib/diagnostic/sampler';
+	import { getProfile } from '$lib/storage/service';
+	import { DEFAULT_DIAGNOSTIC_WORD_BUDGET } from '$lib/models';
+
+	/** 5 chars ≈ 1 word (spec §2.3) — translates the user's word budget into the sampler's char target. */
+	const CHARS_PER_WORD = 5;
 
 	type LoadState =
 		| { status: 'loading' }
@@ -23,9 +28,14 @@
 		try {
 			// Use the synth path (no quote bank): the target-bigram boost
 			// lives in `selectRealTextSentence`, and the diagnostic wants
-			// coverage more than literary naturalness.
-			const corpus = await loadBuiltinCorpus('en-top-1000');
-			const passage = sampleDiagnosticPassage(corpus);
+			// coverage more than literary naturalness. Word budget comes
+			// from settings so advanced users can shorten the sample for
+			// quick re-checks.
+			const [corpus, profile] = await Promise.all([loadBuiltinCorpus('en-top-1000'), getProfile()]);
+			const wordBudget = profile?.wordBudgets?.diagnostic ?? DEFAULT_DIAGNOSTIC_WORD_BUDGET;
+			const passage = sampleDiagnosticPassage(corpus, {
+				targetChars: wordBudget * CHARS_PER_WORD
+			});
 			state = { status: 'ready', text: passage.text };
 		} catch (err) {
 			state = {

@@ -27,8 +27,23 @@ import type { SchedulerInput, PlannedSession, PlannedSessionReason } from './typ
 import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 	DEFAULT_REAL_TEXT_WORD_BUDGET,
-	DEFAULT_DIAGNOSTIC_WORD_BUDGET
+	DEFAULT_DIAGNOSTIC_WORD_BUDGET,
+	type UserSettings
 } from '../models';
+
+/**
+ * Extract a word-budget trio from a user settings blob, filling
+ * missing entries from the factory defaults. Kept near the planner
+ * because the planner is the only caller that needs all three at
+ * once; each session route only needs its own type.
+ */
+function resolveWordBudgets(settings?: UserSettings) {
+	return {
+		bigramDrill: settings?.wordBudgets?.bigramDrill ?? DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
+		realText: settings?.wordBudgets?.realText ?? DEFAULT_REAL_TEXT_WORD_BUDGET,
+		diagnostic: settings?.wordBudgets?.diagnostic ?? DEFAULT_DIAGNOSTIC_WORD_BUDGET
+	};
+}
 
 /**
  * Run a full diagnostic every N non-diagnostic sessions (spec §5).
@@ -53,13 +68,16 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 		recentSessions,
 		latestDiagnosticReport,
 		graduatedFromRotation,
-		drillTargetCount = DEFAULT_DRILL_TARGET_COUNT
+		drillTargetCount = DEFAULT_DRILL_TARGET_COUNT,
+		userSettings
 	} = input;
+
+	const budgets = resolveWordBudgets(userSettings);
 
 	// 1. First-run: user has never completed a session. Onboarding needs
 	//    a diagnostic before it can compute baseline WPM (spec §7.2).
 	if (recentSessions.length === 0) {
-		return [diagnosticPlan('first-run-diagnostic')];
+		return [diagnosticPlan('first-run-diagnostic', undefined, budgets.diagnostic)];
 	}
 
 	// 2. We have sessions but no diagnostic report on file — can happen
@@ -67,7 +85,7 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	//    migrated from an older schema. Fail safe with a fresh
 	//    diagnostic so the drill has priority targets to pull from.
 	if (!latestDiagnosticReport) {
-		return [diagnosticPlan('missing-report-diagnostic')];
+		return [diagnosticPlan('missing-report-diagnostic', undefined, budgets.diagnostic)];
 	}
 
 	// 3. Cadence rule: every DIAGNOSTIC_INTERVAL non-diagnostic sessions,
@@ -75,7 +93,7 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	//    current (spec §5).
 	const since = sessionsSinceLastDiagnostic(recentSessions);
 	if (since >= DIAGNOSTIC_INTERVAL) {
-		return [diagnosticPlan('cadence-diagnostic', since)];
+		return [diagnosticPlan('cadence-diagnostic', since, budgets.diagnostic)];
 	}
 
 	// 4. Default daily = drill + real text.
@@ -89,7 +107,9 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	// drill phase entirely and jump to real text — there's nothing to
 	// drill on. The user has "arrived" at the current target roster.
 	if (drillTargets.length === 0) {
-		return Array.from({ length: PAIRS_PER_DAY }, () => realtextPlan('no-targets-left'));
+		return Array.from({ length: PAIRS_PER_DAY }, () =>
+			realtextPlan(budgets.realText, 'no-targets-left')
+		);
 	}
 
 	// Interleave drill + real-text mini-sessions so variety breaks up a
@@ -97,8 +117,8 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	// after any pair and the next run re-plans from scratch.
 	const plan: PlannedSession[] = [];
 	for (let i = 0; i < PAIRS_PER_DAY; i++) {
-		plan.push(drillPlan(drillTargets));
-		plan.push(realtextPlan());
+		plan.push(drillPlan(drillTargets, budgets.bigramDrill));
+		plan.push(realtextPlan(budgets.realText));
 	}
 	return plan;
 }
@@ -142,11 +162,12 @@ function diagnosticPlan(
 		PlannedSessionReason,
 		'first-run-diagnostic' | 'cadence-diagnostic' | 'missing-report-diagnostic'
 	>,
-	sessionsSince?: number
+	sessionsSince: number | undefined,
+	wordBudget: number
 ): PlannedSession {
 	const config: SessionConfig = {
 		type: 'diagnostic',
-		wordBudget: DEFAULT_DIAGNOSTIC_WORD_BUDGET
+		wordBudget
 	};
 	const labels: Record<typeof reason, string> = {
 		'first-run-diagnostic': 'First diagnostic',
@@ -170,10 +191,10 @@ function diagnosticPlan(
 	};
 }
 
-function drillPlan(targets: string[]): PlannedSession {
+function drillPlan(targets: string[], wordBudget: number): PlannedSession {
 	const config: SessionConfig = {
 		type: 'bigram-drill',
-		wordBudget: DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
+		wordBudget,
 		bigramsTargeted: targets,
 		pacerEnabled: true
 	};
@@ -185,10 +206,10 @@ function drillPlan(targets: string[]): PlannedSession {
 	};
 }
 
-function realtextPlan(hint?: 'no-targets-left'): PlannedSession {
+function realtextPlan(wordBudget: number, hint?: 'no-targets-left'): PlannedSession {
 	const config: SessionConfig = {
 		type: 'real-text',
-		wordBudget: DEFAULT_REAL_TEXT_WORD_BUDGET,
+		wordBudget,
 		pacerEnabled: true
 	};
 	return {

@@ -11,6 +11,7 @@
 	import { generateBigramDrillSequence } from '$lib/drill/bigram-drill';
 	import { phaseTargetMsFromWPM } from '$lib/session/graduation';
 	import { consumePlannedSession } from '$lib/scheduler/handoff';
+	import { getProfile } from '$lib/storage/service';
 	import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from '$lib/models';
 
 	/**
@@ -42,7 +43,14 @@
 				planned?.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0
 					? planned.config.bigramsTargeted
 					: (FALLBACK_TARGETS as readonly string[]);
-			const wordBudget = planned?.config.wordBudget ?? DEFAULT_BIGRAM_DRILL_WORD_BUDGET;
+			// Direct-nav users get their profile's drill budget; planned
+			// sessions use the scheduler-chosen value (which already read
+			// the profile upstream).
+			const profile = planned ? undefined : await getProfile();
+			const wordBudget =
+				planned?.config.wordBudget ??
+				profile?.wordBudgets?.bigramDrill ??
+				DEFAULT_BIGRAM_DRILL_WORD_BUDGET;
 
 			const corpus = await loadBuiltinCorpus('en-top-1000');
 			const seq = generateBigramDrillSequence({

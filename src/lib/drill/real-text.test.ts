@@ -79,15 +79,15 @@ describe('generateRealTextSequence', () => {
 		expect(out.segments.every((s) => s.kind === 'synth')).toBe(true);
 	});
 
-	it('concatenates segment texts with the two-space separator', () => {
+	it('concatenates segment texts with a single-space separator', () => {
 		const qb = bank([quote(1, 'aa'), quote(2, 'bb')]);
 		const out = generateRealTextSequence({
 			quoteBank: qb,
 			options: { targetLengthChars: 3, rng: () => 0 }
 		});
 		// With target 3 and quote 'aa' (2 chars) first, we keep going until
-		// ≥3 chars → picks a 2nd quote. Final text = "aa" + "  " + "bb".
-		expect(out.text).toBe('aa  bb');
+		// ≥3 chars → picks a 2nd quote. Final text = "aa" + " " + "bb".
+		expect(out.text).toBe('aa bb');
 	});
 
 	it('stops at maxChunks even if the target length is not met', () => {

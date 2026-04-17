@@ -5,6 +5,7 @@
  */
 import type { SessionConfig, SessionSummary } from '../session/types';
 import type { DiagnosticReport } from '../diagnostic/types';
+import type { UserSettings } from '../models';
 
 /**
  * Why the planner emitted a given entry. Drives the dashboard copy
@@ -52,4 +53,9 @@ export interface SchedulerInput {
 	 * preference.
 	 */
 	drillTargetCount?: number;
+	/**
+	 * User profile for per-user overrides: word budgets, classification
+	 * thresholds, language/corpus. Absent = factory defaults.
+	 */
+	userSettings?: UserSettings;
 }

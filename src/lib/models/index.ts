@@ -11,6 +11,17 @@ export interface UserSettings {
 		speedMs: number;
 		errorRate: number;
 	};
+	/**
+	 * Per-user override of the `DEFAULT_*_WORD_BUDGET` constants. Absent
+	 * keys fall back to the defaults; omitting the whole object is the
+	 * same as the factory setup. Settings page surfaces the three
+	 * knobs together so a power user can tune session length.
+	 */
+	wordBudgets?: {
+		bigramDrill: number;
+		realText: number;
+		diagnostic: number;
+	};
 }
 
 /** Mean transition time at/under which a bigram counts as fast (spec §3.1). */

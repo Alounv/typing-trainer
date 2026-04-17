@@ -387,11 +387,9 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 
 > First-run experience per spec §8.
 
-- [ ] **7.1** Language selection screen
-  - Languages: English, French (extensible), supports selecting multiple languages
-- [ ] **7.2** First diagnostic session (also derives baselineWPM)
-- [ ] **7.3** First diagnostic report display
-- [ ] **7.4** Transition to daily session flow
+- [ ] **7.1** First diagnostic session (also derives baselineWPM)
+- [ ] **7.2** First diagnostic report display
+- [ ] **7.3** Transition to daily session flow
 
 ---
 
@@ -458,6 +456,7 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 - [x] **10.4** Dark mode
 - [ ] **10.5** Accessibility follow-up pass (non-typing surfaces: dashboards, settings, modals — typing surface a11y lives in Phase 2.4)
 - [ ] **10.6** Performance audit (ensure keystroke capture has zero lag; re-run the Phase 2 perf spike on low-end hardware)
+- [ ] **10.7** Comment pass (do last): tighten verbose comments and strip `spec §…` references from code comments, JSDoc, and interface descriptions. The plan itself keeps its spec references; only source files are in scope.
 
 ---
 
