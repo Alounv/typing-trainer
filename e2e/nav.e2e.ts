@@ -7,7 +7,7 @@ test('dashboard renders and nav links route correctly', async ({ page }) => {
 	// pinning the h1 text anyway.
 	await expect(page.getByTestId('start-diagnostic')).toBeVisible();
 
-	await page.getByRole('link', { name: 'Drill' }).click();
+	await page.getByTestId('override-drill').click();
 	await expect(page).toHaveURL(/\/session\/bigram-drill$/);
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bigram drill');
 });
