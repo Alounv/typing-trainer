@@ -335,14 +335,14 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 
 ### Drill generation (`drill/`)
 
-- [ ] **5.1** `bigram-drill.ts` — bigram drill sequence generator (spec §4.1)
+- [x] **5.1** `bigram-drill.ts` — bigram drill sequence generator (spec §4.1)
   - Real word selector from corpus (words containing target bigrams, weighted by frequency)
   - Interleave target (70%) and filler (30%) bigrams
-  - Speed differentiation by classification (acquisition/hasty at 60% WPM, fluency at target WPM)
-- [ ] **5.2** `real-text.ts` — real text sentence selector (spec §4.2)
+  - Speed differentiation by classification (acquisition/hasty at 60% WPM, fluency at target WPM) _(pacing is not applied in this pure module — the session runner in Slice 2 will apply per-classification pacing when consuming the generated sequence)_
+- [x] **5.2** `real-text.ts` — real text sentence selector (spec §4.2)
   - Sentence selection from corpus, weighted by non-healthy bigram density
   - Minimum 8 words per sentence
-- [ ] **5.3** Tests for drill sequence generation
+- [x] **5.3** Tests for drill sequence generation
 
 ### Session orchestration (`session/`)
 
