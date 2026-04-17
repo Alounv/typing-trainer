@@ -7,12 +7,15 @@
 	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
-	import { loadBuiltinCorpus } from '$lib/corpus/registry';
+	import { loadBuiltinCorpus, isBuiltinCorpusId } from '$lib/corpus/registry';
 	import { generateBigramDrillSequence } from '$lib/drill/bigram-drill';
 	import { phaseTargetMsFromWPM } from '$lib/session/graduation';
 	import { consumePlannedSession } from '$lib/scheduler/handoff';
 	import { getProfile } from '$lib/storage/service';
 	import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from '$lib/models';
+
+	/** Corpus used when the profile is absent or its id isn't a known built-in. */
+	const FALLBACK_CORPUS_ID = 'en-top-1000';
 
 	/**
 	 * Fallback targets. Only used when the user lands here without a
@@ -43,16 +46,19 @@
 				planned?.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0
 					? planned.config.bigramsTargeted
 					: (FALLBACK_TARGETS as readonly string[]);
-			// Direct-nav users get their profile's drill budget; planned
-			// sessions use the scheduler-chosen value (which already read
-			// the profile upstream).
-			const profile = planned ? undefined : await getProfile();
+			// Profile drives both word budget and corpus language/size.
+			// Planned sessions already had the budget chosen upstream; we
+			// always read the profile for corpus so a French user's drill
+			// uses French even when navigating from a plan card.
+			const profile = await getProfile();
 			const wordBudget =
 				planned?.config.wordBudget ??
 				profile?.wordBudgets?.bigramDrill ??
 				DEFAULT_BIGRAM_DRILL_WORD_BUDGET;
+			const pickedId = profile?.corpusIds?.[0];
+			const corpusId = pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
 
-			const corpus = await loadBuiltinCorpus('en-top-1000');
+			const corpus = await loadBuiltinCorpus(corpusId);
 			const seq = generateBigramDrillSequence({
 				targetBigrams: targets,
 				corpus,

@@ -7,7 +7,12 @@
 	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
-	import { loadBuiltinCorpus, loadQuoteBank } from '$lib/corpus/registry';
+	import {
+		loadBuiltinCorpus,
+		loadQuoteBank,
+		isBuiltinCorpusId,
+		hasQuoteBank
+	} from '$lib/corpus/registry';
 	import { generateRealTextSequence } from '$lib/drill/real-text';
 	import { consumePlannedSession } from '$lib/scheduler/handoff';
 	import { getProfile } from '$lib/storage/service';
@@ -15,6 +20,9 @@
 
 	/** 5 chars ≈ 1 word (spec §2.3). Used to size text from a word budget. */
 	const CHARS_PER_WORD = 5;
+
+	/** Corpus used when the profile is absent or its id isn't a known built-in. */
+	const FALLBACK_CORPUS_ID = 'en-top-1000';
 
 	type LoadState =
 		| { status: 'loading' }
@@ -26,23 +34,28 @@
 	onMount(async () => {
 		try {
 			// Dashboard hand-off: the scheduler chooses the word budget for
-			// a planned session. Direct nav (override row or URL paste)
-			// falls back to the user's profile setting, then to the factory
-			// default — so a setting change takes effect even when the user
-			// jumps in via the override rather than the plan card.
+			// a planned session. Corpus + quote bank always come from the
+			// profile (even for planned sessions) so a French user gets
+			// French prose regardless of how they kicked off the session.
 			const planned = consumePlannedSession('real-text');
-			const profile = planned ? undefined : await getProfile();
+			const profile = await getProfile();
 			const wordBudget =
 				planned?.config.wordBudget ??
 				profile?.wordBudgets?.realText ??
 				DEFAULT_REAL_TEXT_WORD_BUDGET;
 			const targetChars = wordBudget * CHARS_PER_WORD;
+			const pickedCorpusId = profile?.corpusIds?.[0];
+			const corpusId =
+				pickedCorpusId && isBuiltinCorpusId(pickedCorpusId) ? pickedCorpusId : FALLBACK_CORPUS_ID;
+			const language = profile?.languages?.[0] ?? 'en';
 
 			// Quote bank is the primary source; corpus is the synth fallback
 			// when the bank runs out of quotes before hitting target chars.
+			// The bank is optional — an unsupported language drops through
+			// to synth-only, which still produces valid text.
 			const [bank, corpus] = await Promise.all([
-				loadQuoteBank('en'),
-				loadBuiltinCorpus('en-top-1000')
+				hasQuoteBank(language) ? loadQuoteBank(language) : Promise.resolve(undefined),
+				loadBuiltinCorpus(corpusId)
 			]);
 			const seq = generateRealTextSequence({
 				quoteBank: bank,

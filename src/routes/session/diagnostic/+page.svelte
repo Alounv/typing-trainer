@@ -9,13 +9,19 @@
 	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
-	import { loadBuiltinCorpus } from '$lib/corpus/registry';
+	import { loadBuiltinCorpus, isBuiltinCorpusId } from '$lib/corpus/registry';
 	import { sampleDiagnosticPassage } from '$lib/diagnostic/sampler';
 	import { getProfile } from '$lib/storage/service';
 	import { DEFAULT_DIAGNOSTIC_WORD_BUDGET } from '$lib/models';
 
 	/** 5 chars ≈ 1 word (spec §2.3) — translates the user's word budget into the sampler's char target. */
 	const CHARS_PER_WORD = 5;
+
+	/**
+	 * Corpus used when the user has no stored profile or their stored id
+	 * doesn't match any built-in (e.g. a migration or a removed corpus).
+	 */
+	const FALLBACK_CORPUS_ID = 'en-top-1000';
 
 	type LoadState =
 		| { status: 'loading' }
@@ -28,10 +34,14 @@
 		try {
 			// Use the synth path (no quote bank): the target-bigram boost
 			// lives in `selectRealTextSentence`, and the diagnostic wants
-			// coverage more than literary naturalness. Word budget comes
-			// from settings so advanced users can shorten the sample for
-			// quick re-checks.
-			const [corpus, profile] = await Promise.all([loadBuiltinCorpus('en-top-1000'), getProfile()]);
+			// coverage more than literary naturalness. Word budget and
+			// corpus both come from the profile — a French-primary user
+			// gets a French diagnostic, for example. Unknown ids fall
+			// back to English rather than throwing mid-route.
+			const profile = await getProfile();
+			const pickedId = profile?.corpusIds?.[0];
+			const corpusId = pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
+			const corpus = await loadBuiltinCorpus(corpusId);
 			const wordBudget = profile?.wordBudgets?.diagnostic ?? DEFAULT_DIAGNOSTIC_WORD_BUDGET;
 			const passage = sampleDiagnosticPassage(corpus, {
 				targetChars: wordBudget * CHARS_PER_WORD
