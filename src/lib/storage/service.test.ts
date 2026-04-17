@@ -8,18 +8,15 @@ import {
 	clearAll,
 	getBigramHistory,
 	getProfile,
-	getProgressStore,
 	getRecentSessions,
 	getSession,
 	saveProfile,
-	saveProgressStore,
 	saveSession
 } from './service';
 import type { SessionSummary } from '../session/types';
 import type { BigramAggregate } from '../bigram/types';
 import type { DiagnosticReport } from '../diagnostic/types';
 import type { UserSettings } from '../models';
-import type { ProgressStore } from '../progress/types';
 
 function makeAggregate(overrides: Partial<BigramAggregate> = {}): BigramAggregate {
 	return {
@@ -134,22 +131,8 @@ describe('storage service — round-trip', () => {
 		expect(await getProfile()).toEqual(next);
 	});
 
-	it('returns undefined for profile and progress store before the first save', async () => {
+	it('returns undefined for the profile before the first save', async () => {
 		expect(await getProfile()).toBeUndefined();
-		expect(await getProgressStore()).toBeUndefined();
-	});
-
-	it('round-trips the progress store (singleton row)', async () => {
-		const store: ProgressStore = {
-			graduationHistory: [],
-			classificationSnapshots: [],
-			wpmHistory: [],
-			sdmHistory: { values: [], current: 0, delta7d: 0, delta30d: 0 },
-			errorFloorHistory: { values: [], current: 0, delta7d: 0, delta30d: 0 },
-			diagnosticReports: []
-		};
-		await saveProgressStore(store);
-		expect(await getProgressStore()).toEqual(store);
 	});
 
 	it('clearAll wipes every table', async () => {
@@ -161,6 +144,5 @@ describe('storage service — round-trip', () => {
 		expect(await getSession('s1')).toBeUndefined();
 		expect(await getBigramHistory('th')).toEqual([]);
 		expect(await getProfile()).toBeUndefined();
-		expect(await getProgressStore()).toBeUndefined();
 	});
 });

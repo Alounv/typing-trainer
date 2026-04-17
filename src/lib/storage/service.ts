@@ -2,7 +2,6 @@ import { db, bigramRecordKey, SINGLETON_ID } from './db';
 import type { SessionSummary } from '../session/types';
 import type { BigramAggregate } from '../bigram/types';
 import type { UserSettings } from '../models';
-import type { ProgressStore } from '../progress/types';
 
 /**
  * Persist summary + mirrored bigram rows atomically — a partial write would
@@ -50,27 +49,9 @@ export async function saveProfile(settings: UserSettings): Promise<void> {
 	await db.profile.put({ id: SINGLETON_ID, settings });
 }
 
-export async function getProgressStore(): Promise<ProgressStore | undefined> {
-	const record = await db.progressStore.get(SINGLETON_ID);
-	return record?.store;
-}
-
-export async function saveProgressStore(store: ProgressStore): Promise<void> {
-	await db.progressStore.put({ id: SINGLETON_ID, store });
-}
-
 /** Wipe all persisted data — used by "reset" and by the test suite. */
 export async function clearAll(): Promise<void> {
-	await db.transaction(
-		'rw',
-		[db.sessions, db.bigramRecords, db.profile, db.progressStore],
-		async () => {
-			await Promise.all([
-				db.sessions.clear(),
-				db.bigramRecords.clear(),
-				db.profile.clear(),
-				db.progressStore.clear()
-			]);
-		}
-	);
+	await db.transaction('rw', [db.sessions, db.bigramRecords, db.profile], async () => {
+		await Promise.all([db.sessions.clear(), db.bigramRecords.clear(), db.profile.clear()]);
+	});
 }
