@@ -176,7 +176,9 @@
 	-->
 	<div
 		class="pointer-events-none absolute top-0 left-0 rounded-sm bg-primary/70 transition-[transform,width,height,opacity] duration-100 ease-out motion-reduce:transition-none"
-		style="transform: translate({cursorRect.x}px, {cursorRect.y}px); width: {cursorRect.w}px; height: {cursorRect.h}px; opacity: {cursorRect.ready ? 1 : 0}"
+		style="transform: translate({cursorRect.x}px, {cursorRect.y}px); width: {cursorRect.w}px; height: {cursorRect.h}px; opacity: {cursorRect.ready
+			? 1
+			: 0}"
 		aria-hidden="true"
 	></div>
 
