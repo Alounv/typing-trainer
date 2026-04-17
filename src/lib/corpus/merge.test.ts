@@ -14,37 +14,27 @@ describe('mergeCorpora', () => {
 		expect(() => mergeCorpora([])).toThrow();
 	});
 
-	it('equal-weight default when weights not supplied', () => {
-		const en = corpus('en', 'en', 'the of');
-		const fr = corpus('fr', 'fr', 'le de');
-		const merged = mergeCorpora([en, fr]);
-		// Equal weight = 0.5 each. `the` has rank-1 weight 1 in EN → 0.5 after merge.
-		expect(merged.wordFrequencies['the']).toBeCloseTo(0.5, 10);
-		expect(merged.wordFrequencies['le']).toBeCloseTo(0.5, 10);
-	});
-
-	it('normalizes raw ratio weights: [70, 30] → 0.7/0.3', () => {
-		const en = corpus('en', 'en', 'one');
-		const fr = corpus('fr', 'fr', 'un');
-		const merged = mergeCorpora([en, fr], { weights: [70, 30] });
-		expect(merged.wordFrequencies['one']).toBeCloseTo(0.7, 10);
-		expect(merged.wordFrequencies['un']).toBeCloseTo(0.3, 10);
-	});
-
-	it('treats all-zero weights as equal weight', () => {
-		// Safety valve — don't divide-by-zero into NaN-land.
-		const en = corpus('en', 'en', 'one');
-		const fr = corpus('fr', 'fr', 'un');
-		const merged = mergeCorpora([en, fr], { weights: [0, 0] });
-		expect(merged.wordFrequencies['one']).toBeCloseTo(0.5, 10);
-	});
-
-	it('falls back to equal weight on length mismatch', () => {
-		const en = corpus('en', 'en', 'one');
-		const fr = corpus('fr', 'fr', 'un');
-		const merged = mergeCorpora([en, fr], { weights: [0.5] });
-		expect(merged.wordFrequencies['one']).toBeCloseTo(0.5, 10);
-	});
+	// Weight-handling sweep. Shape: two rank-1 words (so each contributes
+	// 1.0 pre-scale), weights plugged into the merge, expect the resulting
+	// proportion on each side. The `null` `weights` row exercises the
+	// "default equal-weight" path; numeric arrays exercise normalization,
+	// zero-divide fallback, and length-mismatch fallback.
+	it.each`
+		description             | weights     | enFreq | frFreq
+		${'equal default'}      | ${null}     | ${0.5} | ${0.5}
+		${'raw ratios 70 / 30'} | ${[70, 30]} | ${0.7} | ${0.3}
+		${'all-zero → equal'}   | ${[0, 0]}   | ${0.5} | ${0.5}
+		${'length mismatch'}    | ${[0.5]}    | ${0.5} | ${0.5}
+	`(
+		'weights: $description',
+		({ weights, enFreq, frFreq }: { weights: number[] | null; enFreq: number; frFreq: number }) => {
+			const en = corpus('en', 'en', 'one');
+			const fr = corpus('fr', 'fr', 'un');
+			const merged = mergeCorpora([en, fr], weights === null ? undefined : { weights });
+			expect(merged.wordFrequencies['one']).toBeCloseTo(enFreq, 10);
+			expect(merged.wordFrequencies['un']).toBeCloseTo(frFreq, 10);
+		}
+	);
 
 	it('sums bigram frequencies across corpora, weighted', () => {
 		// Shared bigram 'ab' appears in both inputs — after 50/50 merge,

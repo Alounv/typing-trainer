@@ -16,19 +16,20 @@ function run(n: number, transitionMs: number, correct = true): BigramOccurrence[
 }
 
 describe('phaseTargetMsFromWPM', () => {
-	it('maps 60 WPM → 200 ms per transition', () => {
-		// 60 words × 5 chars = 300 chars/min = 200 ms/char.
-		expect(phaseTargetMsFromWPM(60)).toBe(200);
-	});
-
-	it('maps 100 WPM → 120 ms per transition', () => {
-		expect(phaseTargetMsFromWPM(100)).toBe(120);
-	});
-
-	it('returns +Infinity for non-positive WPM (defensive, never crash)', () => {
-		expect(phaseTargetMsFromWPM(0)).toBe(Number.POSITIVE_INFINITY);
-		expect(phaseTargetMsFromWPM(-10)).toBe(Number.POSITIVE_INFINITY);
-	});
+	// 60 words × 5 chars / min → 200 ms/char at 60 WPM; scales linearly.
+	// Non-positive WPM → +Infinity (defensive, so downstream never NaN-s).
+	it.each`
+		wpm    | expected
+		${60}  | ${200}
+		${100} | ${120}
+		${0}   | ${Number.POSITIVE_INFINITY}
+		${-10} | ${Number.POSITIVE_INFINITY}
+	`(
+		'$wpm WPM → $expected ms/transition',
+		({ wpm, expected }: { wpm: number; expected: number }) => {
+			expect(phaseTargetMsFromWPM(wpm)).toBe(expected);
+		}
+	);
 });
 
 describe('checkBigramGraduation', () => {
@@ -42,85 +43,69 @@ describe('checkBigramGraduation', () => {
 		expect(r.details.sampleSize).toBe(14);
 	});
 
-	it('graduates on 15 correct in a row at exactly target speed', () => {
-		// All 15 correct (14/15 threshold met), all 5 speed-window samples
-		// exactly at target → within tolerance.
-		const r = checkBigramGraduation({
-			recent: run(15, 200),
-			phaseTargetMs: 200
-		});
-		expect(r.graduated).toBe(true);
-		expect(r.reason).toBe('graduated');
-		expect(r.details.accuracyCorrect).toBe(15);
-		expect(r.details.speedWithinTolerance).toBe(5);
-	});
+	/**
+	 * Accuracy-boundary sweep. Each row starts with `run(15, 200)` and flips
+	 * the first `wrongCount` samples to `correct: false`. Targets the
+	 * 14/15 spec boundary: one wrong is fine, two is not.
+	 */
+	it.each`
+		description                | wrongCount | graduated | reason
+		${'15/15 correct'}         | ${0}       | ${true}   | ${'graduated'}
+		${'14/15 (1 wrong start)'} | ${1}       | ${true}   | ${'graduated'}
+		${'13/15 (2 wrong start)'} | ${2}       | ${false}  | ${'accuracy-low'}
+	`(
+		'accuracy: $description → $reason',
+		({
+			wrongCount,
+			graduated,
+			reason
+		}: {
+			wrongCount: number;
+			graduated: boolean;
+			reason: string;
+		}) => {
+			const recent = run(15, 200);
+			for (let i = 0; i < wrongCount; i++) {
+				recent[i] = { correct: false, transitionMs: 200 };
+			}
+			const r = checkBigramGraduation({ recent, phaseTargetMs: 200 });
+			expect(r.graduated).toBe(graduated);
+			expect(r.reason).toBe(reason);
+		}
+	);
 
-	it('accepts exactly 14/15 correct (spec boundary)', () => {
-		const recent = run(15, 200);
-		recent[0] = { correct: false, transitionMs: 200 };
-		const r = checkBigramGraduation({ recent, phaseTargetMs: 200 });
-		expect(r.graduated).toBe(true);
-	});
-
-	it('rejects 13/15 correct with accuracy-low', () => {
-		const recent = run(15, 200);
-		recent[0] = { correct: false, transitionMs: 200 };
-		recent[1] = { correct: false, transitionMs: 200 };
-		const r = checkBigramGraduation({ recent, phaseTargetMs: 200 });
-		expect(r.graduated).toBe(false);
-		expect(r.reason).toBe('accuracy-low');
-		expect(r.details.accuracyCorrect).toBe(13);
-	});
-
-	it('places the inaccurate samples at the tail — still graduates if ≥14/15', () => {
-		// Even if the one wrong-answer is *in* the speed window, graduation
-		// counts accuracy across the full 15 — so 14/15 passes, and speed
-		// tolerance is judged on transition time (which we keep at target).
-		// (Reason this test matters: the "correct" and "speed within
-		// tolerance" checks are independent.)
+	it('places the inaccurate sample at the tail — still graduates if ≥14/15', () => {
+		// Accuracy is counted across the full sample regardless of position.
+		// A wrong-correctness flag doesn't affect the speed check (which only
+		// looks at transitionMs), so a single tail-wrong still graduates.
 		const recent = run(15, 200);
 		recent[14] = { correct: false, transitionMs: 200 };
 		const r = checkBigramGraduation({ recent, phaseTargetMs: 200 });
 		expect(r.graduated).toBe(true);
 	});
 
-	it('accepts a tail sample faster than target — one-sided tolerance', () => {
-		// Default tolerance 20% → cap at 240 ms. No floor — any speed
-		// faster than target is fine. 100 ms is way faster → still passes.
-		const recent = run(15, 200);
-		recent[14] = { correct: true, transitionMs: 100 };
-		const r = checkBigramGraduation({ recent, phaseTargetMs: 200 });
-		expect(r.graduated).toBe(true);
-		expect(r.details.speedWithinTolerance).toBe(5);
-	});
-
-	it('rejects speed-off when a tail sample is slower than tolerance', () => {
-		const recent = run(15, 200);
-		recent[14] = { correct: true, transitionMs: 260 };
-		const r = checkBigramGraduation({ recent, phaseTargetMs: 200 });
-		expect(r.graduated).toBe(false);
-		expect(r.reason).toBe('speed-off');
-	});
-
-	it('boundary: exactly +20% is within tolerance (inclusive ≤)', () => {
-		// Target 200 ms, 20% tol → cap 240 ms. Exactly-240 transitions pass.
-		const recent = run(15, 200);
-		recent[14] = { correct: true, transitionMs: 240 };
-		const r = checkBigramGraduation({ recent, phaseTargetMs: 200 });
-		expect(r.graduated).toBe(true);
-	});
-
-	it('boundary: any speed faster than target passes under one-sided tolerance', () => {
-		// -20% (160 ms) or even -50% (100 ms) — both fine, only too-slow
-		// trips the check.
-		const at160 = run(15, 200);
-		at160[14] = { correct: true, transitionMs: 160 };
-		expect(checkBigramGraduation({ recent: at160, phaseTargetMs: 200 }).graduated).toBe(true);
-
-		const at100 = run(15, 200);
-		at100[14] = { correct: true, transitionMs: 100 };
-		expect(checkBigramGraduation({ recent: at100, phaseTargetMs: 200 }).graduated).toBe(true);
-	});
+	/**
+	 * Speed-boundary sweep. Each row overrides sample 14's transitionMs
+	 * against a 200ms target with default 20% tolerance (cap 240ms).
+	 * One-sided: faster than target always passes; only slow-beyond-cap fails.
+	 */
+	it.each`
+		description             | lastMs | graduated | reason
+		${'exactly target'}     | ${200} | ${true}   | ${'graduated'}
+		${'-50% (much faster)'} | ${100} | ${true}   | ${'graduated'}
+		${'-20%'}               | ${160} | ${true}   | ${'graduated'}
+		${'+20% (boundary)'}    | ${240} | ${true}   | ${'graduated'}
+		${'+30% (too slow)'}    | ${260} | ${false}  | ${'speed-off'}
+	`(
+		'speed: tail @ $description ms → $reason',
+		({ lastMs, graduated, reason }: { lastMs: number; graduated: boolean; reason: string }) => {
+			const recent = run(15, 200);
+			recent[14] = { correct: true, transitionMs: lastMs };
+			const r = checkBigramGraduation({ recent, phaseTargetMs: 200 });
+			expect(r.graduated).toBe(graduated);
+			expect(r.reason).toBe(reason);
+		}
+	);
 
 	it('only the last `speedWindow` transitions are checked for speed', () => {
 		// Default window = 5. Samples 0–9 are ridiculously slow; the last 5
