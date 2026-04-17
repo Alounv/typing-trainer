@@ -47,15 +47,7 @@
 		) => DiagnosticReport;
 	}
 
-	let {
-		type,
-		text,
-		title,
-		what,
-		approach,
-		targetBigrams,
-		buildDiagnosticReport
-	}: Props = $props();
+	let { type, text, title, what, approach, targetBigrams, buildDiagnosticReport }: Props = $props();
 
 	// Reactive mirrors of runner state. The runner itself is plain TS with
 	// no reactivity; we shadow the bits the UI reads in $state so the
@@ -186,16 +178,12 @@
 				class="grid max-w-xl grid-cols-[5rem_1fr] items-baseline gap-x-4 gap-y-2 border-t border-base-300 pt-4"
 				aria-label="Drill targets"
 			>
-				<span
-					class="text-[11px] font-medium tracking-[0.18em] text-base-content/40 uppercase"
-				>
+				<span class="text-[11px] font-medium tracking-[0.18em] text-base-content/40 uppercase">
 					Drilling
 				</span>
 				<ul class="flex flex-wrap gap-1.5">
 					{#each targetBigrams as bigram (bigram)}
-						<li
-							class="rounded-sm bg-base-200 px-2 py-0.5 font-mono text-xs text-base-content/80"
-						>
+						<li class="rounded-sm bg-base-200 px-2 py-0.5 font-mono text-xs text-base-content/80">
 							<!--
 								Bigrams may contain whitespace (space→letter and letter→space
 								are among the most frequent real-typing transitions). Render
