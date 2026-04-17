@@ -1,13 +1,19 @@
 <script lang="ts">
 	/**
-	 * Diagnostic session route. Generates a passage biased toward the top-50
-	 * corpus bigrams, then (on finish) builds a `DiagnosticReport` from the
-	 * in-memory events + aggregates and attaches it to the persisted summary.
-	 * No raw events are kept — priority targets travel with the summary.
+	 * Diagnostic session route. Assembles a passage of real prose from the
+	 * language's quote bank so the bigram distribution matches natural typing.
+	 * Falls back to word-synth when the language has no bank. On finish, builds
+	 * a `DiagnosticReport` from the in-memory events + aggregates and attaches
+	 * it to the persisted summary.
 	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
-	import { loadBuiltinCorpus, isBuiltinCorpusId } from '$lib/corpus/registry';
+	import {
+		loadBuiltinCorpus,
+		isBuiltinCorpusId,
+		loadQuoteBank,
+		hasQuoteBank
+	} from '$lib/corpus/registry';
 	import { sampleDiagnosticPassage } from '$lib/diagnostic/sampler';
 	import { generateDiagnosticReport } from '$lib/diagnostic/engine';
 	import type { FrequencyTable } from '$lib/corpus/types';
@@ -32,19 +38,23 @@
 
 	onMount(async () => {
 		try {
-			// Use the synth path (no quote bank): the target-bigram boost
-			// lives in `selectRealTextSentence`, and the diagnostic wants
-			// coverage more than literary naturalness. Word budget and
-			// corpus both come from the profile — a French-primary user
-			// gets a French diagnostic, for example. Unknown ids fall
-			// back to English rather than throwing mid-route.
+			// Profile drives language/corpus; unknown ids fall back to English.
 			const profile = await getProfile();
 			const pickedId = profile?.corpusIds?.[0];
 			const corpusId = pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
+
+			// Load the corpus (wordlist + language bigram table) and the quote
+			// bank in parallel. The quote bank is optional — languages without
+			// one fall through to synth-path word sampling inside the sampler.
 			const corpus = await loadBuiltinCorpus(corpusId);
+			const quoteBank = hasQuoteBank(corpus.config.language)
+				? await loadQuoteBank(corpus.config.language)
+				: undefined;
+
 			const wordBudget = profile?.wordBudgets?.diagnostic ?? DEFAULT_DIAGNOSTIC_WORD_BUDGET;
 			const passage = sampleDiagnosticPassage(corpus, {
-				targetChars: wordBudget * CHARS_PER_WORD
+				targetChars: wordBudget * CHARS_PER_WORD,
+				quoteBank
 			});
 			state = {
 				status: 'ready',
