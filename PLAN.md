@@ -361,14 +361,14 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 
 > Auto-suggest daily session structure.
 
-- [ ] **6.1** Default session structure (spec §5)
+- [x] **6.1** Default session structure (spec §5)
   - 4 interleaved pairs of [bigram drill (15 words), real text (25 words)] per daily plan
-- [ ] **6.2** Scheduler rules
+- [x] **6.2** Scheduler rules
   - Full diagnostic every 28 non-diagnostic sessions (or on demand) — scaled from 7 to match mini-session volume
   - Alternate between bigram drill and real text (interleave within a day)
   - Remove bigram from rotation after 3 consecutive healthy sessions
-- [ ] **6.3** Dashboard page — suggested session structure, today's drill targets, quick-start buttons, allow user overrides
-- [ ] **6.4** Tests for scheduler logic
+- [x] **6.3** Dashboard page — suggested session structure, today's drill targets, quick-start buttons, allow user overrides
+- [x] **6.4** Tests for scheduler logic
 
 ---
 
