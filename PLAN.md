@@ -369,6 +369,7 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
   - Remove bigram from rotation after 3 consecutive healthy sessions
 - [x] **6.3** Dashboard page — suggested session structure, today's drill targets, quick-start buttons, allow user overrides
 - [x] **6.4** Tests for scheduler logic
+- [ ] **6.5** Today's plan progression — dashboard's plan updates as each mini-session completes (done items drop off or get marked), and the post-session "Next session" button routes to the next planned item rather than back to the generic dashboard.
 
 ---
 
@@ -380,6 +381,7 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
   - Language / corpus selection
   - Threshold configuration (for advanced users)
   - Per-session word budget preferences (drill / real-text / diagnostic)
+- [ ] **6.5.2** Settings should be saved without button 
 
 ---
 
