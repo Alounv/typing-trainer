@@ -40,15 +40,12 @@
 		ghostPosition
 	}: Props = $props();
 
-	const chars = $derived(
-		text.split('').map((char, i) => ({
-			char,
-			state: stateFor(i, position, errorPositions, correctedPositions),
-			// The ghost is only meaningful when it's ahead of the user.
-			// If the pacer catches up or falls behind, no separate marker.
-			ghost: ghostPosition !== undefined && i === ghostPosition && i > position
-		}))
-	);
+	// Per-keystroke hot path: we deliberately do NOT build a $derived array
+	// of char descriptors here. On long texts (e.g. 2k+ chars) that would
+	// allocate N objects and force Svelte's each-block to re-diff every
+	// keystroke. Instead, the template iterates `text` directly and calls
+	// `stateFor()` / ghost-check inline — Svelte's fine-grained reactivity
+	// then re-runs only the class expressions, with no N-wide allocation.
 
 	function stateFor(
 		i: number,
@@ -108,7 +105,11 @@
 		// the viewport itself (not whatever ancestor happens to be
 		// positioned).
 		if (!viewportEl) return;
-		const currentSpan = viewportEl.querySelector<HTMLElement>(`[data-pos="${position}"]`);
+		// Constant-time lookup by child index. The each-block renders one
+		// span per char in order, so `children[position]` is always the
+		// current char's span. Avoids a per-keystroke `querySelector` scan,
+		// which on long texts walks thousands of spans.
+		const currentSpan = viewportEl.children[position] as HTMLElement | undefined;
 		if (!currentSpan) return;
 		const lineTop = currentSpan.offsetTop;
 		if (lineTop === lastLineTop) return;
@@ -143,7 +144,9 @@
 	class="relative max-h-[18rem] overflow-y-hidden font-mono text-2xl leading-loose tracking-wide break-normal whitespace-pre-wrap"
 	aria-label="Drill text"
 >
-	{#each chars as { char, state, ghost }, i (i)}
+	{#each text as char, i (i)}
+		{@const state = stateFor(i, position, errorPositions, correctedPositions)}
+		{@const ghost = ghostPosition !== undefined && i === ghostPosition && i > position}
 		<span
 			class="transition-colors duration-75 motion-reduce:transition-none {stateClasses[
 				state
