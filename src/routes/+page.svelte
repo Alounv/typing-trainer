@@ -67,10 +67,9 @@
 		window.location.href = routeFor(planned.config.type);
 	}
 
-	/** Format a duration in minutes for the card headline. */
-	function minutesLabel(ms: number): string {
-		const m = Math.round(ms / 60_000);
-		return `${m} min`;
+	/** Format the planned word budget for the card headline. */
+	function wordsLabel(wordBudget: number): string {
+		return `${wordBudget} words`;
 	}
 </script>
 
@@ -104,7 +103,7 @@
 					<div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
 						<div class="space-y-1">
 							<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
-								Step {i + 1} · {minutesLabel(planned.config.durationMs)}
+								Step {i + 1} · {wordsLabel(planned.config.wordBudget)}
 							</p>
 							<h2 class="text-2xl font-semibold text-base-content">
 								{planned.label}

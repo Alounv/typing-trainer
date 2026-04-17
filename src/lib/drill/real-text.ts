@@ -21,8 +21,11 @@ import { selectRealTextSentence } from '../corpus/selection';
  * pause without inventing punctuation the original quote doesn't own.
  * A newline would force the user to type a literal \n which isn't in
  * any of our corpora.
+ *
+ * Exported for callers that need to compute char offsets within the
+ * generated text (e.g. round boundary math in `session/rounds`).
  */
-const QUOTE_SEPARATOR = '  ';
+export const QUOTE_SEPARATOR = '  ';
 
 /**
  * Default character target. 1400 chars ≈ 5 minutes at 60 WPM (60 × 5 =

@@ -36,10 +36,12 @@ plateau on real text.
              ▼                 ▼                ▼
       SessionConfig      SessionConfig    SessionConfig
       type: diagnostic   type: bigram-    type: real-text
-       (every 7th)       drill             (10 min, pacer)
-                          (targets from
-                           diagnostic,
-                           filtered)
+       (every 7th,       drill            (100 words, 4
+        200 words,        (50 words, 4     rounds, pacer)
+        single round)     rounds, pacer,
+                          targets from
+                          diagnostic,
+                          filtered)
                                │
                                ▼
                         session runner

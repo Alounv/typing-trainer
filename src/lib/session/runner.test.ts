@@ -185,6 +185,51 @@ describe('SessionRunner', () => {
 		expect(runner.graduatedTargets).toEqual([]);
 	});
 
+	describe('round boundaries', () => {
+		it('fires onRoundComplete once per boundary, in order', () => {
+			const rounds: number[] = [];
+			const runner = new SessionRunner({
+				type: 'real-text',
+				text: 'abcdefgh',
+				roundBoundaries: [2, 4, 6],
+				onRoundComplete: (i) => rounds.push(i)
+			});
+			for (let i = 0; i < 8; i++) {
+				runner.recordEvent(stroke(i, 'x', 'x', i * 10));
+			}
+			expect(rounds).toEqual([0, 1, 2]);
+			expect(runner.currentRound).toBe(3);
+		});
+
+		it('does not re-fire for a boundary already crossed', () => {
+			// A retype at a later position would re-enter recordEvent, but
+			// the round should not trigger twice.
+			const rounds: number[] = [];
+			const runner = new SessionRunner({
+				type: 'real-text',
+				text: 'abcdef',
+				roundBoundaries: [3],
+				onRoundComplete: (i) => rounds.push(i)
+			});
+			for (let i = 0; i < 6; i++) runner.recordEvent(stroke(i, 'x', 'x', i * 10));
+			// Further event at an already-typed position — position doesn't move forward.
+			runner.recordEvent(stroke(5, 'x', 'x', 100));
+			expect(rounds).toEqual([0]);
+		});
+
+		it('no roundBoundaries = no round tracking', () => {
+			const rounds: number[] = [];
+			const runner = new SessionRunner({
+				type: 'diagnostic',
+				text: 'abc',
+				onRoundComplete: (i) => rounds.push(i)
+			});
+			for (let i = 0; i < 3; i++) runner.recordEvent(stroke(i, 'x', 'x', i));
+			expect(rounds).toEqual([]);
+			expect(runner.currentRound).toBe(0);
+		});
+	});
+
 	it('finalize produces a summary with the accumulated events', () => {
 		const runner = new SessionRunner({
 			type: 'bigram-drill',

@@ -18,7 +18,8 @@ sessions move past the typing-lib milestone.
                         ▼
           ┌──────────────────────────────┐
           │        SessionConfig         │
-          │   type / durationMs          │
+          │   type / wordBudget          │
+          │   roundCount                 │
           │   bigramsTargeted? / pacer?  │
           └───────────────┬──────────────┘
                           │
@@ -61,6 +62,8 @@ sessions move past the typing-lib milestone.
 ## Files
 
 - [types.ts](types.ts) — `SessionType`, `SessionSummary`, `SessionConfig`.
+- [runner.ts](runner.ts) — lifecycle manager. Owns round tracking + graduation checks.
+- [rounds.ts](rounds.ts) — pure helper: maps content chunks + `roundCount` to char-offset boundaries.
 - `components/` — future: `<DiagnosticSession>`, `<DrillSession>`, `<RealTextSession>` shells.
 
 ## Invariants

@@ -10,7 +10,7 @@
  *   no diagnostic report on file        → [catch-up diagnostic]
  *   ≥ DIAGNOSTIC_INTERVAL non-diag      → [cadence diagnostic]
  *     sessions since last diagnostic
- *   otherwise                           → [drill (5 min) → real-text (10 min)]
+ *   otherwise                           → [drill (50 words) → real-text (100 words)]
  *
  * The planner intentionally stays shallow: one decision per call. The
  * dashboard re-plans after each completed session so multi-day state
@@ -18,6 +18,13 @@
  */
 import type { SessionConfig } from '../session/types';
 import type { SchedulerInput, PlannedSession, PlannedSessionReason } from './types';
+import {
+	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
+	DEFAULT_REAL_TEXT_WORD_BUDGET,
+	DEFAULT_DIAGNOSTIC_WORD_BUDGET,
+	DEFAULT_ROUND_COUNT,
+	DIAGNOSTIC_ROUND_COUNT
+} from '../models';
 
 /**
  * Run a full diagnostic every N non-diagnostic sessions (spec §5).
@@ -28,17 +35,6 @@ export const DIAGNOSTIC_INTERVAL = 7;
 
 /** Default "top N" priority bigrams to drill per session. */
 export const DEFAULT_DRILL_TARGET_COUNT = 10;
-
-/** Durations (ms) — driven by spec §5 table. Runner may end earlier. */
-export const DRILL_DURATION_MS = 5 * 60_000;
-export const REALTEXT_DURATION_MS = 10 * 60_000;
-/**
- * Diagnostic has no strict time cap — the session ends when the text
- * runs out (spec §2.8). This is a nominal upper bound the runner uses
- * for timeout safety; the passage length is what actually controls the
- * duration.
- */
-export const DIAGNOSTIC_DURATION_MS = 10 * 60_000;
 
 export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	const {
@@ -130,7 +126,8 @@ function diagnosticPlan(
 ): PlannedSession {
 	const config: SessionConfig = {
 		type: 'diagnostic',
-		durationMs: DIAGNOSTIC_DURATION_MS
+		wordBudget: DEFAULT_DIAGNOSTIC_WORD_BUDGET,
+		roundCount: DIAGNOSTIC_ROUND_COUNT
 	};
 	const labels: Record<typeof reason, string> = {
 		'first-run-diagnostic': 'First diagnostic',
@@ -157,7 +154,8 @@ function diagnosticPlan(
 function drillPlan(targets: string[]): PlannedSession {
 	const config: SessionConfig = {
 		type: 'bigram-drill',
-		durationMs: DRILL_DURATION_MS,
+		wordBudget: DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
+		roundCount: DEFAULT_ROUND_COUNT,
 		bigramsTargeted: targets,
 		pacerEnabled: true
 	};
@@ -172,7 +170,8 @@ function drillPlan(targets: string[]): PlannedSession {
 function realtextPlan(hint?: 'no-targets-left'): PlannedSession {
 	const config: SessionConfig = {
 		type: 'real-text',
-		durationMs: REALTEXT_DURATION_MS,
+		wordBudget: DEFAULT_REAL_TEXT_WORD_BUDGET,
+		roundCount: DEFAULT_ROUND_COUNT,
 		pacerEnabled: true
 	};
 	return {

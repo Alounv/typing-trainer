@@ -3,7 +3,7 @@
 > Empty today. This README captures the intended shape so the slot is obvious
 > when work resumes.
 
-A "drill" is a short (~5 min) session where the user repeats words chosen
+A "drill" is a short (~50-word, 4-round) session where the user repeats words chosen
 specifically to stress a set of target bigrams — typically the priority
 bigrams from the latest diagnostic, minus any that have graduated to
 `healthy` in the last 3 sessions (spec §5).

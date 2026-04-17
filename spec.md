@@ -212,7 +212,7 @@ Regressions (any non-healthy → worse classification, or `healthy` → any) are
 
 - Stop a bigram target when: 14 out of 15 most recent occurrences correct AND last 5 are within 20% of phase speed target
 - Phase speed targets: `acquisition` and `hasty` bigrams target 60% of baselineWPM; `fluency` bigrams target targetWPM
-- Or: session time limit reached (default 5 minutes)
+- Or: planned word budget exhausted (default 50 words, split into 4 rounds)
 
 **Output per bigram:** updated BigramRecord appended to bigramHistory.
 
@@ -228,7 +228,7 @@ Regressions (any non-healthy → worse classification, or `healthy` → any) are
 
 **No stop-on-error:** user types through errors. Errors are recorded but not corrected mid-stream (mirrors real use conditions). Backspace allowed but not penalized beyond time cost.
 
-**Session exit condition:** user-chosen duration (default 10 minutes) or word count.
+**Session exit condition:** planned word budget exhausted (default 100 words). Budget is split into 4 rounds aligned to sentence ends, with a brief auto-advancing marker between rounds so the user sees progress instead of one long undifferentiated block.
 
 **Output:** full KeystrokeEvent log; update bigramHistory for all encountered patterns.
 
@@ -238,12 +238,14 @@ Regressions (any non-healthy → worse classification, or `healthy` → any) are
 
 The app should suggest a daily session structure rather than leaving the user to choose manually. This is important for progression and avoiding over-drilling.
 
-**Default daily structure (15 min):**
+**Default daily structure (~150 words):**
 
-| Phase        | Duration | Type                      |
-| ------------ | -------- | ------------------------- |
-| Bigram drill | 5 min    | Targeted, from diagnostic |
-| Real text    | 10 min   | Corpus-based              |
+| Phase        | Word budget | Rounds | Type                      |
+| ------------ | ----------- | ------ | ------------------------- |
+| Bigram drill | 50 words    | 4      | Targeted, from diagnostic |
+| Real text    | 100 words   | 4      | Corpus-based              |
+
+Rounds split each session into equal-ish chunks so the user hits intermediate milestones (with a brief auto-advancing marker showing round N of 4 + accuracy) rather than typing one unbroken stretch.
 
 **Scheduler rules:**
 
@@ -334,8 +336,8 @@ Corpus fit:
 
 ```
 Onboarding
-  → Choose layout + language(s)
-  → First diagnostic session (10 min) — also derives baselineWPM
+  → Choose language(s)
+  → First diagnostic session (~200 words, single round) — also derives baselineWPM
   → First diagnostic report shown
   → Enter daily session flow
 

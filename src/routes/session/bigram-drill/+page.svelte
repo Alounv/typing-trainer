@@ -11,6 +11,8 @@
 	import { generateBigramDrillSequence } from '$lib/drill/bigram-drill';
 	import { phaseTargetMsFromWPM } from '$lib/session/graduation';
 	import { consumePlannedSession } from '$lib/scheduler/handoff';
+	import { computeRoundBoundaries } from '$lib/session/rounds';
+	import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET, DEFAULT_ROUND_COUNT } from '$lib/models';
 
 	/**
 	 * Fallback targets. Only used when the user lands here without a
@@ -29,7 +31,13 @@
 
 	type LoadState =
 		| { status: 'loading' }
-		| { status: 'ready'; text: string; targets: readonly string[] }
+		| {
+				status: 'ready';
+				text: string;
+				targets: readonly string[];
+				roundBoundaries: readonly number[];
+				roundCount: number;
+		  }
 		| { status: 'error'; message: string };
 
 	let state = $state<LoadState>({ status: 'loading' });
@@ -41,13 +49,22 @@
 				planned?.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0
 					? planned.config.bigramsTargeted
 					: (FALLBACK_TARGETS as readonly string[]);
+			const wordBudget = planned?.config.wordBudget ?? DEFAULT_BIGRAM_DRILL_WORD_BUDGET;
+			const roundCount = planned?.config.roundCount ?? DEFAULT_ROUND_COUNT;
 
 			const corpus = await loadBuiltinCorpus('en-top-1000');
 			const seq = generateBigramDrillSequence({
 				targetBigrams: targets,
-				corpus
+				corpus,
+				options: { wordCount: wordBudget }
 			});
-			state = { status: 'ready', text: seq.text, targets };
+			// Bigram-drill text is space-joined words → 1-char separator.
+			const roundBoundaries = computeRoundBoundaries(
+				seq.words.map((w) => w.length),
+				1,
+				roundCount
+			);
+			state = { status: 'ready', text: seq.text, targets, roundBoundaries, roundCount };
 		} catch (err) {
 			state = {
 				status: 'error',
@@ -69,5 +86,7 @@
 		lede="Targeted drill on common trouble pairs. A bigram graduates after 15 clean samples at pace."
 		targetBigrams={state.targets}
 		graduationTargetMs={phaseTargetMsFromWPM(PHASE_WPM)}
+		roundBoundaries={state.roundBoundaries}
+		roundCount={state.roundCount}
 	/>
 {/if}

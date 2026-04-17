@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-	planDailySessions,
-	DIAGNOSTIC_INTERVAL,
-	DEFAULT_DRILL_TARGET_COUNT,
-	DRILL_DURATION_MS,
-	REALTEXT_DURATION_MS
-} from './planner';
+import { planDailySessions, DIAGNOSTIC_INTERVAL, DEFAULT_DRILL_TARGET_COUNT } from './planner';
+import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET, DEFAULT_REAL_TEXT_WORD_BUDGET } from '../models';
 import type { SessionSummary, SessionType } from '../session/types';
 import type { DiagnosticReport, PriorityBigram } from '../diagnostic/types';
 
@@ -104,8 +99,8 @@ describe('planDailySessions — default daily structure', () => {
 			latestDiagnosticReport: report(['th', 'he', 'in'])
 		});
 		expect(plan.map((p) => p.config.type)).toEqual(['bigram-drill', 'real-text']);
-		expect(plan[0].config.durationMs).toBe(DRILL_DURATION_MS);
-		expect(plan[1].config.durationMs).toBe(REALTEXT_DURATION_MS);
+		expect(plan[0].config.wordBudget).toBe(DEFAULT_BIGRAM_DRILL_WORD_BUDGET);
+		expect(plan[1].config.wordBudget).toBe(DEFAULT_REAL_TEXT_WORD_BUDGET);
 	});
 
 	it('drill uses top priority bigrams up to the default count', () => {
