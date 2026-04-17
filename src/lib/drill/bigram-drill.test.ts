@@ -121,4 +121,45 @@ describe('generateBigramDrillSequence', () => {
 		// we expect mostly 'the'.
 		expect(seq.words.filter((w) => w === 'the').length).toBeGreaterThan(0);
 	});
+
+	it('treats a leading-space target as "word starts with letter"', () => {
+		// Target ' a' = "space then 'a'" — happens at the start of any word
+		// beginning with 'a'. Words that only contain 'a' internally should
+		// NOT match.
+		const seq = generateBigramDrillSequence({
+			targetBigrams: [' a'],
+			corpus: corpus('apple banana cherry almond'),
+			options: { wordCount: 40, rng: () => 0, targetRatio: 1 }
+		});
+		// Target pool = words starting with 'a' → 'apple', 'almond'.
+		// With ratio=1 every pick is from that pool.
+		const targetStarts = seq.words.filter((w) => w.startsWith('a')).length;
+		expect(targetStarts).toBe(seq.words.length);
+		expect(seq.stats.distinctTargets).toBe(1);
+	});
+
+	it('treats a trailing-space target as "word ends with letter"', () => {
+		// Target 'e ' = "'e' then space" — happens at the end of any word
+		// ending in 'e'.
+		const seq = generateBigramDrillSequence({
+			targetBigrams: ['e '],
+			corpus: corpus('apple table of the tree'),
+			options: { wordCount: 40, rng: () => 0, targetRatio: 1 }
+		});
+		const targetEnds = seq.words.filter((w) => w.endsWith('e')).length;
+		expect(targetEnds).toBe(seq.words.length);
+		expect(seq.stats.distinctTargets).toBe(1);
+	});
+
+	it('ignores a two-space target (no single word produces it)', () => {
+		// '  ' would correspond to typing two consecutive spaces, which can't
+		// be produced by any single word contributing to a space-joined passage.
+		const seq = generateBigramDrillSequence({
+			targetBigrams: ['  ', 'th'],
+			corpus: corpus('the other thing'),
+			options: { wordCount: 10, rng: () => 0, targetRatio: 1 }
+		});
+		// Only 'th' is a valid matchable target here.
+		expect(seq.stats.distinctTargets).toBeLessThanOrEqual(1);
+	});
 });

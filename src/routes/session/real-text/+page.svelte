@@ -79,6 +79,7 @@
 		type="real-text"
 		text={state.text}
 		title="Real text"
-		lede="Paced reading of real prose. No stop-on-error — type through it."
+		what="Literary prose in your language, drawn from the quote bank. Real sentence structure, real punctuation, real rhythm."
+		approach="Where drill precision becomes typing flow. Keep moving; errors are recorded but never blocking."
 	/>
 {/if}

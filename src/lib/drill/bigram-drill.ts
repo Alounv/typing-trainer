@@ -69,7 +69,7 @@ export function generateBigramDrillSequence(input: BigramDrillInput): BigramDril
 		if (useTarget) {
 			targetWordCount++;
 			for (const t of input.targetBigrams) {
-				if (t.length >= 2 && picked.includes(t)) distinctTargets.add(t);
+				if (wordMatchesTarget(picked, t)) distinctTargets.add(t);
 			}
 		} else {
 			fillerWordCount++;
@@ -108,7 +108,7 @@ function partitionCorpus(
 		// weights ("the" with target "th" → ×1, not ×10).
 		let hits = 0;
 		for (const t of targetBigrams) {
-			if (t.length >= 2 && word.includes(t)) hits++;
+			if (wordMatchesTarget(word, t)) hits++;
 		}
 
 		if (hits > 0) {
@@ -118,6 +118,27 @@ function partitionCorpus(
 		}
 	}
 	return { targets, fillers };
+}
+
+/**
+ * True if placing `word` somewhere in the drill passage will produce the
+ * `target` keystroke transition. Three shapes:
+ *   - `"ab"` (letters only) — match if `word` contains `ab` internally.
+ *   - `" a"` (leading space) — match if `word` starts with `a`, because typing
+ *     the space before this word then its first letter produces the transition.
+ *   - `"a "` (trailing space) — match if `word` ends with `a`, because typing
+ *     its last letter then the space after it produces the transition.
+ * Targets shorter than 2 chars and the `"  "` (two-space) case are no-ops —
+ * they don't correspond to a single-word contribution.
+ */
+function wordMatchesTarget(word: string, target: string): boolean {
+	if (target.length < 2) return false;
+	const leadingSpace = target[0] === ' ';
+	const trailingSpace = target[target.length - 1] === ' ';
+	if (leadingSpace && trailingSpace) return false;
+	if (leadingSpace) return word.startsWith(target.slice(1));
+	if (trailingSpace) return word.endsWith(target.slice(0, -1));
+	return word.includes(target);
 }
 
 /** Weighted pick from a `WeightedWord[]`. O(n) — fine for ≤10k-word pools. */

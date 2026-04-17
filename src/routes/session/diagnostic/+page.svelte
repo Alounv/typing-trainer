@@ -80,7 +80,8 @@
 		type="diagnostic"
 		text={state.text}
 		title="Diagnostic"
-		lede="Type the passage below. Errors are recorded but not blocked — just keep going."
+		what="A calibration run. We measure your baseline typing speed and flag the bigrams that slow you down."
+		approach="Type at a natural pace. There's no score — the point is representative data, not performance."
 		buildDiagnosticReport={(summary, events) =>
 			generateDiagnosticReport({
 				sessionId: summary.id,

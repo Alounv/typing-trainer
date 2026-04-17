@@ -28,7 +28,10 @@
 		type: SessionType;
 		text: string;
 		title: string;
-		lede?: string;
+		/** One-sentence explanation of what this session actually does. */
+		what?: string;
+		/** One-sentence guidance on how the user should type through it. */
+		approach?: string;
 		/** Drill targets, recorded on the summary for later analysis. */
 		targetBigrams?: readonly string[];
 		/**
@@ -44,7 +47,15 @@
 		) => DiagnosticReport;
 	}
 
-	let { type, text, title, lede, targetBigrams, buildDiagnosticReport }: Props = $props();
+	let {
+		type,
+		text,
+		title,
+		what,
+		approach,
+		targetBigrams,
+		buildDiagnosticReport
+	}: Props = $props();
 
 	// Reactive mirrors of runner state. The runner itself is plain TS with
 	// no reactivity; we shadow the bits the UI reads in $state so the
@@ -130,9 +141,76 @@
 </script>
 
 <div class="mx-auto max-w-3xl space-y-8">
-	<header class="space-y-2">
-		<h1 class="text-4xl font-bold tracking-tight">{title}</h1>
-		{#if lede}<p class="text-base-content/70">{lede}</p>{/if}
+	<!--
+		Header + briefing block. `WHAT / HOW / DRILLING` labels live in one
+		aligned column so the page reads like a single instrument panel
+		rather than three disconnected paragraphs. Uses the same
+		letter-spaced uppercase micro-label vocabulary as the dashboard and
+		settings page.
+	-->
+	<header class="space-y-6">
+		<h1 class="text-4xl font-semibold tracking-tight">{title}</h1>
+		{#if what || approach}
+			<dl class="max-w-xl space-y-3 text-sm">
+				{#if what}
+					<div class="grid grid-cols-[5rem_1fr] gap-x-4">
+						<dt
+							class="pt-0.5 text-[11px] font-medium tracking-[0.18em] text-base-content/40 uppercase"
+						>
+							What
+						</dt>
+						<dd class="text-base-content/70">{what}</dd>
+					</div>
+				{/if}
+				{#if approach}
+					<div class="grid grid-cols-[5rem_1fr] gap-x-4">
+						<dt
+							class="pt-0.5 text-[11px] font-medium tracking-[0.18em] text-base-content/40 uppercase"
+						>
+							How
+						</dt>
+						<dd class="text-base-content/70">{approach}</dd>
+					</div>
+				{/if}
+			</dl>
+		{/if}
+
+		{#if targetBigrams && targetBigrams.length > 0}
+			<!--
+				Same grid as the dl above, so the `DRILLING` label sits in
+				the same column as `WHAT / HOW`. Separated from the briefing
+				by a hairline to mark "this is data you'll look at while
+				typing," not more prose.
+			-->
+			<div
+				class="grid max-w-xl grid-cols-[5rem_1fr] items-baseline gap-x-4 gap-y-2 border-t border-base-300 pt-4"
+				aria-label="Drill targets"
+			>
+				<span
+					class="text-[11px] font-medium tracking-[0.18em] text-base-content/40 uppercase"
+				>
+					Drilling
+				</span>
+				<ul class="flex flex-wrap gap-1.5">
+					{#each targetBigrams as bigram (bigram)}
+						<li
+							class="rounded-sm bg-base-200 px-2 py-0.5 font-mono text-xs text-base-content/80"
+						>
+							<!--
+								Bigrams may contain whitespace (space→letter and letter→space
+								are among the most frequent real-typing transitions). Render
+								the literal space as a dimmed open-box glyph so "␣t" and "t"
+								are visibly distinct.
+							-->
+							{#each bigram as char, i (i)}{#if char === ' '}<span
+										class="text-base-content/35"
+										aria-label="space">␣</span
+									>{:else}{char}{/if}{/each}
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
 	</header>
 
 	<!--

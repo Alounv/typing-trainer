@@ -72,7 +72,8 @@
 		type="bigram-drill"
 		text={state.text}
 		title="Bigram drill"
-		lede="Targeted drill on common trouble pairs."
+		what="Targeted practice on the bigrams your last diagnostic flagged. The passage over-samples them so each target recurs many times per minute."
+		approach="Accuracy over speed. Mistype, correct, continue — every transition is measured, so a rushed pass doesn't help."
 		targetBigrams={state.targets}
 	/>
 {/if}
