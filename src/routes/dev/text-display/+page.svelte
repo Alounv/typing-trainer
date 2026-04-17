@@ -1,15 +1,12 @@
 <script lang="ts">
 	/**
-	 * Throwaway preview for TextDisplay (Phase 2.2). Wires capture + display
-	 * together so the four per-character states (pending / current /
-	 * typed-correct / typed-error) are visible during actual typing.
-	 *
+	 * Throwaway preview for TypingSurface + Pacer (Phase 2.2–2.4).
 	 * Remove when the walking skeleton (Phase 2.5) lands.
 	 */
-	import TextDisplay from '$lib/typing/TextDisplay.svelte';
+	import TypingSurface from '$lib/typing/TypingSurface.svelte';
 	import Pacer from '$lib/typing/Pacer.svelte';
-	import { keystrokeCapture } from '$lib/typing/capture';
 	import { SvelteSet } from 'svelte/reactivity';
+	import type { KeystrokeEvent } from '$lib/typing/types';
 
 	const TEXT =
 		'The quick brown fox jumps over the lazy dog. Typing trainers improve speed and accuracy through deliberate practice.';
@@ -23,8 +20,9 @@
 	// read the first word before the clock ticks.
 	let running = $state(false);
 	let ghostPosition = $state(0);
+	let announceErrors = $state(false);
 
-	function onEvent(e: { position: number; expected: string; actual: string }) {
+	function onEvent(e: KeystrokeEvent) {
 		running = true;
 		if (e.actual !== e.expected) {
 			errorPositions.add(e.position);
@@ -38,37 +36,27 @@
 
 <div class="mx-auto max-w-3xl space-y-6 p-8">
 	<header class="space-y-1">
-		<h1 class="text-2xl font-bold">TextDisplay — dev preview</h1>
+		<h1 class="text-2xl font-bold">TypingSurface — dev preview</h1>
 		<p class="text-sm text-base-content/70">
-			Click the box below and type. Wrong characters highlight red; the cursor sits on the next
-			expected character.
+			Focus the box (auto-focused on load) and type. Wrong characters highlight red; corrected ones
+			amber with strikethrough; the pink highlight is the pacer ghost.
 		</p>
 	</header>
 
-	<!-- role="textbox" turns this into an interactive region so tabindex is valid
-	     and screen readers treat it as an input. A proper label comes in Phase 2.4. -->
-	<div
-		role="textbox"
-		tabindex="0"
-		aria-label="Drill typing surface"
-		class="rounded-lg bg-base-200 p-6 focus:outline-2 focus:outline-offset-2 focus:outline-primary"
-		{@attach keystrokeCapture(
-			{ text: TEXT },
-			{
-				onPositionChange: (p) => {
-					position = p;
-				},
-				onEvent,
-				onComplete: () => {
-					completed = true;
-				}
-			}
-		)}
-	>
-		<TextDisplay text={TEXT} {position} {errorPositions} {correctedPositions} {ghostPosition} />
-	</div>
+	<TypingSurface
+		text={TEXT}
+		bind:position
+		{errorPositions}
+		{correctedPositions}
+		{ghostPosition}
+		{announceErrors}
+		{onEvent}
+		onComplete={() => {
+			completed = true;
+		}}
+	/>
 
-	<div class="flex items-center gap-4 text-sm">
+	<div class="flex flex-wrap items-center gap-4 text-sm">
 		<span>Position: <strong>{position}</strong> / {TEXT.length}</span>
 		<span>Errors: <strong>{errorPositions.size}</strong></span>
 		<Pacer
@@ -78,11 +66,13 @@
 			running={running && !completed}
 			bind:ghostPosition
 		/>
+		<label class="flex cursor-pointer items-center gap-2">
+			<input type="checkbox" class="toggle toggle-sm" bind:checked={announceErrors} />
+			Announce errors (SR)
+		</label>
 		{#if completed}
 			<span class="font-medium text-success">✓ Completed</span>
 		{/if}
-		<button class="btn ml-auto btn-sm" onclick={() => (window.location.href = window.location.href)}
-			>Reload</button
-		>
+		<button class="btn ml-auto btn-sm" onclick={() => window.location.reload()}>Reload</button>
 	</div>
 </div>
