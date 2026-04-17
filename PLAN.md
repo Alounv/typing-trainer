@@ -239,17 +239,17 @@ storage/         (depends on: all domain types)
 
 > The standalone typing input module. Takes text + config, emits KeystrokeEvent[]. No domain knowledge.
 
-- [ ] **2.1** `capture.ts` — Svelte action for keystroke capture
+- [x] **2.1** `capture.ts` — Svelte action for keystroke capture
   - Listen to `keydown` events
   - Track expected vs actual characters
   - Detect corrections (backspace within 500ms)
   - Use `performance.now()` for all timestamps
-- [ ] **2.2** `TextDisplay.svelte` — text rendering component
+- [x] **2.2** `TextDisplay.svelte` — text rendering component
   - Render text with cursor, highlight current position, show errors inline
   - Line wrapping behavior (word-boundary aware, no mid-word breaks)
   - Error styling (wrong char highlight, skipped char, extra char)
   - Backspace visual handling (cursor moves back, error state clears)
-- [ ] **2.3** `Pacer.svelte` — speed pacer overlay
+- [x] **2.3** `Pacer.svelte` — speed pacer overlay
   - Visual cursor/highlight advancing at configured WPM
   - Color feedback: green (on pace) / amber (slightly behind) / red (far behind)
 - [ ] **2.4** Accessibility & focus management (load-bearing, not polish)
@@ -257,7 +257,7 @@ storage/         (depends on: all domain types)
   - ARIA live region for error announcements (opt-in, off by default during timed drills)
   - Visible focus ring that doesn't interfere with cursor rendering
   - Verify screen reader doesn't re-announce every character — test with VoiceOver
-- [ ] **2.5** Write tests for capture logic (the module's public contract)
+- [x] **2.5** Write tests for capture logic (the module's public contract)
 
 ---
 
@@ -265,9 +265,9 @@ storage/         (depends on: all domain types)
 
 > End-to-end vertical slice: capture one session → persist raw events → render a throwaway summary page. Proves the wiring works before going wide. This code is disposable; Phase 3+ replaces the summary page with the real diagnostic report.
 
-- [ ] **2.5.1** Hardcode a single short passage (no corpus yet)
-- [ ] **2.5.2** Wire `typing/capture` → session runner stub → Dexie `sessions` table
-- [ ] **2.5.3** Trivial summary page: raw WPM, error count, list of slowest 5 character-pair transitions
+- [x] **2.5.1** Hardcode a single short passage (no corpus yet)
+- [x] **2.5.2** Wire `typing/capture` → session runner stub → Dexie `sessions` table
+- [x] **2.5.3** Trivial summary page: raw WPM, error count, list of slowest 5 character-pair transitions
 - [ ] **2.5.4** Smoke-test the full loop on the deployed preview URL
 
 Exit criterion: you can go to the deployed app, type the passage, and see stored session data rendered on the next page. No classification, no drills, no pacer.
@@ -278,12 +278,12 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 
 > Pure computation: extract and classify bigram data from keystroke events.
 
-- [ ] **2b.1** `extraction.ts` — `extractBigramAggregates(events: KeystrokeEvent[]): BigramAggregate[]`
+- [x] **2b.1** `extraction.ts` — `extractBigramAggregates(events: KeystrokeEvent[]): BigramAggregate[]`
   - Compute transition times, mean, std, error rates
-- [ ] **2b.2** `classification.ts` — classify bigrams (spec §3.1)
+- [x] **2b.2** `classification.ts` — classify bigrams (spec §3.1)
   - Configurable thresholds (`SPEED_THRESHOLD`, `HIGH_ERROR_THRESHOLD`)
   - Classification logic: healthy / fluency / hasty / acquisition
-- [ ] **2b.3** Write comprehensive tests for extraction and classification
+- [x] **2b.3** Write comprehensive tests for extraction and classification
 
 ---
 
