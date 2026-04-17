@@ -291,13 +291,13 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 
 > Orchestrates a diagnostic session, derives pacing, and produces reports. Depends on `bigram/`.
 
-- [ ] **3.1** `pacing.ts` — pacing derivation from diagnostic data (spec §3.3)
+- [x] **3.1** `pacing.ts` — pacing derivation from diagnostic data (spec §3.3)
   - Derive `baselineWPM` from middle quartiles, compute `targetWPM` on-the-fly
-- [ ] **3.2** `engine.ts` — diagnostic report generator (spec §7.3)
+- [x] **3.2** `engine.ts` — diagnostic report generator (spec §7.3)
   - Bigram breakdown by classification
   - Priority bigram targets (badness × corpus frequency)
   - Corpus coverage analysis
-- [ ] **3.3** Unit tests for pacing and report generation
+- [x] **3.3** Unit tests for pacing and report generation
 
 ---
 
