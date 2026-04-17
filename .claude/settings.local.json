@@ -1,21 +1,27 @@
 {
-	"permissions": {
-		"allow": [
-			"Bash(jj --version)",
-			"Bash(jj git:*)",
-			"Bash(jj status:*)",
-			"Bash(jj describe:*)",
-			"Bash(jj bookmark:*)",
-			"Bash(gh repo:*)",
-			"Bash(git checkout:*)",
-			"Bash(git stash:*)",
-			"Bash(git symbolic-ref:*)",
-			"Bash(jj log:*)",
-			"Bash(git mv:*)",
-			"Bash(grep -rn 'vitest-examples\\\\|\\\\$lib/assets' /Users/alounvangkeosay/dev/typing-trainer/src /Users/alounvangkeosay/dev/typing-trainer/vite.config.ts)",
-			"Bash(bun run *)",
-			"mcp__Claude_Preview__preview_start",
-			"Bash(BASE_PATH=/typing-trainer bun run build)"
-		]
-	}
+  "permissions": {
+    "allow": [
+      "Bash(jj --version)",
+      "Bash(jj git:*)",
+      "Bash(jj status:*)",
+      "Bash(jj describe:*)",
+      "Bash(jj bookmark:*)",
+      "Bash(gh repo:*)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)",
+      "Bash(git symbolic-ref:*)",
+      "Bash(jj log:*)",
+      "Bash(git mv:*)",
+      "Bash(grep -rn 'vitest-examples\\\\|\\\\$lib/assets' /Users/alounvangkeosay/dev/typing-trainer/src /Users/alounvangkeosay/dev/typing-trainer/vite.config.ts)",
+      "Bash(bun run *)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(BASE_PATH=/typing-trainer bun run build)",
+      "Bash(gh run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" https://alounv.github.io/typing-trainer/)",
+      "Bash(curl -s https://alounv.github.io/typing-trainer/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" https://alounv.github.io/typing-trainer/session/bigram-drill)",
+      "Bash(curl -s https://alounv.github.io/typing-trainer/session/bigram-drill)",
+      "Bash(jj st *)"
+    ]
+  }
 }

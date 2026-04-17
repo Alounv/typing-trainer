@@ -28,6 +28,9 @@ jobs:
       - run: bun run lint
       - run: bun run check
       - run: bun run test:unit --run
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+      - run: bun run test:e2e
       - name: Build
         run: bun run build
         env:
