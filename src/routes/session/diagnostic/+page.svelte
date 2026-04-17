@@ -8,6 +8,7 @@
 	 * composes end-to-end before Phase 3+ piles on.
 	 */
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { SvelteSet } from 'svelte/reactivity';
 	import TypingSurface from '$lib/typing/TypingSurface.svelte';
 	import type { KeystrokeEvent } from '$lib/typing/types';
@@ -56,7 +57,7 @@
 		});
 		try {
 			await saveSession(summary);
-			await goto(`/session/${summary.id}/summary`);
+			await goto(resolve('/session/[id]/summary', { id: summary.id }));
 		} catch (err) {
 			saving = false;
 			saveError = err instanceof Error ? err.message : 'Failed to save session.';

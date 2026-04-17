@@ -8,6 +8,7 @@
 	 */
 	import { getRecentSessions } from '$lib/storage/service';
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import type { SessionSummary } from '$lib/session/types';
 
 	let lastSession = $state<SessionSummary | null>(null);
@@ -38,7 +39,7 @@
 
 	<section class="space-y-4">
 		<a
-			href="/session/diagnostic"
+			href={resolve('/session/diagnostic')}
 			class="btn tracking-wide btn-lg btn-primary"
 			data-testid="start-diagnostic"
 		>
@@ -66,7 +67,7 @@
 				{(lastSession.errorRate * 100).toFixed(1)}<span class="text-base-content/40"> % err</span>
 			</p>
 			<a
-				href="/session/{lastSession.id}/summary"
+				href={resolve('/session/[id]/summary', { id: lastSession.id })}
 				class="ml-auto text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
 			>
 				See details →

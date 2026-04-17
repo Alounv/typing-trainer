@@ -10,6 +10,7 @@
 	 */
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { getSession } from '$lib/storage/service';
 	import type { SessionSummary } from '$lib/session/types';
 	import type { BigramAggregate } from '$lib/bigram/types';
@@ -153,9 +154,10 @@
 			which is the correct thing to do after reviewing a session.
 		-->
 		<div class="flex flex-wrap items-center gap-6 pt-2">
-			<a href="/session/diagnostic" class="btn btn-lg btn-primary">Run another session</a>
+			<a href={resolve('/session/diagnostic')} class="btn btn-lg btn-primary">Run another session</a
+			>
 			<a
-				href="/"
+				href={resolve('/')}
 				class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
 			>
 				Back to dashboard
