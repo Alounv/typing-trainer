@@ -88,6 +88,18 @@
 	{:else}
 		{@const data = state.data}
 
+		{#if data.allDoneForToday}
+			<!--
+				All mini-sessions done today. Deliberately quiet — no confetti,
+				no streak counter (spec §10.4 restricts celebration to structural
+				change). The override row below still lets the user run a one-off.
+			-->
+			<section class="space-y-2" data-testid="day-complete">
+				<h2 class="text-2xl font-semibold text-base-content">Today's plan is done.</h2>
+				<p class="text-base-content/65">Rest is part of the work. Come back tomorrow.</p>
+			</section>
+		{/if}
+
 		<!--
 			Planned session stack. Each card mirrors the shell's tone: big
 			headline, one-line rationale, single primary action. Numbered

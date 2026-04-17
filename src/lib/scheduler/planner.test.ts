@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	planDailySessions,
+	sliceCompletedFromPlan,
 	DIAGNOSTIC_INTERVAL,
 	DEFAULT_DRILL_TARGET_COUNT,
 	PAIRS_PER_DAY
@@ -177,5 +178,68 @@ describe('planDailySessions — session config shape', () => {
 	it('diagnostic session has no targeted bigrams', () => {
 		const plan = planDailySessions({ recentSessions: [] });
 		expect(plan[0].config.bigramsTargeted).toBeUndefined();
+	});
+});
+
+describe('sliceCompletedFromPlan', () => {
+	/**
+	 * Build a canonical interleaved daily plan to slice against. Uses the
+	 * real planner so the test reflects the actual shape the dashboard sees
+	 * (drill/real-text/drill/real-text/...).
+	 */
+	function dailyPlan() {
+		return planDailySessions({
+			recentSessions: recent('diagnostic'),
+			latestDiagnosticReport: report(['th'])
+		});
+	}
+
+	it('returns the full plan when nothing has been completed today', () => {
+		const full = dailyPlan();
+		const remaining = sliceCompletedFromPlan(full, {});
+		expect(remaining).toHaveLength(full.length);
+		expect(remaining[0]).toBe(full[0]);
+	});
+
+	/**
+	 * The interleaved order is [drill, real-text, drill, real-text, …].
+	 * "2 drills + 0 real-text done" chews through the first drill, keeps
+	 * the first real-text, chews through the second drill. Net: we drop
+	 * the two earliest drill slots while the real-text slots in between
+	 * survive, so 6 items remain.
+	 */
+	it.each`
+		drillsDone | realTextDone | expectedRemaining
+		${1}       | ${0}         | ${PAIRS_PER_DAY * 2 - 1}
+		${2}       | ${0}         | ${PAIRS_PER_DAY * 2 - 2}
+		${2}       | ${2}         | ${PAIRS_PER_DAY * 2 - 4}
+		${4}       | ${4}         | ${0}
+	`(
+		'$drillsDone drills + $realTextDone real-text done → $expectedRemaining remaining',
+		({ drillsDone, realTextDone, expectedRemaining }) => {
+			const full = dailyPlan();
+			const remaining = sliceCompletedFromPlan(full, {
+				'bigram-drill': drillsDone,
+				'real-text': realTextDone
+			});
+			expect(remaining).toHaveLength(expectedRemaining);
+		}
+	);
+
+	it('preserves interleaving order of surviving items', () => {
+		// 1 drill + 0 real-text done → first survivor is the initial real-text,
+		// then drill, real-text, drill, real-text, drill, real-text.
+		const full = dailyPlan();
+		const remaining = sliceCompletedFromPlan(full, { 'bigram-drill': 1 });
+		expect(remaining[0].config.type).toBe('real-text');
+		expect(remaining[1].config.type).toBe('bigram-drill');
+	});
+
+	it('does not consume credits across unrelated session types', () => {
+		// A diagnostic-day plan is a single diagnostic item; completing a
+		// drill earlier in the day shouldn't mark it done.
+		const diagPlan = planDailySessions({ recentSessions: [] });
+		const remaining = sliceCompletedFromPlan(diagPlan, { 'bigram-drill': 3 });
+		expect(remaining).toEqual(diagPlan);
 	});
 });

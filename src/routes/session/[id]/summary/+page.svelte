@@ -11,22 +11,41 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { getSession } from '$lib/storage/service';
-	import type { SessionSummary } from '$lib/session/types';
+	import { getSession, getRecentSessions } from '$lib/storage/service';
+	import type { SessionSummary, SessionType } from '$lib/session/types';
 	import type { BigramAggregate } from '$lib/bigram/types';
+	import { loadBuiltinCorpus } from '$lib/corpus/registry';
+	import { loadDashboardData } from '$lib/scheduler/dashboard-data';
+	import { stashPlannedSession } from '$lib/scheduler/handoff';
+	import type { PlannedSession } from '$lib/scheduler/types';
 
 	type LoadState =
 		| { status: 'loading' }
-		| { status: 'ready'; summary: SessionSummary }
+		| { status: 'ready'; summary: SessionSummary; next: PlannedSession | undefined }
 		| { status: 'missing' }
 		| { status: 'error'; message: string };
 
 	let state = $state<LoadState>({ status: 'loading' });
 
+	/** Matches the dashboard's recent-session window; the planner only peeks a few. */
+	const RECENT_WINDOW = 20;
+
 	onMount(async () => {
 		try {
-			const summary = await getSession(page.params.id!);
-			state = summary ? { status: 'ready', summary } : { status: 'missing' };
+			// Load the session + re-run the planner in parallel. The planner
+			// sees the just-completed session (it's in recentSessions) so the
+			// first remaining plan item *is* the real "what's next".
+			const [summary, recentSessions, corpus] = await Promise.all([
+				getSession(page.params.id!),
+				getRecentSessions(RECENT_WINDOW),
+				loadBuiltinCorpus('en-top-1000').catch(() => undefined)
+			]);
+			if (!summary) {
+				state = { status: 'missing' };
+				return;
+			}
+			const dashboard = await loadDashboardData({ recentSessions, corpus });
+			state = { status: 'ready', summary, next: dashboard.plan[0] };
 		} catch (err) {
 			state = {
 				status: 'error',
@@ -34,6 +53,25 @@
 			};
 		}
 	});
+
+	/** Route path for a planned session's type (mirrors the dashboard). */
+	function routeFor(type: SessionType): string {
+		switch (type) {
+			case 'diagnostic':
+				return resolve('/session/diagnostic');
+			case 'bigram-drill':
+				return resolve('/session/bigram-drill');
+			case 'real-text':
+				return resolve('/session/real-text');
+		}
+	}
+
+	function startNext(planned: PlannedSession) {
+		// Same handoff pattern the dashboard uses: stash the config so the
+		// session route can read its targets / word budget on mount.
+		stashPlannedSession(planned);
+		window.location.href = routeFor(planned.config.type);
+	}
 
 	/**
 	 * Slowest-5 bigrams by `meanTime`. Filters out `NaN` — those are bigrams
@@ -149,19 +187,35 @@
 		</section>
 
 		<!--
-			Single prominent CTA. Secondary action is a text link rather than
-			a ghost button — makes "Run another" the obvious one-action-on-this-page,
-			which is the correct thing to do after reviewing a session.
+			Single prominent CTA. When there's a next planned session, this
+			routes straight into it (same handoff as the dashboard); when
+			today's plan is exhausted, we fall back to "Back to dashboard"
+			as the primary action — there's no sensible "next" to push.
 		-->
 		<div class="flex flex-wrap items-center gap-6 pt-2">
-			<a href={resolve('/session/diagnostic')} class="btn btn-lg btn-primary">Run another session</a
-			>
-			<a
-				href={resolve('/')}
-				class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
-			>
-				Back to dashboard
-			</a>
+			{#if state.next}
+				{@const next = state.next}
+				<button
+					type="button"
+					class="btn btn-lg btn-primary"
+					onclick={() => startNext(next)}
+					data-testid="next-session"
+				>
+					Next session: {next.label} →
+				</button>
+				<a
+					href={resolve('/')}
+					class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
+				>
+					Back to dashboard
+				</a>
+			{:else}
+				<a
+					href={resolve('/')}
+					class="btn btn-lg btn-primary"
+					data-testid="day-complete-cta">Day complete · Back to dashboard</a
+				>
+			{/if}
 		</div>
 	{/if}
 </div>

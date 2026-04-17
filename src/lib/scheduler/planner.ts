@@ -22,7 +22,7 @@
  * dashboard re-plans after each completed session so multi-day state
  * ("streaks", weekly schedules) lives elsewhere.
  */
-import type { SessionConfig } from '../session/types';
+import type { SessionConfig, SessionType } from '../session/types';
 import type { SchedulerInput, PlannedSession, PlannedSessionReason } from './types';
 import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
@@ -204,6 +204,37 @@ function drillPlan(targets: string[], wordBudget: number): PlannedSession {
 		label: 'Bigram drill',
 		rationale: `Targeted practice on your ${targets.length} weakest bigrams.`
 	};
+}
+
+/**
+ * Drop already-completed-today items off the front of a plan, matched
+ * by session type. Used by the dashboard/summary layer so the plan
+ * visibly shrinks as the user works through it, and so the post-session
+ * "Next session" CTA can pick the true next step.
+ *
+ * Walks the plan in order; for each item, if the matching completed
+ * count is positive, it consumes one credit and skips the item,
+ * otherwise the item survives. This keeps the interleaved
+ * drill/real-text ordering intact — a user who completed 2 drills and
+ * 1 real-text ends up with [drill, real-text, drill, real-text, drill]
+ * remaining (the real-text before the second drill is gone).
+ */
+export function sliceCompletedFromPlan(
+	plan: readonly PlannedSession[],
+	completedToday: Readonly<Partial<Record<SessionType, number>>>
+): PlannedSession[] {
+	const remaining: Partial<Record<SessionType, number>> = { ...completedToday };
+	const out: PlannedSession[] = [];
+	for (const item of plan) {
+		const type = item.config.type;
+		const left = remaining[type] ?? 0;
+		if (left > 0) {
+			remaining[type] = left - 1;
+			continue;
+		}
+		out.push(item);
+	}
+	return out;
 }
 
 function realtextPlan(wordBudget: number, hint?: 'no-targets-left'): PlannedSession {
