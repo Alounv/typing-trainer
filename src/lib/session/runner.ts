@@ -127,17 +127,6 @@ export interface SessionRunnerConfig {
 	onBigramGraduated?: (bigram: string) => void;
 	/** Override classification thresholds for the final summary. */
 	thresholds?: ClassificationThresholds;
-	/**
-	 * Char offsets where round boundaries fall, ordered ascending.
-	 * Sized `roundCount - 1`: the final round ends at `text.length` and
-	 * doesn't need a marker. Empty/omitted = no round tracking.
-	 *
-	 * When the position first reaches a boundary, `onRoundComplete`
-	 * fires with the zero-based index of the round that just finished.
-	 */
-	roundBoundaries?: readonly number[];
-	/** Fires once per boundary when the typing position first crosses it. */
-	onRoundComplete?: (roundIndex: number) => void;
 }
 
 /**
@@ -156,13 +145,6 @@ export class SessionRunner {
 	private readonly targetOccurrences = new Map<string, BigramOccurrence[]>();
 	private readonly graduated_ = new Set<string>();
 	private position_ = 0;
-	/**
-	 * Index of the next round boundary to cross. Advances as the
-	 * position sweeps past entries in `config.roundBoundaries`. Also
-	 * serves as "how many rounds have completed so far", which is what
-	 * UI renders.
-	 */
-	private currentRound_ = 0;
 
 	constructor(config: SessionRunnerConfig) {
 		this.config = config;
@@ -185,20 +167,6 @@ export class SessionRunner {
 		// a replay-style caller feeding events out of order — position
 		// should only move forward from the runner's view.
 		this.position_ = Math.max(this.position_, event.position + 1);
-
-		// Round transitions fire once per boundary, in order. A while-loop
-		// handles the edge where a paste or fast-advance vaults past
-		// multiple boundaries in a single event.
-		const boundaries = this.config.roundBoundaries;
-		if (boundaries) {
-			while (
-				this.currentRound_ < boundaries.length &&
-				this.position_ >= boundaries[this.currentRound_]
-			) {
-				this.config.onRoundComplete?.(this.currentRound_);
-				this.currentRound_++;
-			}
-		}
 
 		if (this.events_.length < 2) return;
 		const prev = this.events_[this.events_.length - 2];
@@ -273,10 +241,5 @@ export class SessionRunner {
 	/** Set of target bigrams that have met graduation criteria. */
 	get graduatedTargets(): readonly string[] {
 		return [...this.graduated_];
-	}
-
-	/** How many rounds have completed — equivalently, the index of the round currently in progress. */
-	get currentRound(): number {
-		return this.currentRound_;
 	}
 }

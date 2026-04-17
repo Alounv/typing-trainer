@@ -10,7 +10,13 @@
  *   no diagnostic report on file        → [catch-up diagnostic]
  *   ≥ DIAGNOSTIC_INTERVAL non-diag      → [cadence diagnostic]
  *     sessions since last diagnostic
- *   otherwise                           → [drill (50 words) → real-text (100 words)]
+ *   otherwise                           → N interleaved [drill, real-text]
+ *                                         mini-sessions
+ *
+ * "Mini-session" is the v2 unit: short (~15–25 words), self-contained,
+ * each completion is its own checkpoint. Chained together the user
+ * gets the equivalent of a longer workout with natural save points
+ * between.
  *
  * The planner intentionally stays shallow: one decision per call. The
  * dashboard re-plans after each completed session so multi-day state
@@ -21,20 +27,26 @@ import type { SchedulerInput, PlannedSession, PlannedSessionReason } from './typ
 import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 	DEFAULT_REAL_TEXT_WORD_BUDGET,
-	DEFAULT_DIAGNOSTIC_WORD_BUDGET,
-	DEFAULT_ROUND_COUNT,
-	DIAGNOSTIC_ROUND_COUNT
+	DEFAULT_DIAGNOSTIC_WORD_BUDGET
 } from '../models';
 
 /**
  * Run a full diagnostic every N non-diagnostic sessions (spec §5).
- * Kept as a named constant so tests (and a future settings override)
- * can tune it without string-matching the rule.
+ * Scaled up from 7 (v1) to 28: a daily plan now emits 8 mini-sessions
+ * instead of 2, so keeping weekly-ish diagnostic cadence means counting
+ * 4× more non-diagnostic sessions. Settings will eventually tune this.
  */
-export const DIAGNOSTIC_INTERVAL = 7;
+export const DIAGNOSTIC_INTERVAL = 28;
 
 /** Default "top N" priority bigrams to drill per session. */
 export const DEFAULT_DRILL_TARGET_COUNT = 10;
+
+/**
+ * Mini-sessions per daily plan, per phase. `PAIRS_PER_DAY = 4` means
+ * the non-diagnostic plan emits 4 drill + 4 real-text sessions
+ * interleaved — a full workout with save points between each.
+ */
+export const PAIRS_PER_DAY = 4;
 
 export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	const {
@@ -77,10 +89,18 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	// drill phase entirely and jump to real text — there's nothing to
 	// drill on. The user has "arrived" at the current target roster.
 	if (drillTargets.length === 0) {
-		return [realtextPlan('no-targets-left')];
+		return Array.from({ length: PAIRS_PER_DAY }, () => realtextPlan('no-targets-left'));
 	}
 
-	return [drillPlan(drillTargets), realtextPlan()];
+	// Interleave drill + real-text mini-sessions so variety breaks up a
+	// long daily workout. Each pair is independent: the user can stop
+	// after any pair and the next run re-plans from scratch.
+	const plan: PlannedSession[] = [];
+	for (let i = 0; i < PAIRS_PER_DAY; i++) {
+		plan.push(drillPlan(drillTargets));
+		plan.push(realtextPlan());
+	}
+	return plan;
 }
 
 /**
@@ -126,8 +146,7 @@ function diagnosticPlan(
 ): PlannedSession {
 	const config: SessionConfig = {
 		type: 'diagnostic',
-		wordBudget: DEFAULT_DIAGNOSTIC_WORD_BUDGET,
-		roundCount: DIAGNOSTIC_ROUND_COUNT
+		wordBudget: DEFAULT_DIAGNOSTIC_WORD_BUDGET
 	};
 	const labels: Record<typeof reason, string> = {
 		'first-run-diagnostic': 'First diagnostic',
@@ -155,7 +174,6 @@ function drillPlan(targets: string[]): PlannedSession {
 	const config: SessionConfig = {
 		type: 'bigram-drill',
 		wordBudget: DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
-		roundCount: DEFAULT_ROUND_COUNT,
 		bigramsTargeted: targets,
 		pacerEnabled: true
 	};
@@ -171,7 +189,6 @@ function realtextPlan(hint?: 'no-targets-left'): PlannedSession {
 	const config: SessionConfig = {
 		type: 'real-text',
 		wordBudget: DEFAULT_REAL_TEXT_WORD_BUDGET,
-		roundCount: DEFAULT_ROUND_COUNT,
 		pacerEnabled: true
 	};
 	return {

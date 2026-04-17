@@ -353,7 +353,7 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
   - Follow spec §4.1: 14/15 recent correct AND last 5 within 20% of phase speed target. (No time-based timeout — sessions are pre-sized by word budget, so text exhaustion is the natural end.)
 - [x] **5.6** Session UI chrome (`session/components/`) — timer, stats bar
 - [x] **5.7** Tests for session runner and graduation logic
-- [x] **5.8** Rounds inside a session — drills/real-text split the word budget into 4 equal-ish rounds with a brief auto-advancing marker between them so users get intermediate milestones instead of one long undifferentiated block. Diagnostic stays single-round (it's a measurement, not a workout).
+- [x] **5.8** Mini-session model — drills and real-text sessions are intentionally small (~15–25 words, <1 min each). The scheduler emits 4 drill + 4 real-text mini-sessions interleaved, so each completion is its own checkpoint and abandoning mid-plan costs at most one mini-session.
 
 ---
 
@@ -362,10 +362,10 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 > Auto-suggest daily session structure.
 
 - [ ] **6.1** Default session structure (spec §5)
-  - Bigram drill (50 words, 4 rounds) → Real text (100 words, 4 rounds)
+  - 4 interleaved pairs of [bigram drill (15 words), real text (25 words)] per daily plan
 - [ ] **6.2** Scheduler rules
-  - Full diagnostic every 7 sessions (or on demand)
-  - Alternate between bigram drill and real text
+  - Full diagnostic every 28 non-diagnostic sessions (or on demand) — scaled from 7 to match mini-session volume
+  - Alternate between bigram drill and real text (interleave within a day)
   - Remove bigram from rotation after 3 consecutive healthy sessions
 - [ ] **6.3** Dashboard page — suggested session structure, today's drill targets, quick-start buttons, allow user overrides
 - [ ] **6.4** Tests for scheduler logic
@@ -374,12 +374,12 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 
 ## Phase 6.5 — Settings
 
-> User-facing configuration surface. Lands here because by now every setting it exposes (corpus, thresholds, word budget, round count) has a live consumer.
+> User-facing configuration surface. Lands here because by now every setting it exposes (corpus, thresholds, word budget) has a live consumer.
 
 - [ ] **6.5.1** Settings page
   - Language / corpus selection
   - Threshold configuration (for advanced users)
-  - Per-session word budget + round count preferences
+  - Per-session word budget preferences (drill / real-text / diagnostic)
 
 ---
 

@@ -24,15 +24,11 @@ export interface SessionConfig {
 	/**
 	 * Total words the runner targets. The generator pre-sizes text to
 	 * roughly this many words; the runner may end earlier on graduation
-	 * (spec §4.1).
+	 * (spec §4.1). Kept intentionally small for drill/real-text — a
+	 * session is a mini-workout (≤1 min at 60 WPM) so abandoning loses
+	 * at most a minute of data and every completion is a checkpoint.
 	 */
 	wordBudget: number;
-	/**
-	 * How many equal-ish chunks the budget is split into. 1 = no
-	 * between-rounds transitions (diagnostic uses this — it's a
-	 * measurement, not a workout). Drills and real-text default to 4.
-	 */
-	roundCount: number;
 	bigramsTargeted?: string[];
 	pacerEnabled?: boolean;
 }

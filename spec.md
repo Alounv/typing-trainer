@@ -212,7 +212,7 @@ Regressions (any non-healthy → worse classification, or `healthy` → any) are
 
 - Stop a bigram target when: 14 out of 15 most recent occurrences correct AND last 5 are within 20% of phase speed target
 - Phase speed targets: `acquisition` and `hasty` bigrams target 60% of baselineWPM; `fluency` bigrams target targetWPM
-- Or: planned word budget exhausted (default 50 words, split into 4 rounds)
+- Or: planned word budget exhausted (default 15 words per mini-session)
 
 **Output per bigram:** updated BigramRecord appended to bigramHistory.
 
@@ -228,7 +228,7 @@ Regressions (any non-healthy → worse classification, or `healthy` → any) are
 
 **No stop-on-error:** user types through errors. Errors are recorded but not corrected mid-stream (mirrors real use conditions). Backspace allowed but not penalized beyond time cost.
 
-**Session exit condition:** planned word budget exhausted (default 100 words). Budget is split into 4 rounds aligned to sentence ends, with a brief auto-advancing marker between rounds so the user sees progress instead of one long undifferentiated block.
+**Session exit condition:** planned word budget exhausted (default 25 words per mini-session). Each session is a self-contained mini-workout with its own summary save — the daily plan chains several of them so abandoning mid-plan costs at most one mini-session, not the whole block.
 
 **Output:** full KeystrokeEvent log; update bigramHistory for all encountered patterns.
 
@@ -238,19 +238,21 @@ Regressions (any non-healthy → worse classification, or `healthy` → any) are
 
 The app should suggest a daily session structure rather than leaving the user to choose manually. This is important for progression and avoiding over-drilling.
 
-**Default daily structure (~150 words):**
+**Default daily structure (~160 words total):**
 
-| Phase        | Word budget | Rounds | Type                      |
-| ------------ | ----------- | ------ | ------------------------- |
-| Bigram drill | 50 words    | 4      | Targeted, from diagnostic |
-| Real text    | 100 words   | 4      | Corpus-based              |
+A daily plan = 4 interleaved pairs of `[bigram drill, real text]` mini-sessions. Each mini-session is atomic: complete it and the summary saves to storage; abandon it and only that one ~15–25-word run is lost.
 
-Rounds split each session into equal-ish chunks so the user hits intermediate milestones (with a brief auto-advancing marker showing round N of 4 + accuracy) rather than typing one unbroken stretch.
+| Phase        | Per-session | Pairs/day | Type                      |
+| ------------ | ----------- | --------- | ------------------------- |
+| Bigram drill | 15 words    | 4         | Targeted, from diagnostic |
+| Real text    | 25 words    | 4         | Corpus-based              |
+
+Interleaving (drill → real-text → drill → …) breaks up monotony; a user who stops after two pairs still banked two drills + two real-text sessions of real data.
 
 **Scheduler rules:**
 
-- Run full diagnostic every 7 sessions (or on demand)
-- Each session contains both phases (bigram drill followed by real text) as shown above
+- Run full diagnostic every 28 non-diagnostic mini-sessions (or on demand) — scales with the higher mini-session count to preserve the ~weekly cadence
+- Each daily plan interleaves 4 bigram-drill and 4 real-text mini-sessions as shown above
 - After 3 consecutive sessions where a bigram is `healthy`, remove from drill rotation
 
 ---
@@ -337,7 +339,7 @@ Corpus fit:
 ```
 Onboarding
   → Choose language(s)
-  → First diagnostic session (~200 words, single round) — also derives baselineWPM
+  → First diagnostic session (~200 words) — also derives baselineWPM
   → First diagnostic report shown
   → Enter daily session flow
 

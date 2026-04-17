@@ -9,7 +9,7 @@ import type { PlannedSession } from './types';
  */
 function plan(type: 'diagnostic' | 'bigram-drill' | 'real-text'): PlannedSession {
 	return {
-		config: { type, wordBudget: 50, roundCount: 4, bigramsTargeted: ['th'] },
+		config: { type, wordBudget: 15, bigramsTargeted: ['th'] },
 		reason: 'default-drill',
 		label: 'Test'
 	};

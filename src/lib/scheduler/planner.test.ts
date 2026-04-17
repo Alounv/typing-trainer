@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { planDailySessions, DIAGNOSTIC_INTERVAL, DEFAULT_DRILL_TARGET_COUNT } from './planner';
+import {
+	planDailySessions,
+	DIAGNOSTIC_INTERVAL,
+	DEFAULT_DRILL_TARGET_COUNT,
+	PAIRS_PER_DAY
+} from './planner';
 import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET, DEFAULT_REAL_TEXT_WORD_BUDGET } from '../models';
 import type { SessionSummary, SessionType } from '../session/types';
 import type { DiagnosticReport, PriorityBigram } from '../diagnostic/types';
@@ -93,12 +98,18 @@ describe('planDailySessions — diagnostic triggers', () => {
 });
 
 describe('planDailySessions — default daily structure', () => {
-	it('mid-cycle: drill then real-text, in order', () => {
+	it('mid-cycle: interleaves drill + real-text mini-sessions', () => {
 		const plan = planDailySessions({
 			recentSessions: recent('real-text', 'diagnostic'),
 			latestDiagnosticReport: report(['th', 'he', 'in'])
 		});
-		expect(plan.map((p) => p.config.type)).toEqual(['bigram-drill', 'real-text']);
+		// Full day = PAIRS_PER_DAY × [drill, real-text].
+		expect(plan).toHaveLength(PAIRS_PER_DAY * 2);
+		const types = plan.map((p) => p.config.type);
+		for (let i = 0; i < PAIRS_PER_DAY; i++) {
+			expect(types[i * 2]).toBe('bigram-drill');
+			expect(types[i * 2 + 1]).toBe('real-text');
+		}
 		expect(plan[0].config.wordBudget).toBe(DEFAULT_BIGRAM_DRILL_WORD_BUDGET);
 		expect(plan[1].config.wordBudget).toBe(DEFAULT_REAL_TEXT_WORD_BUDGET);
 	});
@@ -138,8 +149,9 @@ describe('planDailySessions — default daily structure', () => {
 			latestDiagnosticReport: report(['th', 'he']),
 			graduatedFromRotation: new Set(['th', 'he'])
 		});
-		expect(plan).toHaveLength(1);
-		expect(plan[0].config.type).toBe('real-text');
+		// Still PAIRS_PER_DAY mini-sessions — just all real-text, no drill.
+		expect(plan).toHaveLength(PAIRS_PER_DAY);
+		expect(plan.every((p) => p.config.type === 'real-text')).toBe(true);
 	});
 });
 

@@ -26,30 +26,17 @@ export const DEFAULT_HIGH_ERROR_THRESHOLD = 0.05;
 export const TARGET_WPM_MULTIPLIER = 1.17;
 
 /**
- * Default word budgets per session type. Picked so a typical user gets
- * ~2–3 minutes per drill, ~5 minutes per real-text session at 60 WPM —
- * enough for meaningful practice without feeling like a slog. Advanced
+ * Default word budgets per session type. Intentionally small so a
+ * session is a mini-workout: <1 min at 60 WPM. Each completion is its
+ * own checkpoint — abandoning mid-session loses at most a minute of
+ * data, and the daily plan chains several of them together. Advanced
  * users can override via `UserSettings` (Phase 6.5).
  */
-export const DEFAULT_BIGRAM_DRILL_WORD_BUDGET = 50;
-export const DEFAULT_REAL_TEXT_WORD_BUDGET = 100;
+export const DEFAULT_BIGRAM_DRILL_WORD_BUDGET = 15;
+export const DEFAULT_REAL_TEXT_WORD_BUDGET = 25;
 /**
  * Diagnostic needs enough surface area to hit ≥15 occurrences of top-200
- * bigrams (spec §2.8); sized generously to guarantee coverage.
+ * bigrams (spec §2.8); sized generously to guarantee coverage. Stays
+ * one large sample — fragmenting would starve the classifier.
  */
 export const DEFAULT_DIAGNOSTIC_WORD_BUDGET = 200;
-
-/**
- * Drills and real-text sessions split into N equal-ish rounds with a
- * brief auto-advancing transition between them — gives the user
- * intermediate milestones instead of one long undifferentiated block.
- * 4 is the sweet spot: enough structure to feel progress, few enough
- * transitions that they don't break flow.
- */
-export const DEFAULT_ROUND_COUNT = 4;
-/**
- * Diagnostic stays single-round: it's a measurement, not a workout.
- * Splitting the sample would fragment the bigram-occurrence counts that
- * §2.8 relies on.
- */
-export const DIAGNOSTIC_ROUND_COUNT = 1;

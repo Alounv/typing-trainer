@@ -46,15 +46,6 @@
 		 * `false`; diagnostic routes flip it on.
 		 */
 		persistRawEvents?: boolean;
-		/**
-		 * Char offsets where round boundaries fall — one per round except
-		 * the final. Shell shows a round indicator and fires a brief
-		 * transition toast as each boundary is crossed. Empty/omitted =
-		 * no round UI (diagnostic is always single-round).
-		 */
-		roundBoundaries?: readonly number[];
-		/** Total rounds in the session; 1 = no round UI. */
-		roundCount?: number;
 	}
 
 	let {
@@ -64,9 +55,7 @@
 		lede,
 		targetBigrams,
 		graduationTargetMs,
-		persistRawEvents = false,
-		roundBoundaries = [],
-		roundCount = 1
+		persistRawEvents = false
 	}: Props = $props();
 
 	// Reactive mirrors of runner state. The runner itself is plain TS with
@@ -81,26 +70,6 @@
 	let saving = $state(false);
 	let saveError = $state<string | null>(null);
 	let graduatedCount = $state(0);
-
-	/**
-	 * Zero-indexed round the user is currently in (0 = first round).
-	 * Advances via the runner's `onRoundComplete` callback. Visible in
-	 * the UI as "Round N of M" so the user sees intermediate progress
-	 * instead of one long undifferentiated block.
-	 */
-	let currentRound = $state(0);
-	/**
-	 * Index of the most recently completed round, used to drive the
-	 * brief transition toast. `null` means nothing to show (initial
-	 * state or after the toast's auto-dismiss timer fires).
-	 */
-	let transitionRound = $state<number | null>(null);
-	/** Characters correctly typed within the current round (for the toast's accuracy stat). */
-	let roundCorrectChars = $state(0);
-	/** Total chars committed within the current round — same denominator used for accuracy. */
-	let roundTotalChars = $state(0);
-	/** Last round's accuracy %, shown by the toast. Recomputed at each transition. */
-	let lastRoundAccuracy = $state(100);
 
 	// `performance.now()` anchor captured on the first keystroke, not on
 	// mount — reading / focus time shouldn't inflate the WPM denominator.
@@ -117,18 +86,6 @@
 		text,
 		targetBigrams,
 		graduationTargetMs,
-		roundBoundaries,
-		onRoundComplete: (i) => {
-			// Snapshot accuracy for the round that just ended, then reset
-			// round-local counters for the next round. The toast below
-			// reads `lastRoundAccuracy` plus `transitionRound`.
-			lastRoundAccuracy =
-				roundTotalChars === 0 ? 100 : Math.round((roundCorrectChars / roundTotalChars) * 100);
-			roundCorrectChars = 0;
-			roundTotalChars = 0;
-			currentRound = i + 1;
-			transitionRound = i;
-		},
 		onBigramGraduated: () => {
 			graduatedCount = runner.graduatedTargets.length;
 		}
@@ -141,19 +98,6 @@
 			sessionStart = performance.now();
 			running = true;
 		}
-		// Per-round accuracy tracking (first-input only, same rule as
-		// session-level errorRate). Done before `recordEvent` so the
-		// counters are already updated when a boundary crossing fires
-		// `onRoundComplete` inside the runner.
-		if (event.position >= 0 && event.position < text.length) {
-			// Only count the first input at each position — retypes after
-			// backspace shouldn't get a second chance to "fix" accuracy.
-			if (!errorPositions.has(event.position) && !correctedPositions.has(event.position)) {
-				roundTotalChars++;
-				if (event.actual === event.expected) roundCorrectChars++;
-			}
-		}
-
 		runner.recordEvent(event);
 		position = runner.position;
 
@@ -202,51 +146,13 @@
 		}, 200);
 		return () => window.clearInterval(id);
 	});
-
-	/** How long the round-transition toast lingers before auto-dismissing. */
-	const ROUND_TOAST_MS = 1500;
-	// Auto-dismiss the round-transition toast. Tracked by `transitionRound`
-	// so each boundary fires a fresh timer and a rapid-fire sequence of
-	// transitions doesn't pile up overlapping toasts.
-	$effect(() => {
-		if (transitionRound === null) return;
-		const id = window.setTimeout(() => {
-			transitionRound = null;
-		}, ROUND_TOAST_MS);
-		return () => window.clearTimeout(id);
-	});
-
-	const showRoundIndicator = $derived(roundCount > 1);
 </script>
 
-<div class="relative mx-auto max-w-3xl space-y-8">
+<div class="mx-auto max-w-3xl space-y-8">
 	<header class="space-y-2">
 		<h1 class="text-4xl font-bold tracking-tight">{title}</h1>
 		{#if lede}<p class="text-base-content/70">{lede}</p>{/if}
 	</header>
-
-	{#if transitionRound !== null}
-		<!--
-			Transition toast — brief, auto-dismissing marker that the round
-			just ended. Shows round number + accuracy. Non-blocking: input
-			keeps working; this is a progress landmark, not a pause screen.
-			`role="status"` with polite live region so screen readers pick
-			it up without interrupting.
-		-->
-		<div
-			class="pointer-events-none absolute -top-2 right-0 left-0 flex justify-center"
-			role="status"
-			aria-live="polite"
-		>
-			<div
-				class="rounded-full border border-base-300 bg-base-100 px-4 py-2 text-sm shadow-md"
-				data-testid="round-transition-toast"
-			>
-				<span class="font-medium">Round {transitionRound + 1} of {roundCount}</span>
-				<span class="text-base-content/50"> · {lastRoundAccuracy}% accurate</span>
-			</div>
-		</div>
-	{/if}
 
 	<!--
 		Ambient progress: hairline bar above the drill. Doubles as a visible
@@ -274,16 +180,6 @@
 	<div class="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">
 		<Timer {elapsedMs} />
 		<StatsBar {position} {elapsedMs} {errorCount} />
-		{#if showRoundIndicator}
-			<span class="flex items-baseline gap-1.5" data-testid="round-indicator">
-				<span class="text-base-content/55">Round</span>
-				<span class="font-mono font-medium text-base-content tabular-nums">
-					{Math.min(currentRound + 1, roundCount)}<span class="text-base-content/40"
-						>/{roundCount}</span
-					>
-				</span>
-			</span>
-		{/if}
 		{#if targetBigrams && targetBigrams.length > 0}
 			<span class="flex items-baseline gap-1.5">
 				<span class="text-base-content/55">Graduated</span>
