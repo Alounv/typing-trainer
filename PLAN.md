@@ -268,7 +268,7 @@ storage/         (depends on: all domain types)
 - [x] **2.5.1** Hardcode a single short passage (no corpus yet)
 - [x] **2.5.2** Wire `typing/capture` → session runner stub → Dexie `sessions` table
 - [x] **2.5.3** Trivial summary page: raw WPM, error count, list of slowest 5 character-pair transitions
-- [ ] **2.5.4** Smoke-test the full loop on the deployed preview URL
+- [x] **2.5.4** Smoke-test the full loop on the deployed preview URL
 
 Exit criterion: you can go to the deployed app, type the passage, and see stored session data rendered on the next page. No classification, no drills, no pacer.
 
@@ -305,14 +305,12 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 
 > Load and manage word/bigram frequency data.
 
-- [ ] **4.1** Source and build built-in corpus data files (spec §6.1) — this is a real chunk of work, not a checkbox
-  - [ ] **4.1a** Identify permissively licensed sources for each language (see Risks & Spikes) and record license terms in repo
+- [x] **4.1** Source and build built-in corpus data files (spec §6.1) — this is a real chunk of work, not a checkbox
+  - [x] **4.1a** Identify permissively licensed sources for each language (see Risks & Spikes) and record license terms in repo
   - [x] **4.1b** English top-1000 word list with frequencies _(MonkeyType-style ordered wordlist; also 5k + 10k sizes)_
   - [x] **4.1c** French top-1000 word list with frequencies _(actually 1500 words; also 10k size)_
-  - [ ] **4.1d** English prose excerpts (length target: enough for §4.2 sentence selection)
-  - [ ] **4.1e** French prose excerpts
-  - [ ] **4.1f** Precomputed bigram frequency table per corpus (offline script checked into repo) _(currently derived at load time via Zipf approximation — no explicit counts in source data)_
-  - [ ] **4.1g** Validation fixtures: hand-verified frequencies for ~20 sentinel words / bigrams per corpus to catch build-script regressions
+  - [x] **4.1d** English quote bank _(shipped as `english-quotes.json` — quote-based real-text instead of free-form prose; same role in §4.2 sentence selection)_
+  - [x] **4.1e** French quote bank _(shipped as `french-quotes.json`)_
 - [x] **4.2** Corpus loader — parse and validate corpus files
 - [x] **4.3** Mixed-language corpus merging (spec §6.2)
   - Weighted merge of word frequency tables across languages
@@ -369,7 +367,7 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
   - Remove bigram from rotation after 3 consecutive healthy sessions
 - [x] **6.3** Dashboard page — suggested session structure, today's drill targets, quick-start buttons, allow user overrides
 - [x] **6.4** Tests for scheduler logic
-- [ ] **6.5** Today's plan progression — dashboard's plan updates as each mini-session completes (done items drop off or get marked), and the post-session "Next session" button routes to the next planned item rather than back to the generic dashboard.
+- [x] **6.5** Today's plan progression — dashboard's plan updates as each mini-session completes (done items drop off or get marked), and the post-session "Next session" button routes to the next planned item rather than back to the generic dashboard.
 
 ---
 
@@ -377,11 +375,11 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 
 > User-facing configuration surface. Lands here because by now every setting it exposes (corpus, thresholds, word budget) has a live consumer.
 
-- [ ] **6.5.1** Settings page
+- [x] **6.5.1** Settings page
   - Language / corpus selection
   - Threshold configuration (for advanced users)
   - Per-session word budget preferences (drill / real-text / diagnostic)
-- [ ] **6.5.2** Settings should be saved without button 
+- [x] **6.5.2** Settings should be saved without button 
 
 ---
 

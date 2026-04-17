@@ -6,12 +6,12 @@
 	 * (session routes, planner) read back via `getProfile` and fall
 	 * back to the `DEFAULT_*` constants when fields are absent.
 	 *
-	 * Explicit Save button rather than auto-save on every keystroke: a
-	 * threshold change between half-typed states is rarely what the
-	 * user means, and the number inputs are forgiving of intermediate
-	 * values anyway. Reset-to-defaults just rewrites the row with the
-	 * factory shape — simpler than a "clear the override" toggle per
-	 * field, and reversible in one click.
+	 * Auto-save on edit (Phase 6.5.2): each field change kicks a short
+	 * debounced save rather than gating behind a "Save" button. The
+	 * debounce is long enough that number inputs don't write a profile
+	 * per keystroke, short enough that a user leaving the page feels
+	 * confident their changes stuck. The timestamp + error live-region
+	 * in the footer is the single source of feedback.
 	 */
 	import { onMount } from 'svelte';
 	import { getProfile, saveProfile } from '$lib/storage/service';
@@ -76,6 +76,14 @@
 	let saveError = $state<string | null>(null);
 	let savedAt = $state<Date | null>(null);
 
+	/**
+	 * Debounce window for auto-save (ms). Long enough that dragging a
+	 * number input past several intermediate values writes one row, not
+	 * seven; short enough that stepping away after an edit still
+	 * captures it before the user navigates.
+	 */
+	const AUTO_SAVE_DEBOUNCE_MS = 400;
+
 	onMount(async () => {
 		try {
 			const stored = await getProfile();
@@ -96,6 +104,29 @@
 			loadError = err instanceof Error ? err.message : 'Failed to load settings.';
 			loadState = 'error';
 		}
+	});
+
+	/**
+	 * Auto-save: debounced `$effect` that reacts to any change in
+	 * `form` once the page has finished loading. The `loadState` guard
+	 * prevents the effect's initial run (which fires against the
+	 * pre-load defaults) from writing the factory shape over an
+	 * existing profile. The timer handle in the cleanup closure ensures
+	 * an edit followed immediately by another edit collapses into one
+	 * save.
+	 */
+	$effect(() => {
+		if (loadState !== 'ready') return;
+		// Read through the reactive form so the effect re-runs on any
+		// leaf change. `$state.snapshot` is called inside the timer so
+		// what gets saved is the value at debounce-fire time, not the
+		// older value captured when the edit started.
+		$state.snapshot(form);
+
+		const handle = setTimeout(() => {
+			void save();
+		}, AUTO_SAVE_DEBOUNCE_MS);
+		return () => clearTimeout(handle);
 	});
 
 	/**
@@ -156,9 +187,11 @@
 		}
 	}
 
-	async function reset() {
+	function reset() {
+		// The reactive assignment triggers the auto-save effect — no need
+		// to call `save()` directly. Keeps the reset path identical to any
+		// other edit, so there's one save code path, not two.
 		form = buildDefaults();
-		await save();
 	}
 </script>
 
@@ -372,34 +405,35 @@
 			</dl>
 		</section>
 
+		<!--
+			No Save button: edits auto-persist shortly after the user
+			stops. The status line is the only feedback the footer needs,
+			so it owns the whole row. "Reset to defaults" lives on the
+			right as the only action the user can still trigger manually,
+			styled as a quiet text link so it doesn't pull focus in idle
+			state.
+		-->
 		<footer class="flex flex-wrap items-center gap-x-6 gap-y-3 pt-2">
-			<button
-				type="button"
-				class="btn tracking-wide btn-primary"
-				onclick={save}
-				disabled={saving}
-				data-testid="settings-save"
-			>
-				{saving ? 'Saving…' : 'Save changes'}
-			</button>
-			<button
-				type="button"
-				class="text-sm text-base-content/55 underline-offset-4 hover:text-base-content hover:underline disabled:pointer-events-none disabled:opacity-50"
-				onclick={reset}
-				disabled={saving}
-				data-testid="settings-reset"
-			>
-				Reset to defaults
-			</button>
-			<div class="ml-auto text-sm" aria-live="polite">
+			<div class="text-sm" aria-live="polite">
 				{#if saveError}
 					<p class="text-error" role="alert">{saveError}</p>
+				{:else if saving}
+					<p class="font-mono text-base-content/45 tabular-nums">Saving…</p>
 				{:else if savedAt}
 					<p class="font-mono text-base-content/45 tabular-nums">
 						Saved · {savedAt.toLocaleTimeString()}
 					</p>
 				{/if}
 			</div>
+			<button
+				type="button"
+				class="ml-auto text-sm text-base-content/55 underline-offset-4 hover:text-base-content hover:underline disabled:pointer-events-none disabled:opacity-50"
+				onclick={reset}
+				disabled={saving}
+				data-testid="settings-reset"
+			>
+				Reset to defaults
+			</button>
 		</footer>
 	{/if}
 </div>
