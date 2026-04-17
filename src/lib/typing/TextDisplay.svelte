@@ -66,29 +66,32 @@
 
 	// DaisyUI semantic colors keep the drill readable across any active theme.
 	const stateClasses: Record<CharState, string> = {
-		pending: 'text-base-content/50',
-		'typed-correct': 'text-base-content/70',
+		pending: 'text-base-content/45',
+		'typed-correct': 'text-base-content/75',
 		// Uncorrected error: solid red tint — the mistake is still standing.
-		'typed-error': 'text-error-content bg-error/25 rounded-sm',
+		'typed-error': 'text-error-content bg-error/30 rounded-sm',
 		// Corrected error: reads like typed-correct, but a thin dotted amber
 		// underline marks where the user stumbled. No background, no
 		// strikethrough — the correction should feel like recovery, not
 		// punishment. The data still records it for analytics (spec §2.2).
 		'typed-error-corrected':
-			'text-base-content/70 underline decoration-dotted decoration-warning underline-offset-4',
-		current: 'text-base-content bg-primary/20 border-b-2 border-primary rounded-sm'
+			'text-base-content/75 underline decoration-dotted decoration-warning underline-offset-4',
+		// Current char: solid saturated block + thicker primary rule. Must
+		// out-weight the pacer ghost (below) — cursor is the user's anchor,
+		// pacer is peripheral.
+		current: 'text-primary-content bg-primary/70 rounded-sm'
 	};
 </script>
 
 <div
-	class="font-mono text-2xl leading-loose break-normal whitespace-pre-wrap"
+	class="font-mono text-2xl leading-loose tracking-wide break-normal whitespace-pre-wrap"
 	aria-label="Drill text"
 >
 	{#each chars as { char, state, ghost }, i (i)}
 		<span
 			class="transition-colors duration-75 motion-reduce:transition-none {stateClasses[
 				state
-			]} {ghost ? 'rounded-sm border-b-2 border-secondary bg-secondary/30' : ''}"
+			]} {ghost ? 'rounded-sm border-b border-secondary/60 bg-secondary/15' : ''}"
 			data-state={state}
 			data-ghost={ghost || undefined}>{char}</span
 		>

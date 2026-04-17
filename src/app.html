@@ -4,6 +4,19 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
+		<!--
+			Web fonts. Spline Sans for chrome, JetBrains Mono for drill and
+			numerics. `preconnect` warms the TLS/DNS hop; `display=swap` shows
+			fallback glyphs until the web font arrives rather than flashing
+			invisible text. Weights are chosen to match the type hierarchy:
+			400 body, 500 medium labels, 600/700 headings and display numbers.
+		-->
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap"
+		/>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

@@ -47,9 +47,9 @@
 	}
 </script>
 
-<div class="mx-auto max-w-3xl space-y-6">
-	<header class="space-y-1">
-		<h1 class="text-3xl font-bold">Session summary</h1>
+<div class="mx-auto max-w-3xl space-y-10">
+	<header>
+		<h1 class="text-4xl font-bold tracking-tight">Session summary</h1>
 	</header>
 
 	{#if state.status === 'loading'}
@@ -63,56 +63,107 @@
 	{:else}
 		{@const s = state.summary}
 		{@const slowest = slowestFive(s.bigramAggregates)}
-		<section class="stats bg-base-200 shadow">
-			<div class="stat">
-				<div class="stat-title">Raw WPM</div>
-				<div class="stat-value" data-testid="wpm-value">{s.wpm.toFixed(1)}</div>
-				<div class="stat-desc">Not smoothed — first-pass reading</div>
-			</div>
-			<div class="stat">
-				<div class="stat-title">Error rate</div>
-				<div class="stat-value">{(s.errorRate * 100).toFixed(1)}%</div>
-				<div class="stat-desc">First-input errors (spec §2.2)</div>
-			</div>
-			<div class="stat">
-				<div class="stat-title">Duration</div>
-				<div class="stat-value">{(s.durationMs / 1000).toFixed(1)}s</div>
-			</div>
+
+		<!--
+			Hero metric treatment: WPM is the headline; error rate and duration
+			are supporting chips. Deliberately replaces the three-equal-boxes
+			daisyUI `stats` template — a session ends on one number, not three.
+			Numeric displays are mono + `tabular-nums` so digit widths stay
+			stable (matters when these update from re-renders or retakes).
+		-->
+		<section class="space-y-3">
+			<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
+				Raw WPM
+			</p>
+			<p
+				class="font-mono text-7xl font-medium leading-none tabular-nums text-base-content"
+				data-testid="wpm-value"
+			>
+				{s.wpm.toFixed(1)}
+			</p>
+			<p class="text-sm text-base-content/60">Not smoothed — first-pass reading</p>
+
+			<dl class="flex flex-wrap gap-x-6 gap-y-2 pt-3 text-sm">
+				<div class="flex items-baseline gap-2">
+					<dt class="text-base-content/55">Errors</dt>
+					<dd class="font-mono font-medium tabular-nums text-base-content/90">
+						{(s.errorRate * 100).toFixed(1)}%
+					</dd>
+				</div>
+				<div class="flex items-baseline gap-2">
+					<dt class="text-base-content/55">Duration</dt>
+					<dd class="font-mono font-medium tabular-nums text-base-content/90">
+						{(s.durationMs / 1000).toFixed(1)}s
+					</dd>
+				</div>
+			</dl>
 		</section>
 
-		<section class="space-y-2">
-			<h2 class="text-xl font-semibold">Slowest 5 transitions</h2>
+		<!--
+			Slowest bigrams as tiles, not a table. The bigram glyph itself is
+			the subject; ms is supporting caption. Auto-fit grid caps tile
+			width so a small sample set doesn't stretch into stadium-sized
+			cards. No card shadows — flat surfaces tied together by a common
+			border color, no generic drop-shadow tell.
+		-->
+		<section class="space-y-4">
+			<div class="flex items-baseline justify-between">
+				<h2 class="text-xl font-semibold tracking-tight">Slowest transitions</h2>
+				<p class="text-xs tracking-wide text-base-content/50 uppercase">
+					Top 5 by mean time
+				</p>
+			</div>
 			{#if slowest.length === 0}
 				<p class="text-base-content/70">
 					No clean bigram samples yet — need at least one error-free adjacent pair.
 				</p>
 			{:else}
-				<table class="table">
-					<thead>
-						<tr>
-							<th>Bigram</th>
-							<th class="text-right">Mean (ms)</th>
-							<th class="text-right">Occurrences</th>
-							<th class="text-right">Error rate</th>
-						</tr>
-					</thead>
-					<tbody data-testid="slowest-table-body">
-						{#each slowest as b (b.bigram)}
-							<tr>
-								<td class="font-mono">{b.bigram === ' ' ? '␣' : b.bigram.replace(/ /g, '␣')}</td>
-								<td class="text-right">{b.meanTime.toFixed(0)}</td>
-								<td class="text-right">{b.occurrences}</td>
-								<td class="text-right">{(b.errorRate * 100).toFixed(0)}%</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+				<ul
+					class="grid gap-3"
+					style="grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));"
+					data-testid="slowest-tiles"
+				>
+					{#each slowest as b (b.bigram)}
+						<li
+							class="flex flex-col gap-2 rounded-md border border-base-300 bg-base-200/60 px-4 py-3"
+						>
+							<span
+								class="font-mono text-2xl leading-none tracking-wide text-base-content"
+								aria-label={`bigram ${b.bigram}`}
+							>
+								{b.bigram === ' ' ? '␣' : b.bigram.replace(/ /g, '␣')}
+							</span>
+							<div class="flex items-baseline justify-between text-xs">
+								<span class="font-mono tabular-nums text-base-content/80">
+									{b.meanTime.toFixed(0)}<span class="text-base-content/40"> ms</span>
+								</span>
+								{#if b.errorRate > 0}
+									<span class="font-mono tabular-nums text-error">
+										{(b.errorRate * 100).toFixed(0)}%
+									</span>
+								{:else}
+									<span class="text-base-content/40">clean</span>
+								{/if}
+							</div>
+						</li>
+					{/each}
+				</ul>
 			{/if}
 		</section>
 
-		<div class="flex gap-2">
-			<a href="/session/diagnostic" class="btn btn-primary">Run another</a>
-			<a href="/" class="btn btn-ghost">Dashboard</a>
+		<!--
+			Single prominent CTA. Secondary action is a text link rather than
+			a ghost button — makes "Run another" the obvious one-action-on-this-page,
+			which is the correct thing to do after reviewing a session.
+		-->
+		<div class="flex flex-wrap items-center gap-6 pt-2">
+			<a href="/session/diagnostic" class="btn btn-primary btn-lg">Run another session</a>
+			<a
+				href="/"
+				class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
+			>
+				Back to dashboard
+			</a>
 		</div>
 	{/if}
 </div>

@@ -43,8 +43,8 @@ test('type diagnostic passage → persisted → summary page shows stats', async
 	const wpmText = await wpm.textContent();
 	expect(Number(wpmText)).toBeGreaterThan(0);
 
-	// Slowest-5 table populated — the passage is long enough to yield at least
+	// Slowest-5 tiles populated — the passage is long enough to yield at least
 	// a handful of clean bigrams.
-	const rows = page.getByTestId('slowest-table-body').locator('tr');
-	await expect(rows).toHaveCount(5);
+	const tiles = page.getByTestId('slowest-tiles').locator('li');
+	await expect(tiles).toHaveCount(5);
 });

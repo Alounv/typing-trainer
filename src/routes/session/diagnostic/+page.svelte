@@ -64,31 +64,59 @@
 	}
 </script>
 
-<div class="mx-auto max-w-3xl space-y-6">
-	<header class="space-y-1">
-		<h1 class="text-3xl font-bold">Diagnostic</h1>
+<div class="mx-auto max-w-3xl space-y-8">
+	<header class="space-y-2">
+		<h1 class="text-4xl font-bold tracking-tight">Diagnostic</h1>
 		<p class="text-base-content/70">
 			Type the passage below. Errors are recorded but not blocked — just keep going.
 		</p>
 	</header>
 
-	<TypingSurface
-		text={TEXT}
-		bind:position
-		{errorPositions}
-		{correctedPositions}
-		{onEvent}
-		{onComplete}
-	/>
+	<!--
+		Ambient progress: a hairline bar above the drill replaces the old
+		"Position: X / Y" debug readout. Visible but non-demanding — the user
+		focuses on the text, the bar drifts in peripheral vision. Width is
+		driven by `position / TEXT.length`; `aria-valuenow` is the integer
+		percent so assistive tech gets a meaningful progress announcement
+		without re-announcing on every keystroke.
+	-->
+	<div class="space-y-3">
+		<div
+			class="h-0.5 w-full overflow-hidden rounded-full bg-base-300"
+			role="progressbar"
+			aria-label="Session progress"
+			aria-valuemin="0"
+			aria-valuemax="100"
+			aria-valuenow={Math.round((position / TEXT.length) * 100)}
+		>
+			<div
+				class="h-full bg-primary transition-[width] duration-75 ease-out motion-reduce:transition-none"
+				style="width: {(position / TEXT.length) * 100}%"
+			></div>
+		</div>
 
-	<div class="flex items-center gap-4 text-sm">
-		<span>Position: <strong>{position}</strong> / {TEXT.length}</span>
-		<span>Errors: <strong>{errorPositions.size}</strong></span>
-		{#if saving}
-			<span class="text-base-content/70">Saving…</span>
-		{/if}
-		{#if saveError}
-			<span class="text-error" role="alert">{saveError}</span>
-		{/if}
+		<TypingSurface
+			text={TEXT}
+			bind:position
+			{errorPositions}
+			{correctedPositions}
+			{onEvent}
+			{onComplete}
+		/>
 	</div>
+
+	<!-- Transient state only: save progress and save errors. The live error
+	     count has been dropped — the red/amber char highlights already show
+	     errors in place, counting them mid-session added pressure without
+	     insight. -->
+	{#if saving || saveError}
+		<div class="text-sm" aria-live="polite">
+			{#if saving}
+				<span class="text-base-content/70">Saving…</span>
+			{/if}
+			{#if saveError}
+				<span class="text-error" role="alert">{saveError}</span>
+			{/if}
+		</div>
+	{/if}
 </div>
