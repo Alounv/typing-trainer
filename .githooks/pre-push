@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -e
+
+echo "▶ lint"
+bun run lint
+
+echo "▶ check"
+bun run check
+
+echo "▶ test:unit"
+bun run test:unit --run
