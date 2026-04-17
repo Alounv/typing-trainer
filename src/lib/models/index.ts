@@ -1,11 +1,7 @@
-/** `bépo` is the French alternative; called out explicitly in the spec. */
-export type KeyboardLayout = 'qwerty' | 'dvorak' | 'azerty' | 'bépo';
-
 export type Language = 'en' | 'fr';
 
 /** Persistent user configuration (spec §2.4). */
 export interface UserSettings {
-	layout: KeyboardLayout;
 	/** Ordered by priority — first entry drives default corpus selection. */
 	languages: Language[];
 	/** One `CorpusConfig.id` per entry in `languages`. */

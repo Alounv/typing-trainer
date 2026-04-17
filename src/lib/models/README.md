@@ -1,8 +1,7 @@
 # `models/` — shared user settings & global constants
 
-The small, stable set of app-wide config: the user's keyboard layout &
-languages, their threshold overrides, and the default values everything else
-reads from.
+The small, stable set of app-wide config: the user's languages, their
+threshold overrides, and the default values everything else reads from.
 
 Think of this as the only module with no dependencies — it's imported by
 almost everyone else and imports nothing in the app.
@@ -13,11 +12,7 @@ almost everyone else and imports nothing in the app.
                        ┌──────────────────────────────┐
                        │        UserSettings          │    persisted as
                        │                              │    ProfileRecord
-                       │   layout: KeyboardLayout     │    in storage/
-                       │     qwerty|dvorak|azerty|    │
-                       │     bépo                     │
-                       │                              │
-                       │   languages[]                │
+                       │   languages[]                │    in storage/
                        │     (priority-ordered)       │
                        │                              │
                        │   corpusIds[]                │
@@ -45,7 +40,7 @@ almost everyone else and imports nothing in the app.
 
 ## Files
 
-- [index.ts](index.ts) — `KeyboardLayout`, `Language`, `UserSettings`, and the three `DEFAULT_*` constants.
+- [index.ts](index.ts) — `Language`, `UserSettings`, and the three `DEFAULT_*` constants.
 
 ## Why a dedicated folder for so few types?
 

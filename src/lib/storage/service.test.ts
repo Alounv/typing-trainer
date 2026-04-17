@@ -127,7 +127,6 @@ describe('storage service — round-trip', () => {
 
 	it('round-trips user settings (singleton row)', async () => {
 		const settings: UserSettings = {
-			layout: 'bépo',
 			languages: ['fr', 'en'],
 			corpusIds: ['fr-top-1000', 'en-top-1000']
 		};
@@ -135,7 +134,7 @@ describe('storage service — round-trip', () => {
 		expect(await getProfile()).toEqual(settings);
 
 		// Overwriting replaces — not merges.
-		const next: UserSettings = { ...settings, layout: 'qwerty' };
+		const next: UserSettings = { ...settings, languages: ['en'] };
 		await saveProfile(next);
 		expect(await getProfile()).toEqual(next);
 	});
@@ -163,7 +162,7 @@ describe('storage service — round-trip', () => {
 			sessionId: 's1',
 			events: []
 		});
-		await saveProfile({ layout: 'qwerty', languages: ['en'], corpusIds: ['en-top-1000'] });
+		await saveProfile({ languages: ['en'], corpusIds: ['en-top-1000'] });
 
 		await clearAll();
 

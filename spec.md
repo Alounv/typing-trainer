@@ -64,7 +64,6 @@ Persistent user configuration. Separated from session data.
 
 ```ts
 interface UserSettings {
-	layout: string; // 'bépo' | 'azerty' | 'qwerty' | 'dvorak' | ...
 	languages: string[]; // e.g. ['en'], ['fr', 'en'] — order = priority
 	corpusIds: string[]; // references CorpusConfig entries, one per language
 }
@@ -261,7 +260,7 @@ The app should suggest a daily session structure rather than leaving the user to
 The app should ship with at minimum:
 
 - `en-top-1000`, `en-top-5000` (English frequency lists)
-- `fr-top-1000`, `fr-top-5000` (French frequency lists — important for Bépo users)
+- `fr-top-1000`, `fr-top-5000` (French frequency lists)
 - `fr-prose` — excerpts from public domain French prose (Maupassant, Zola, etc.)
 - `en-prose` — English prose equivalents
 
