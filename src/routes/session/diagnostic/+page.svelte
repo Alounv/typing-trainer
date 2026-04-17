@@ -27,7 +27,7 @@
 	 * Corpus used when the user has no stored profile or their stored id
 	 * doesn't match any built-in (e.g. a migration or a removed corpus).
 	 */
-	const FALLBACK_CORPUS_ID = 'en-top-1000';
+	const FALLBACK_CORPUS_ID = 'en';
 
 	type LoadState =
 		| { status: 'loading' }

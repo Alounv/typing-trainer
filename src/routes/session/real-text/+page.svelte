@@ -20,7 +20,7 @@
 	const CHARS_PER_WORD = 5;
 
 	/** Corpus used when the profile is absent or its id isn't a known built-in. */
-	const FALLBACK_CORPUS_ID = 'en-top-1000';
+	const FALLBACK_CORPUS_ID = 'en';
 
 	type LoadState =
 		| { status: 'loading' }

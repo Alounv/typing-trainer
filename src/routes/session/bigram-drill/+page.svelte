@@ -12,7 +12,7 @@
 	import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from '$lib/models';
 
 	/** Corpus used when the profile is absent or its id isn't a known built-in. */
-	const FALLBACK_CORPUS_ID = 'en-top-1000';
+	const FALLBACK_CORPUS_ID = 'en';
 
 	/**
 	 * Fallback targets. Only used when the user lands here without a

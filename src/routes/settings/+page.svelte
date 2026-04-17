@@ -24,7 +24,7 @@
 		type Language,
 		type UserSettings
 	} from '$lib/models';
-	import { BUILTIN_CORPUS_IDS, type BuiltinCorpusId } from '$lib/corpus/registry';
+	import type { BuiltinCorpusId } from '$lib/corpus/registry';
 
 	/**
 	 * Source of truth for what the factory-fresh profile looks like.
@@ -35,7 +35,7 @@
 	function buildDefaults(): UserSettings {
 		return {
 			languages: ['en'],
-			corpusIds: ['en-top-1000'],
+			corpusIds: ['en'],
 			thresholds: {
 				speedMs: DEFAULT_SPEED_THRESHOLD_MS,
 				errorRate: DEFAULT_HIGH_ERROR_THRESHOLD
@@ -48,23 +48,12 @@
 		};
 	}
 
-	/**
-	 * Filter the full built-in corpus list to just the ids that match
-	 * a language. Drives the "which corpus for this language" picker
-	 * after the user checks a language box.
-	 */
-	function corporaFor(language: Language): BuiltinCorpusId[] {
-		return BUILTIN_CORPUS_IDS.filter((id) => id.startsWith(`${language}-`)) as BuiltinCorpusId[];
-	}
-
-	/**
-	 * Default corpus per language. Used when the user toggles a
-	 * language on — we pick the smallest/top list as the sensible
-	 * starting point rather than force an explicit choice.
-	 */
+	// One corpus per language now — the `corpusIds` array on the profile
+	// is kept parallel to `languages` using the language code itself as
+	// the id (both are `'en'` or `'fr'`).
 	const DEFAULT_CORPUS_PER_LANGUAGE: Record<Language, BuiltinCorpusId> = {
-		en: 'en-top-1000',
-		fr: 'fr-top-1500'
+		en: 'en',
+		fr: 'fr'
 	};
 
 	type LoadState = 'loading' | 'ready' | 'error';
@@ -161,19 +150,6 @@
 		}
 	}
 
-	function setCorpusFor(lang: Language, id: BuiltinCorpusId) {
-		const idx = form.languages.indexOf(lang);
-		if (idx === -1) return;
-		const next = [...form.corpusIds];
-		next[idx] = id;
-		form.corpusIds = next;
-	}
-
-	function corpusFor(lang: Language): BuiltinCorpusId | undefined {
-		const idx = form.languages.indexOf(lang);
-		return idx === -1 ? undefined : (form.corpusIds[idx] as BuiltinCorpusId | undefined);
-	}
-
 	async function save() {
 		saving = true;
 		saveError = null;
@@ -217,8 +193,7 @@
 				<h2 id="lang-heading" class="text-xl font-semibold tracking-tight">Language</h2>
 			</div>
 			<p class="max-w-xl text-sm text-base-content/65">
-				Pick what you want to practice. English leads when both are on. The corpus drives every
-				passage the trainer shows you.
+				Pick what you want to practice. English leads when both are on.
 			</p>
 
 			<dl class="divide-y divide-base-300 border-y border-base-300">
@@ -251,25 +226,9 @@
 							</label>
 						</dt>
 						<dd>
-							{#if enabled}
-								<select
-									class="min-w-[10rem] appearance-none border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary"
-									value={corpusFor(typedLang)}
-									onchange={(e) =>
-										setCorpusFor(
-											typedLang,
-											(e.target as HTMLSelectElement).value as BuiltinCorpusId
-										)}
-									data-testid={`corpus-${typedLang}`}
-									aria-label={`${label} corpus`}
-								>
-									{#each corporaFor(typedLang) as id (id)}
-										<option value={id}>{id}</option>
-									{/each}
-								</select>
-							{:else}
-								<span class="font-mono text-xs text-base-content/30">off</span>
-							{/if}
+							<span class="font-mono text-xs text-base-content/30">
+								{enabled ? 'on' : 'off'}
+							</span>
 						</dd>
 					</div>
 				{/each}

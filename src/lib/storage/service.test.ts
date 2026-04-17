@@ -119,7 +119,7 @@ describe('storage service — round-trip', () => {
 	it('round-trips user settings (singleton row)', async () => {
 		const settings: UserSettings = {
 			languages: ['fr', 'en'],
-			corpusIds: ['fr-top-1000', 'en-top-1000']
+			corpusIds: ['fr', 'en']
 		};
 		await saveProfile(settings);
 		expect(await getProfile()).toEqual(settings);
@@ -136,7 +136,7 @@ describe('storage service — round-trip', () => {
 
 	it('clearAll wipes every table', async () => {
 		await saveSession(makeSession());
-		await saveProfile({ languages: ['en'], corpusIds: ['en-top-1000'] });
+		await saveProfile({ languages: ['en'], corpusIds: ['en'] });
 
 		await clearAll();
 

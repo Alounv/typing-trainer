@@ -22,20 +22,12 @@ const BIGRAM_LOADERS: Record<BigramLanguage, () => Promise<FrequencyTable>> = {
 };
 
 /**
- * Canonical ids for built-in corpora. Exposed as a `const` tuple so
- * callers can type-check against them (e.g., "is this the id of a real
- * built-in, or a custom-corpus id I made up?").
- *
- * `fr-top-1500` is deliberately named after its actual size — the source
- * file is 1,500 words even though it's in `french1k.ts`.
+ * Canonical ids for built-in corpora — one per language. The size split
+ * (1k/5k/10k) is gone: quote banks are the primary source of text now,
+ * and the wordlist is only a synth fallback — no user-meaningful knob to
+ * tune. Ids are just the language code.
  */
-export const BUILTIN_CORPUS_IDS = [
-	'en-top-1000',
-	'en-top-5000',
-	'en-top-10000',
-	'fr-top-1500',
-	'fr-top-10000'
-] as const;
+export const BUILTIN_CORPUS_IDS = ['en', 'fr'] as const;
 export type BuiltinCorpusId = (typeof BUILTIN_CORPUS_IDS)[number];
 
 /**
@@ -65,14 +57,8 @@ async function loadFromSources(
 }
 
 const LOADERS: Record<BuiltinCorpusId, () => Promise<CorpusData>> = {
-	'en-top-1000': () => loadFromSources('en-top-1000', 'en', () => import('./data/english1k.txt?raw')),
-	'en-top-5000': () => loadFromSources('en-top-5000', 'en', () => import('./data/english5k.txt?raw')),
-	'en-top-10000': () =>
-		loadFromSources('en-top-10000', 'en', () => import('./data/english10k.txt?raw')),
-	'fr-top-1500': () =>
-		loadFromSources('fr-top-1500', 'fr', () => import('./data/french1_5k.txt?raw')),
-	'fr-top-10000': () =>
-		loadFromSources('fr-top-10000', 'fr', () => import('./data/french10k.txt?raw'))
+	en: () => loadFromSources('en', 'en', () => import('./data/english10k.txt?raw')),
+	fr: () => loadFromSources('fr', 'fr', () => import('./data/french10k.txt?raw'))
 };
 
 function buildConfig(id: BuiltinCorpusId, language: string): CorpusConfig {
