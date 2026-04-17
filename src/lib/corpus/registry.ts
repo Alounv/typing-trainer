@@ -1,4 +1,4 @@
-import type { CorpusConfig, CorpusData } from './types';
+import type { CorpusConfig, CorpusData, QuoteBank } from './types';
 import { loadCorpus } from './loader';
 
 /**
@@ -79,5 +79,52 @@ export function isBuiltinCorpusId(id: string): id is BuiltinCorpusId {
 export async function loadBuiltinCorpus(id: BuiltinCorpusId): Promise<CorpusData> {
 	const loader = LOADERS[id];
 	if (!loader) throw new Error(`Unknown built-in corpus id: ${id}`);
+	return loader();
+}
+
+/**
+ * Languages with a shipped quote bank. Kept as a separate dimension from
+ * `BUILTIN_CORPUS_IDS` because a user might pick a wordlist-only language
+ * (or a custom corpus) — we shouldn't pretend quotes are always available.
+ */
+export const QUOTE_BANK_LANGUAGES = ['en', 'fr'] as const;
+export type QuoteBankLanguage = (typeof QUOTE_BANK_LANGUAGES)[number];
+
+const QUOTE_LOADERS: Record<QuoteBankLanguage, () => Promise<QuoteBank>> = {
+	/*
+	 * JSON imports use Vite's default JSON handling (no `?raw`) — the file
+	 * parses at build time and the module yields the parsed object. This
+	 * stays code-split per language so English users don't pay for the
+	 * French bank.
+	 */
+	en: async () => {
+		const mod = await import('./data/english-quotes.json');
+		// JSON imports type as `number[][]` which won't narrow to our tuple
+		// `[min, max]` shape. Double-cast via `unknown` — the data is author-
+		// controlled and the schema is stable; a narrower runtime validator
+		// would be overkill for a build-time asset.
+		return mod.default as unknown as QuoteBank;
+	},
+	fr: async () => {
+		const mod = await import('./data/french-quotes.json');
+		// JSON imports type as `number[][]` which won't narrow to our tuple
+		// `[min, max]` shape. Double-cast via `unknown` — the data is author-
+		// controlled and the schema is stable; a narrower runtime validator
+		// would be overkill for a build-time asset.
+		return mod.default as unknown as QuoteBank;
+	}
+};
+
+export function hasQuoteBank(language: string): language is QuoteBankLanguage {
+	return (QUOTE_BANK_LANGUAGES as readonly string[]).includes(language);
+}
+
+/**
+ * Load a language's quote bank. Rejects on unknown languages — callers
+ * should gate on {@link hasQuoteBank} first.
+ */
+export async function loadQuoteBank(language: QuoteBankLanguage): Promise<QuoteBank> {
+	const loader = QUOTE_LOADERS[language];
+	if (!loader) throw new Error(`No quote bank for language: ${language}`);
 	return loader();
 }

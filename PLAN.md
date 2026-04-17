@@ -208,11 +208,11 @@ storage/         (depends on: all domain types)
 
 > Get a green build and a live preview URL before writing domain code.
 
-- [ ] **0.5.1** Configure `@sveltejs/adapter-static` for SPA output
-- [ ] **0.5.2** GitHub Actions workflow: install → lint → typecheck → test → build
-- [ ] **0.5.3** Preview deploy target (Vercel / Netlify / GitHub Pages) wired to PRs
-- [ ] **0.5.4** Production deploy on merge to `main`
-- [ ] **0.5.5** Verify the deployed shell loads offline-ready (service worker optional for v0.1)
+- [x] **0.5.1** Configure `@sveltejs/adapter-static` for SPA output
+- [x] **0.5.2** GitHub Actions workflow: install → lint → typecheck → test → build
+- [x] **0.5.3** Preview deploy target (Vercel / Netlify / GitHub Pages) wired to PRs
+- [x] **0.5.4** Production deploy on merge to `main`
+- [x] **0.5.5** Verify the deployed shell loads offline-ready (service worker optional for v0.1)
 
 ---
 

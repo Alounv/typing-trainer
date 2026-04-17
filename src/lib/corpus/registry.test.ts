@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_CORPUS_IDS, isBuiltinCorpusId, loadBuiltinCorpus } from './registry';
+import {
+	BUILTIN_CORPUS_IDS,
+	QUOTE_BANK_LANGUAGES,
+	hasQuoteBank,
+	isBuiltinCorpusId,
+	loadBuiltinCorpus,
+	loadQuoteBank
+} from './registry';
 
 describe('isBuiltinCorpusId', () => {
 	it('narrows known ids', () => {
@@ -42,3 +49,33 @@ describe('loadBuiltinCorpus', () => {
 		}
 	});
 });
+
+describe('hasQuoteBank', () => {
+	it('narrows to known languages', () => {
+		expect(hasQuoteBank('en')).toBe(true);
+		expect(hasQuoteBank('fr')).toBe(true);
+	});
+
+	it('rejects unknown languages', () => {
+		expect(hasQuoteBank('de')).toBe(false);
+		expect(hasQuoteBank('xx')).toBe(false);
+	});
+});
+
+describe('loadQuoteBank', () => {
+	it('loads English and French banks with the expected shape', async () => {
+		for (const lang of QUOTE_BANK_LANGUAGES) {
+			const bank = await loadQuoteBank(lang);
+			expect(bank.language).toMatch(/english|french/);
+			expect(bank.quotes.length).toBeGreaterThan(100);
+			expect(bank.groups.length).toBeGreaterThan(0);
+			// Spot-check a quote's shape.
+			const q = bank.quotes[0];
+			expect(typeof q.id).toBe('number');
+			expect(typeof q.text).toBe('string');
+			expect(typeof q.source).toBe('string');
+			expect(typeof q.length).toBe('number');
+		}
+	});
+});
+
