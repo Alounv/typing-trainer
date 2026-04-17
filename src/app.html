@@ -17,6 +17,31 @@
 			rel="stylesheet"
 			href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap"
 		/>
+		<!--
+			Theme init: set `data-theme` before first paint to prevent the
+			stored theme from flashing through the default. Must be inline
+			and synchronous. Mirrors the resolution logic in
+			`src/lib/stores/theme.svelte.ts` — keep them in sync.
+		-->
+		<script>
+			(function () {
+				try {
+					var stored = localStorage.getItem('theme');
+					var choice = stored || 'system';
+					var resolved;
+					if (choice === 'system') {
+						resolved = window.matchMedia('(prefers-color-scheme: dark)').matches
+							? 'dark'
+							: 'light';
+					} else {
+						resolved = choice;
+					}
+					document.documentElement.dataset.theme = resolved;
+				} catch (e) {
+					document.documentElement.dataset.theme = 'dark';
+				}
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

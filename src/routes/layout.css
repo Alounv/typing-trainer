@@ -1,73 +1,13 @@
 @import 'tailwindcss';
 
 /*
- * Custom daisyUI theme: the default purple-on-dark palette reads as
- * generic dashboard-adjacent. We're a typing trainer, so the palette
- * leans toward warm-tinted dark (hue 70 — gentle amber) with a single
- * restrained amber accent. Amber was already in use for corrected-error
- * underlines, so picking it as the primary completes the system rather
- * than introducing a new color.
- *
- * All colors are in OKLCH so lightness steps are perceptually uniform.
- * Neutrals carry ~0.012 chroma toward the brand hue — not enough to
- * look tinted on its own, but it ties chrome and accent together so
- * nothing reads as a cold gray island.
+ * All daisyUI themes enabled. No custom brand theme — the app relies on
+ * the daisyUI built-ins. System-preference users land on `dark`
+ * (daisyUI's built-in default for prefers-color-scheme: dark) or `light`
+ * otherwise.
  */
 @plugin 'daisyui' {
-	themes: typewriter --default;
-}
-
-@plugin 'daisyui/theme' {
-	name: 'typewriter';
-	default: true;
-	prefersdark: true;
-	color-scheme: dark;
-
-	/* Surfaces: very-dark warm-black → lifted inks. base-100 is the page,
-	   base-200 the focused drill surface, base-300 elevated chips/borders. */
-	--color-base-100: oklch(0.17 0.012 70);
-	--color-base-200: oklch(0.22 0.014 70);
-	--color-base-300: oklch(0.27 0.016 70);
-	--color-base-content: oklch(0.95 0.01 70);
-
-	/* Amber accent — the single meaningful accent, used rarely. Chroma is
-	   deliberately moderate (0.13) to feel like warm brass rather than
-	   safety vest. Content-on-primary is dark so contrast holds. */
-	--color-primary: oklch(0.78 0.13 70);
-	--color-primary-content: oklch(0.18 0.025 70);
-
-	--color-secondary: oklch(0.62 0.08 180);
-	--color-secondary-content: oklch(0.14 0.02 180);
-
-	--color-accent: oklch(0.72 0.14 50);
-	--color-accent-content: oklch(0.18 0.025 50);
-
-	--color-neutral: oklch(0.32 0.014 70);
-	--color-neutral-content: oklch(0.92 0.01 70);
-
-	/* Status colors: warm red for errors, moderate amber-yellow for
-	   corrected-error dotted underlines, calm green for success, blue
-	   for informational. All tinted slightly warm so they belong to
-	   the same family. */
-	--color-info: oklch(0.72 0.08 220);
-	--color-info-content: oklch(0.16 0.02 220);
-	--color-success: oklch(0.68 0.12 140);
-	--color-success-content: oklch(0.14 0.02 140);
-	--color-warning: oklch(0.82 0.13 85);
-	--color-warning-content: oklch(0.2 0.03 85);
-	--color-error: oklch(0.65 0.18 25);
-	--color-error-content: oklch(0.15 0.02 25);
-
-	/* Radius / border scale: subtle rounding, firmer borders. A typing
-	   trainer should feel precise and mechanical, not pillowy. */
-	--radius-selector: 0.25rem;
-	--radius-field: 0.375rem;
-	--radius-box: 0.5rem;
-	--size-selector: 0.25rem;
-	--size-field: 0.25rem;
-	--border: 1px;
-	--depth: 1;
-	--noise: 0;
+	themes: all;
 }
 
 /* Typography tokens. Two families: a distinctive geometric sans (Spline

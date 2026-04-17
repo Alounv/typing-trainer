@@ -3,6 +3,9 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { onMount } from 'svelte';
+	import ThemeSelect from '$lib/components/ThemeSelect.svelte';
+	import { initThemeStore } from '$lib/stores/theme.svelte';
 
 	let { children } = $props();
 
@@ -14,6 +17,11 @@
 		{ href: '/analytics', label: 'Analytics' },
 		{ href: '/settings', label: 'Settings' }
 	] as const;
+
+	// The inline script in app.html already applied `data-theme` pre-paint;
+	// this mount hydrates the reactive store from the same source and starts
+	// listening for OS changes when the user is on "System".
+	onMount(() => initThemeStore());
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
@@ -23,7 +31,7 @@
 		<div class="flex-1">
 			<a href={resolve('/')} class="btn text-lg font-semibold btn-ghost">Typing Trainer</a>
 		</div>
-		<nav class="flex-none">
+		<nav class="flex flex-none items-center gap-3">
 			<ul class="menu menu-horizontal gap-1 px-1">
 				{#each nav as item (item.href)}
 					<li>
@@ -37,6 +45,9 @@
 					</li>
 				{/each}
 			</ul>
+			<!-- Separator between section nav and the appearance control. -->
+			<span aria-hidden="true" class="h-5 w-px bg-base-300"></span>
+			<ThemeSelect />
 		</nav>
 	</header>
 	<main class="container mx-auto flex-1 p-6">
