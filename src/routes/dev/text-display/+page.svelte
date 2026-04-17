@@ -38,8 +38,8 @@
 	<header class="space-y-1">
 		<h1 class="text-2xl font-bold">TypingSurface — dev preview</h1>
 		<p class="text-sm text-base-content/70">
-			Focus the box (auto-focused on load) and type. Wrong characters highlight red; corrected ones
-			amber with strikethrough; the pink highlight is the pacer ghost.
+			Focus the box (auto-focused on load) and type. Uncorrected wrong characters highlight red;
+			corrected ones keep a subtle amber dotted underline; the pink highlight is the pacer ghost.
 		</p>
 	</header>
 

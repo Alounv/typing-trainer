@@ -70,9 +70,12 @@
 		'typed-correct': 'text-base-content/70',
 		// Uncorrected error: solid red tint — the mistake is still standing.
 		'typed-error': 'text-error-content bg-error/25 rounded-sm',
-		// Corrected error: softer amber — "you slipped here but caught it".
-		// Subtle strikethrough + warning tone distinguishes from pure red.
-		'typed-error-corrected': 'text-warning-content bg-warning/20 line-through rounded-sm',
+		// Corrected error: reads like typed-correct, but a thin dotted amber
+		// underline marks where the user stumbled. No background, no
+		// strikethrough — the correction should feel like recovery, not
+		// punishment. The data still records it for analytics (spec §2.2).
+		'typed-error-corrected':
+			'text-base-content/70 underline decoration-dotted decoration-warning underline-offset-4',
 		current: 'text-base-content bg-primary/20 border-b-2 border-primary rounded-sm'
 	};
 </script>
