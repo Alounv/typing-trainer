@@ -9,7 +9,7 @@
 	import { generateBigramDrillSequence } from '$lib/drill/bigram-drill';
 	import { consumePlannedSession } from '$lib/scheduler/handoff';
 	import { findGraduatedBigrams } from '$lib/scheduler/graduation-filter';
-	import { DEFAULT_DRILL_TARGET_COUNT } from '$lib/scheduler/planner';
+	import { DEFAULT_DRILL_TARGET_COUNT, selectDrillTargets } from '$lib/scheduler/planner';
 	import { getBigramHistory, getProfile, getRecentSessions } from '$lib/storage/service';
 	import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from '$lib/models';
 
@@ -56,23 +56,23 @@
 			const pickedId = profile?.corpusIds?.[0];
 			const corpusId = pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
 
-			const targets =
+			const fromPlan =
 				planned?.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0
-					? planned.config.bigramsTargeted
-					: await resolveDirectNavTargets();
+					? { targets: planned.config.bigramsTargeted, mix: planned.drillMix }
+					: null;
+			const resolved = fromPlan ?? (await resolveDirectNavMix());
 
-			// Direct nav has no mix metadata; treat as priority-only.
-			const exposure = planned?.drillMix?.exposure ?? [];
-			const priorityCount = planned?.drillMix?.priority?.length ?? targets.length;
+			const exposure = resolved.mix?.exposure ?? [];
+			const priorityCount = resolved.mix?.priority?.length ?? resolved.targets.length;
 			const exposureOnly = priorityCount === 0 && exposure.length > 0;
 
 			const corpus = await loadBuiltinCorpus(corpusId);
 			const seq = generateBigramDrillSequence({
-				targetBigrams: targets,
+				targetBigrams: resolved.targets,
 				corpus,
 				options: { wordCount: wordBudget }
 			});
-			state = { status: 'ready', text: seq.text, targets, exposure, exposureOnly };
+			state = { status: 'ready', text: seq.text, targets: resolved.targets, exposure, exposureOnly };
 		} catch (err) {
 			state = {
 				status: 'error',
@@ -82,21 +82,29 @@
 	});
 
 	/**
-	 * Pick drill targets without a dashboard hand-off. Mirrors the planner:
-	 * latest diagnostic's `priorityTargets`, minus any bigrams that the
-	 * cross-session graduation filter has retired. Falls back to SEED_TARGETS
-	 * only when there's no diagnostic on file (first-run / reset).
+	 * Pick targets without a dashboard hand-off. Mirrors the planner's
+	 * selection (including undertrained backfill) so direct nav and plan
+	 * nav agree. Falls back to SEED_TARGETS only when there's no diagnostic
+	 * on file.
 	 */
-	async function resolveDirectNavTargets(): Promise<readonly string[]> {
+	async function resolveDirectNavMix(): Promise<{
+		targets: readonly string[];
+		mix?: { priority: string[]; exposure: string[] };
+	}> {
 		const recent = await getRecentSessions(RECENT_WINDOW);
-		const latestDiag = recent.find((s) => s.type === 'diagnostic');
-		const report = latestDiag?.diagnosticReport;
-		if (!report) return SEED_TARGETS;
+		const report = recent.find((s) => s.type === 'diagnostic')?.diagnosticReport;
+		if (!report) return { targets: SEED_TARGETS };
 
 		const priority = report.priorityTargets.map((p) => p.bigram);
 		const graduated = await findGraduatedBigrams(priority, getBigramHistory);
-		const active = priority.filter((b) => !graduated.has(b)).slice(0, DEFAULT_DRILL_TARGET_COUNT);
-		return active.length > 0 ? active : SEED_TARGETS;
+		const mix = selectDrillTargets(
+			priority,
+			report.corpusFit.undertrained,
+			graduated,
+			DEFAULT_DRILL_TARGET_COUNT
+		);
+		const targets = [...mix.priority, ...mix.exposure];
+		return targets.length > 0 ? { targets, mix } : { targets: SEED_TARGETS };
 	}
 </script>
 

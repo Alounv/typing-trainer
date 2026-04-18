@@ -103,8 +103,11 @@ function sessionsSinceLastDiagnostic(recent: readonly { type: string }[]): numbe
  * undertrained bigrams so early sessions — when most bigrams haven't hit the
  * ≥10-occurrence classification floor — still have meaningful targets.
  * Graduated filter applies to both; exposure is deduped against priority.
+ *
+ * Exported so the drill route's direct-nav fallback can use the same selection
+ * as the planner — otherwise the two entry points would disagree on targets.
  */
-function selectDrillTargets(
+export function selectDrillTargets(
 	priorityBigrams: readonly string[],
 	undertrainedBigrams: readonly string[],
 	graduated: ReadonlySet<string> | undefined,
