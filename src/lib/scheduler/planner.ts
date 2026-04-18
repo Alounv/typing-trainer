@@ -65,14 +65,15 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	}
 
 	// 4. Default daily = drill + real text.
-	const drillTargets = selectDrillTargets(
+	const drillMix = selectDrillTargets(
 		latestDiagnosticReport.priorityTargets.map((p) => p.bigram),
+		latestDiagnosticReport.corpusFit.undertrained,
 		graduatedFromRotation,
 		drillTargetCount
 	);
 
-	// All priority targets graduated → skip drill, go straight to real text.
-	if (drillTargets.length === 0) {
+	// Nothing to drill (no weaknesses, no corpus backfill) → real-text only.
+	if (drillMix.priority.length === 0 && drillMix.exposure.length === 0) {
 		return Array.from({ length: PAIRS_PER_DAY }, () =>
 			realtextPlan(budgets.realText, 'no-targets-left')
 		);
@@ -82,7 +83,7 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	// stop after any pair and the next run re-plans.
 	const plan: PlannedSession[] = [];
 	for (let i = 0; i < PAIRS_PER_DAY; i++) {
-		plan.push(drillPlan(drillTargets, budgets.bigramDrill));
+		plan.push(drillPlan(drillMix, budgets.bigramDrill));
 		plan.push(realtextPlan(budgets.realText));
 	}
 	return plan;
@@ -97,20 +98,40 @@ function sessionsSinceLastDiagnostic(recent: readonly { type: string }[]): numbe
 	return Number.POSITIVE_INFINITY;
 }
 
-// Strip graduated bigrams from the priority list; cap at `count`. Order-preserving.
+/**
+ * Priority (diagnosed weaknesses) first; when short of `count`, backfill with
+ * undertrained bigrams so early sessions — when most bigrams haven't hit the
+ * ≥10-occurrence classification floor — still have meaningful targets.
+ * Graduated filter applies to both; exposure is deduped against priority.
+ */
 function selectDrillTargets(
 	priorityBigrams: readonly string[],
+	undertrainedBigrams: readonly string[],
 	graduated: ReadonlySet<string> | undefined,
 	count: number
-): string[] {
+): { priority: string[]; exposure: string[] } {
 	const filter = graduated ?? new Set<string>();
-	const out: string[] = [];
+
+	const priority: string[] = [];
 	for (const b of priorityBigrams) {
 		if (filter.has(b)) continue;
-		out.push(b);
-		if (out.length >= count) break;
+		priority.push(b);
+		if (priority.length >= count) break;
 	}
-	return out;
+
+	const remaining = count - priority.length;
+	const exposure: string[] = [];
+	if (remaining > 0) {
+		const seen = new Set(priority);
+		for (const b of undertrainedBigrams) {
+			if (filter.has(b)) continue;
+			if (seen.has(b)) continue;
+			exposure.push(b);
+			if (exposure.length >= remaining) break;
+		}
+	}
+
+	return { priority, exposure };
 }
 
 function diagnosticPlan(
@@ -147,7 +168,12 @@ function diagnosticPlan(
 	};
 }
 
-function drillPlan(targets: string[], wordBudget: number): PlannedSession {
+function drillPlan(
+	mix: { priority: string[]; exposure: string[] },
+	wordBudget: number
+): PlannedSession {
+	// Priority first so `bigramsTargeted` stays correctly ordered for source-blind consumers.
+	const targets = [...mix.priority, ...mix.exposure];
 	const config: SessionConfig = {
 		type: 'bigram-drill',
 		wordBudget,
@@ -157,8 +183,20 @@ function drillPlan(targets: string[], wordBudget: number): PlannedSession {
 		config,
 		reason: 'default-drill',
 		label: 'Bigram drill',
-		rationale: `Targeted practice on your ${targets.length} weakest bigrams.`
+		rationale: buildDrillRationale(mix),
+		drillMix: mix
 	};
+}
+
+/** "Why this mix" line — shape varies by which buckets are populated. */
+function buildDrillRationale(mix: { priority: string[]; exposure: string[] }): string {
+	const p = mix.priority.length;
+	const e = mix.exposure.length;
+	if (p > 0 && e === 0) return `Targeted practice on your ${p} weakest bigrams.`;
+	if (p === 0 && e > 0) {
+		return `Building exposure on ${e} common bigrams — not enough data yet to pinpoint weaknesses.`;
+	}
+	return `${p} ${p === 1 ? 'weakness' : 'weaknesses'} + ${e} new ${e === 1 ? 'bigram' : 'bigrams'} to build exposure.`;
 }
 
 /**

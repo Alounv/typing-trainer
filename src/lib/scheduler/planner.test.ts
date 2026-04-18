@@ -36,7 +36,7 @@ function priorityTarget(bigram: string): PriorityBigram {
 	return { bigram, score: 1, meanTime: 300, errorRate: 0 };
 }
 
-function report(priorityBigrams: string[]): DiagnosticReport {
+function report(priorityBigrams: string[], undertrained: string[] = []): DiagnosticReport {
 	return {
 		sessionId: 'diag-1',
 		timestamp: 0,
@@ -45,7 +45,13 @@ function report(priorityBigrams: string[]): DiagnosticReport {
 		counts: { healthy: 0, fluency: 0, hasty: 0, acquisition: 0 },
 		topBottlenecks: { fluency: [], hasty: [], acquisition: [] },
 		priorityTargets: priorityBigrams.map(priorityTarget),
-		corpusFit: { coverageRatio: 1, undertrained: [] }
+		// Default coverage = 1 when no undertrained entries, otherwise <1 to keep
+		// it internally consistent (real reports compute it, we just need a
+		// plausible shape for planner tests).
+		corpusFit: {
+			coverageRatio: undertrained.length === 0 ? 1 : 0.5,
+			undertrained
+		}
 	};
 }
 
@@ -143,7 +149,7 @@ describe('planDailySessions — default daily structure', () => {
 		expect(plan[0].config.bigramsTargeted).toEqual(['th', 'in']);
 	});
 
-	it('all priority targets graduated → skip drill, emit real-text only', () => {
+	it('all priority targets graduated and no undertrained → skip drill, emit real-text only', () => {
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
 			latestDiagnosticReport: report(['th', 'he']),
@@ -152,6 +158,110 @@ describe('planDailySessions — default daily structure', () => {
 		// Still PAIRS_PER_DAY mini-sessions — just all real-text, no drill.
 		expect(plan).toHaveLength(PAIRS_PER_DAY);
 		expect(plan.every((p) => p.config.type === 'real-text')).toBe(true);
+	});
+});
+
+describe('planDailySessions — exposure backfill from undertrained', () => {
+	// The scenario that motivated this: after a short first diagnostic, almost
+	// every bigram is still `unclassified` (< MIN_OCCURRENCES_FOR_CLASSIFICATION
+	// samples), so `priorityTargets` is empty or near-empty. Without backfill,
+	// drill would either skip entirely or target only a sliver of what the user
+	// actually needs to practice. Backfilling from `corpusFit.undertrained`
+	// (high-frequency corpus bigrams the user hasn't typed enough) turns the
+	// drill into a useful exposure session until classification catches up.
+
+	it('short priority list → backfilled from undertrained up to drillTargetCount', () => {
+		const plan = planDailySessions({
+			recentSessions: recent('diagnostic'),
+			latestDiagnosticReport: report(
+				['th', 'he'],
+				// Undertrained is already frequency-sorted by the diagnostic engine;
+				// planner should preserve that order.
+				['in', 'er', 'an', 'on', 'at', 're', 'en', 'or']
+			),
+			drillTargetCount: 5
+		});
+		// 2 priority + 3 exposure = 5 targets; flattened priority-first.
+		expect(plan[0].config.bigramsTargeted).toEqual(['th', 'he', 'in', 'er', 'an']);
+		expect(plan[0].drillMix).toEqual({
+			priority: ['th', 'he'],
+			exposure: ['in', 'er', 'an']
+		});
+	});
+
+	it('priority already fills the cap → no exposure needed', () => {
+		const plan = planDailySessions({
+			recentSessions: recent('diagnostic'),
+			latestDiagnosticReport: report(['a', 'b', 'c'], ['x', 'y']),
+			drillTargetCount: 3
+		});
+		expect(plan[0].drillMix).toEqual({ priority: ['a', 'b', 'c'], exposure: [] });
+	});
+
+	it('empty priority, non-empty undertrained → exposure-only drill', () => {
+		// First-diagnostic scenario: nothing crossed the classification floor,
+		// but the corpus gives us a ranked list of common bigrams to expose.
+		const plan = planDailySessions({
+			recentSessions: recent('diagnostic'),
+			latestDiagnosticReport: report([], ['th', 'he', 'in']),
+			drillTargetCount: 3
+		});
+		expect(plan[0].config.type).toBe('bigram-drill');
+		expect(plan[0].drillMix).toEqual({ priority: [], exposure: ['th', 'he', 'in'] });
+		// Rationale should make the exposure-only nature explicit — the user
+		// should know this isn't a weakness-driven drill yet.
+		expect(plan[0].rationale).toMatch(/not enough data/i);
+	});
+
+	it('graduated bigrams are stripped from exposure too', () => {
+		const plan = planDailySessions({
+			recentSessions: recent('diagnostic'),
+			latestDiagnosticReport: report([], ['th', 'he', 'in']),
+			graduatedFromRotation: new Set(['he']),
+			drillTargetCount: 5
+		});
+		expect(plan[0].drillMix?.exposure).toEqual(['th', 'in']);
+	});
+
+	it('priority/exposure overlap is deduped — a bigram picked as priority is not also exposed', () => {
+		// In practice `undertrained` and `priorityTargets` come from disjoint
+		// populations (classified vs. not), but the two lists are built
+		// independently and nothing in the engine guarantees no overlap —
+		// defend against it here.
+		const plan = planDailySessions({
+			recentSessions: recent('diagnostic'),
+			latestDiagnosticReport: report(['th'], ['th', 'he']),
+			drillTargetCount: 3
+		});
+		expect(plan[0].drillMix).toEqual({ priority: ['th'], exposure: ['he'] });
+	});
+
+	it('rationale reflects the mix (priority + exposure)', () => {
+		const plan = planDailySessions({
+			recentSessions: recent('diagnostic'),
+			latestDiagnosticReport: report(['th'], ['he', 'in']),
+			drillTargetCount: 3
+		});
+		expect(plan[0].rationale).toMatch(/1 weakness.*2 new bigrams/);
+	});
+
+	it('empty priority AND empty undertrained → no drill, real-text only', () => {
+		// The "nothing to do" fallback survives — both buckets must be empty.
+		const plan = planDailySessions({
+			recentSessions: recent('diagnostic'),
+			latestDiagnosticReport: report([], [])
+		});
+		expect(plan.every((p) => p.config.type === 'real-text')).toBe(true);
+	});
+
+	it('pure-priority drills expose no drillMix.exposure entries', () => {
+		// Regression guard: when backfill isn't needed, the mix's exposure
+		// array must remain empty (not undefined, not accidentally populated).
+		const plan = planDailySessions({
+			recentSessions: recent('diagnostic'),
+			latestDiagnosticReport: report(['th', 'he'])
+		});
+		expect(plan[0].drillMix).toEqual({ priority: ['th', 'he'], exposure: [] });
 	});
 });
 

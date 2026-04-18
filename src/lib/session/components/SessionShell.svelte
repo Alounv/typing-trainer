@@ -35,6 +35,12 @@
 		/** Drill targets, recorded on the summary for later analysis. */
 		targetBigrams?: readonly string[];
 		/**
+		 * Subset of `targetBigrams` that are exposure backfill (not diagnosed
+		 * weaknesses). Renders in the dashed style; anything not in this list
+		 * is treated as priority.
+		 */
+		exposureBigrams?: readonly string[];
+		/**
 		 * Diagnostic routes pass a builder that turns the just-finalized summary
 		 * (plus its raw events, available in-memory only for this call) into a
 		 * `DiagnosticReport` which is attached to the summary before persistence.
@@ -47,7 +53,25 @@
 		) => DiagnosticReport;
 	}
 
-	let { type, text, title, what, approach, targetBigrams, buildDiagnosticReport }: Props = $props();
+	let {
+		type,
+		text,
+		title,
+		what,
+		approach,
+		targetBigrams,
+		exposureBigrams,
+		buildDiagnosticReport
+	}: Props = $props();
+
+	const exposureSet = $derived(new Set(exposureBigrams ?? []));
+	// Legend only shows when both chip styles are actually on screen.
+	const hasMix = $derived(
+		!!exposureBigrams &&
+			exposureBigrams.length > 0 &&
+			!!targetBigrams &&
+			targetBigrams.some((b) => !exposureSet.has(b))
+	);
 
 	// Reactive mirrors of runner state. The runner itself is plain TS with
 	// no reactivity; we shadow the bits the UI reads in $state so the
@@ -183,7 +207,16 @@
 				</span>
 				<ul class="flex flex-wrap gap-1.5">
 					{#each targetBigrams as bigram (bigram)}
-						<li class="rounded-sm bg-base-200 px-2 py-0.5 font-mono text-xs text-base-content/80">
+						{@const isExposure = exposureSet.has(bigram)}
+						<!-- Filled = priority, dashed = exposure. aria carries the same distinction. -->
+						<li
+							class="rounded-sm px-2 py-0.5 font-mono text-xs {isExposure
+								? 'border border-dashed border-base-content/40 text-base-content/60'
+								: 'bg-base-200 text-base-content/80'}"
+							aria-label={isExposure
+								? `${bigram}, new bigram for exposure practice`
+								: `${bigram}, diagnosed weakness`}
+						>
 							<!--
 								Bigrams may contain whitespace (space→letter and letter→space
 								are among the most frequent real-typing transitions). Render
@@ -197,6 +230,22 @@
 						</li>
 					{/each}
 				</ul>
+				{#if hasMix}
+					<!-- Legend, aligned in the value column. -->
+					<span></span>
+					<p class="text-[11px] text-base-content/50">
+						<span
+							class="mr-1 inline-block rounded-sm bg-base-200 px-1.5 py-0.5 align-middle font-mono text-base-content/80"
+							>ab</span
+						>
+						diagnosed weakness ·
+						<span
+							class="mx-1 inline-block rounded-sm border border-dashed border-base-content/40 px-1.5 py-0.5 align-middle font-mono text-base-content/60"
+							>cd</span
+						>
+						new bigram — not enough data yet
+					</p>
+				{/if}
 			</div>
 		{/if}
 	</header>

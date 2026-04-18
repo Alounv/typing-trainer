@@ -141,22 +141,40 @@
 					</div>
 
 					{#if planned.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0}
-						<!--
-							Target chips: the transparent version of "what the
-							planner picked for you today". Helpful when the user
-							wonders *why* a drill feels easier/harder on any given
-							day. Also makes the graduated-rotation rule's output
-							inspectable at a glance.
-						-->
+						<!-- Target chips — two styles when mix includes exposure backfill. -->
+						{@const exposureSet = new Set(planned.drillMix?.exposure ?? [])}
+						{@const mixed =
+							exposureSet.size > 0 &&
+							planned.config.bigramsTargeted.some((b) => !exposureSet.has(b))}
 						<ul class="mt-4 flex flex-wrap gap-1.5" aria-label="Drill targets">
 							{#each planned.config.bigramsTargeted as bigram (bigram)}
+								{@const isExposure = exposureSet.has(bigram)}
 								<li
-									class="rounded-sm bg-base-200 px-2 py-0.5 font-mono text-xs text-base-content/80"
+									class="rounded-sm px-2 py-0.5 font-mono text-xs {isExposure
+										? 'border border-dashed border-base-content/40 text-base-content/60'
+										: 'bg-base-200 text-base-content/80'}"
+									aria-label={isExposure
+										? `${bigram}, new bigram for exposure practice`
+										: `${bigram}, diagnosed weakness`}
 								>
 									{bigram}
 								</li>
 							{/each}
 						</ul>
+						{#if mixed}
+							<p class="mt-2 text-[11px] text-base-content/50">
+								<span
+									class="mr-1 inline-block rounded-sm bg-base-200 px-1.5 py-0.5 align-middle font-mono text-base-content/80"
+									>ab</span
+								>
+								diagnosed weakness ·
+								<span
+									class="mx-1 inline-block rounded-sm border border-dashed border-base-content/40 px-1.5 py-0.5 align-middle font-mono text-base-content/60"
+									>cd</span
+								>
+								new bigram — not enough data yet
+							</p>
+						{/if}
 					{/if}
 				</article>
 			{/each}

@@ -26,6 +26,17 @@ export interface PlannedSession {
 	label: string;
 	/** Optional longer "why this, why now" line. */
 	rationale?: string;
+	/**
+	 * Drill-only provenance for `config.bigramsTargeted`: `priority` are
+	 * diagnosed weaknesses, `exposure` are frequent-but-unclassified bigrams
+	 * backfilled when priority is short. Flattened priority-first into the
+	 * config so downstream consumers can stay source-agnostic; the UI reads
+	 * this to label each target.
+	 */
+	drillMix?: {
+		priority: string[];
+		exposure: string[];
+	};
 }
 
 export interface SchedulerInput {
