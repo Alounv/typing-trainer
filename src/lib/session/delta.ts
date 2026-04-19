@@ -75,8 +75,14 @@ export function computeSessionDelta(
 		.filter((s) => s.id !== current.id)
 		.sort((a, b) => a.timestamp - b.timestamp);
 
-	const wpm = buildMetricDelta(current.wpm, prior.map((s) => s.wpm));
-	const errorRate = buildMetricDelta(current.errorRate, prior.map((s) => s.errorRate));
+	const wpm = buildMetricDelta(
+		current.wpm,
+		prior.map((s) => s.wpm)
+	);
+	const errorRate = buildMetricDelta(
+		current.errorRate,
+		prior.map((s) => s.errorRate)
+	);
 	const bigrams = buildBigramDelta(current, prior);
 	const errorFloor: ErrorFloorInfo = {
 		current: current.errorRate,
@@ -112,7 +118,11 @@ function buildMetricDelta(current: number, priorValues: readonly number[]): Metr
 	// rate this reads as "you got worse" — correct — and for WPM a 0 baseline
 	// is essentially impossible, so the edge case is just defensive).
 	const deltaPct =
-		rollingAvg === 0 ? (current === 0 ? 0 : Number.POSITIVE_INFINITY) : (current - rollingAvg) / rollingAvg;
+		rollingAvg === 0
+			? current === 0
+				? 0
+				: Number.POSITIVE_INFINITY
+			: (current - rollingAvg) / rollingAvg;
 
 	let verdict: MetricVerdict;
 	if (!Number.isFinite(deltaPct)) {
@@ -132,10 +142,7 @@ function buildMetricDelta(current: number, priorValues: readonly number[]): Metr
 	};
 }
 
-function buildBigramDelta(
-	current: SessionSummary,
-	prior: readonly SessionSummary[]
-): BigramDelta {
+function buildBigramDelta(current: SessionSummary, prior: readonly SessionSummary[]): BigramDelta {
 	// "Previous session" = the most recent prior session that actually carried
 	// bigram data. Skipping empty/diagnostic-only priors gives a more meaningful
 	// comparison than "the one right before this one, even if it was empty".
@@ -174,9 +181,7 @@ function countDrilled(s: SessionSummary): number {
 	// Diagnostic / real-text: count distinct bigrams we observed cleanly enough
 	// to have a timing sample. Using `occurrences > 0` rather than a finite
 	// meanTime so error-only bigrams still count — the user did encounter them.
-	return new Set(
-		s.bigramAggregates.filter((a) => a.occurrences > 0).map((a) => a.bigram)
-	).size;
+	return new Set(s.bigramAggregates.filter((a) => a.occurrences > 0).map((a) => a.bigram)).size;
 }
 
 /**

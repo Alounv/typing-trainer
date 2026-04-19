@@ -105,9 +105,7 @@ describe('computeSessionDelta — error rate and error floor', () => {
 	it('handles a zero-baseline error rate without dividing by zero', () => {
 		// Prior sessions were all error-free; this one has a few errors. A raw
 		// (current - 0) / 0 would be Infinity; we treat it as an "up" verdict.
-		const prior = [0, 1, 2].map((i) =>
-			makeSession({ id: `p${i}`, timestamp: i, errorRate: 0 })
-		);
+		const prior = [0, 1, 2].map((i) => makeSession({ id: `p${i}`, timestamp: i, errorRate: 0 }));
 		const current = makeSession({ id: 'now', timestamp: 999, errorRate: 0.05 });
 		const delta = computeSessionDelta(current, [...prior, current]);
 		expect(delta.errorRate.verdict).toBe('up');
@@ -132,11 +130,15 @@ describe('computeSessionDelta — bigram delta', () => {
 	}
 
 	it('counts bigrams that graduated from non-healthy to healthy', () => {
-		const prev = withAggregates('prev', [
-			['th', 'acquisition'],
-			['er', 'hasty'],
-			['in', 'healthy']
-		], { timestamp: 100 });
+		const prev = withAggregates(
+			'prev',
+			[
+				['th', 'acquisition'],
+				['er', 'hasty'],
+				['in', 'healthy']
+			],
+			{ timestamp: 100 }
+		);
 		const current = withAggregates(
 			'now',
 			[
@@ -152,10 +154,14 @@ describe('computeSessionDelta — bigram delta', () => {
 	});
 
 	it('counts bigrams that regressed out of healthy', () => {
-		const prev = withAggregates('prev', [
-			['th', 'healthy'],
-			['er', 'healthy']
-		], { timestamp: 100 });
+		const prev = withAggregates(
+			'prev',
+			[
+				['th', 'healthy'],
+				['er', 'healthy']
+			],
+			{ timestamp: 100 }
+		);
 		const current = withAggregates(
 			'now',
 			[
@@ -220,18 +226,14 @@ describe('computeSessionDelta — summary sentence', () => {
 	});
 
 	it('quotes the percentage delta when above the average', () => {
-		const prior = [0, 1, 2].map((i) =>
-			makeSession({ id: `p${i}`, timestamp: i, wpm: 60 })
-		);
+		const prior = [0, 1, 2].map((i) => makeSession({ id: `p${i}`, timestamp: i, wpm: 60 }));
 		const current = makeSession({ id: 'now', timestamp: 999, wpm: 72 });
 		const delta = computeSessionDelta(current, [...prior, current]);
 		expect(delta.summarySentence).toMatch(/20% above your 3-session average/);
 	});
 
 	it('mentions "even with" when the current matches the baseline within the flat band', () => {
-		const prior = [0, 1, 2].map((i) =>
-			makeSession({ id: `p${i}`, timestamp: i, wpm: 60 })
-		);
+		const prior = [0, 1, 2].map((i) => makeSession({ id: `p${i}`, timestamp: i, wpm: 60 }));
 		const current = makeSession({ id: 'now', timestamp: 999, wpm: 60 });
 		const delta = computeSessionDelta(current, [...prior, current]);
 		expect(delta.summarySentence).toMatch(/even with your 3-session average/);
