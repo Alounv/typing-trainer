@@ -72,7 +72,13 @@
 				corpus,
 				options: { wordCount: wordBudget }
 			});
-			state = { status: 'ready', text: seq.text, targets: resolved.targets, exposure, exposureOnly };
+			state = {
+				status: 'ready',
+				text: seq.text,
+				targets: resolved.targets,
+				exposure,
+				exposureOnly
+			};
 		} catch (err) {
 			state = {
 				status: 'error',

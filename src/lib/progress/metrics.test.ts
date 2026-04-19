@@ -105,9 +105,7 @@ describe('buildWpmSeries', () => {
 	});
 
 	it('σ envelope brackets the rolling mean symmetrically', () => {
-		const sessions = Array.from({ length: 8 }, (_, i) =>
-			session(`s${i}`, i * 1000, 50 + i)
-		);
+		const sessions = Array.from({ length: 8 }, (_, i) => session(`s${i}`, i * 1000, 50 + i));
 		const last = buildWpmSeries(sessions).at(-1)!;
 		expect(last.plus1Sigma! - last.rolling!).toBeCloseTo(last.rolling! - last.minus1Sigma!, 10);
 	});

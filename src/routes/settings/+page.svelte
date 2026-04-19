@@ -25,6 +25,7 @@
 		type UserSettings
 	} from '$lib/models';
 	import type { BuiltinCorpusId } from '$lib/corpus/registry';
+	import DataTransfer from '$lib/settings/components/DataTransfer.svelte';
 
 	/**
 	 * Source of truth for what the factory-fresh profile looks like.
@@ -363,6 +364,8 @@
 				</div>
 			</dl>
 		</section>
+
+		<DataTransfer />
 
 		<!--
 			No Save button: edits auto-persist shortly after the user

@@ -1,10 +1,7 @@
 import type { BigramAggregate, BigramClassification } from '../bigram/types';
 import type { SessionSummary } from '../session/types';
 import type { FrequencyTable } from '../corpus/types';
-import {
-	DEFAULT_THRESHOLDS,
-	type ClassificationThresholds
-} from '../bigram/classification';
+import { DEFAULT_THRESHOLDS, type ClassificationThresholds } from '../bigram/classification';
 
 /**
  * Rolling average with a trailing window. For positions before the window is
@@ -47,8 +44,7 @@ export function rollingStdDev(values: readonly number[], window: number): (numbe
 			out.push(0);
 			continue;
 		}
-		const variance =
-			slice.reduce((acc, v) => acc + (v - mean) * (v - mean), 0) / denom;
+		const variance = slice.reduce((acc, v) => acc + (v - mean) * (v - mean), 0) / denom;
 		out.push(Math.sqrt(variance));
 	}
 	return out;

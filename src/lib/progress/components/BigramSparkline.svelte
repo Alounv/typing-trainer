@@ -56,9 +56,7 @@
 	});
 
 	// Direction hint — green if improving (last faster than first), muted otherwise.
-	const improving = $derived(
-		points.length >= 2 && points.at(-1)!.meanTime < points[0].meanTime
-	);
+	const improving = $derived(points.length >= 2 && points.at(-1)!.meanTime < points[0].meanTime);
 </script>
 
 {#if points.length < 2}

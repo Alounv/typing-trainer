@@ -200,12 +200,11 @@
 			-->
 			<div
 				class="grid max-w-xl grid-cols-[5rem_1fr] items-baseline gap-x-4 gap-y-2 border-t border-base-300 pt-4"
-				aria-label="Drill targets"
 			>
 				<span class="text-[11px] font-medium tracking-[0.18em] text-base-content/40 uppercase">
 					Drilling
 				</span>
-				<ul class="flex flex-wrap gap-1.5">
+				<ul class="flex flex-wrap gap-1.5" aria-label="Drill targets">
 					{#each targetBigrams as bigram (bigram)}
 						{@const isExposure = exposureSet.has(bigram)}
 						<!-- Filled = priority, dashed = exposure. aria carries the same distinction. -->

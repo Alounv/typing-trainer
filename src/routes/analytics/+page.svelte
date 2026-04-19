@@ -68,10 +68,7 @@
 
 	onMount(async () => {
 		try {
-			const [sessions, profile] = await Promise.all([
-				getRecentSessions(SESSION_CAP),
-				getProfile()
-			]);
+			const [sessions, profile] = await Promise.all([getRecentSessions(SESSION_CAP), getProfile()]);
 
 			// Corpus load is best-effort: if it fails (e.g. network hiccup on
 			// a code-split chunk), we still want the WPM chart to render —
@@ -79,8 +76,7 @@
 			let corpusFrequencies: FrequencyTable | undefined;
 			try {
 				const pickedId = profile?.corpusIds?.[0];
-				const corpusId =
-					pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
+				const corpusId = pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
 				const corpus = await loadBuiltinCorpus(corpusId);
 				corpusFrequencies = corpus.bigramFrequencies;
 			} catch {
@@ -91,10 +87,7 @@
 			const [currentSession, previousSession] = diagnosticSessions;
 			const graduatedCount =
 				currentSession && previousSession
-					? countGraduations(
-							previousSession.bigramAggregates,
-							currentSession.bigramAggregates
-						)
+					? countGraduations(previousSession.bigramAggregates, currentSession.bigramAggregates)
 					: null;
 
 			state = {
@@ -169,10 +162,7 @@
 					/>
 				</div>
 				{#if state.graduatedCount !== null}
-					<p
-						class="text-sm text-base-content/70"
-						data-testid="graduations-delta"
-					>
+					<p class="text-sm text-base-content/70" data-testid="graduations-delta">
 						<!--
 							Graduations between consecutive diagnostics is the
 							single most motivating number on this page — structural
@@ -184,8 +174,8 @@
 						{#if state.graduatedCount === 0}
 							No bigrams graduated to healthy between diagnostics yet — keep going.
 						{:else if state.graduatedCount === 1}
-							<span class="font-medium text-success">1 bigram</span> graduated to healthy since the
-							previous diagnostic.
+							<span class="font-medium text-success">1 bigram</span> graduated to healthy since the previous
+							diagnostic.
 						{:else}
 							<span class="font-medium text-success">{state.graduatedCount} bigrams</span>
 							graduated to healthy since the previous diagnostic.
@@ -213,8 +203,8 @@
 			</div>
 			<BigramTable rows={state.bigrams} />
 			<p class="text-xs text-base-content/55">
-				Default sort: priority (badness × corpus frequency). Tap any column to re-sort; tap again
-				to flip direction.
+				Default sort: priority (badness × corpus frequency). Tap any column to re-sort; tap again to
+				flip direction.
 			</p>
 		</section>
 	{/if}

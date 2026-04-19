@@ -83,7 +83,9 @@
 			{#each currentSegments as seg (seg.label)}
 				{#if seg.percent > 0}
 					<div
-						class="{COLOR[seg.label]} flex items-center justify-center text-xs font-medium text-white"
+						class="{COLOR[
+							seg.label
+						]} flex items-center justify-center text-xs font-medium text-white"
 						style="width: {seg.percent}%"
 						title={`${seg.label}: ${seg.count}`}
 					>
@@ -117,7 +119,9 @@
 				{#each previousSegments as seg (seg.label)}
 					{#if seg.percent > 0}
 						<div
-							class="{COLOR[seg.label]} flex items-center justify-center text-xs font-medium text-white"
+							class="{COLOR[
+								seg.label
+							]} flex items-center justify-center text-xs font-medium text-white"
 							style="width: {seg.percent}%"
 							title={`${seg.label}: ${seg.count}`}
 						>
@@ -144,4 +148,40 @@
 			</li>
 		{/each}
 	</ul>
+
+	<!--
+		Collapsed definitions. The vocabulary (acquisition / hasty / fluency /
+		healthy) is jargon the first time a user sees it — keep the glossary one
+		click away rather than cluttering the primary view.
+	-->
+	<details class="text-xs text-base-content/70">
+		<summary class="cursor-pointer text-base-content/60 select-none hover:text-base-content">
+			What do these mean?
+		</summary>
+		<dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
+			<dt class="flex items-center gap-1.5 font-medium">
+				<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR.acquisition}"></span>
+				Acquisition
+			</dt>
+			<dd class="text-base-content/65">Slow and error-prone — still learning the pair.</dd>
+
+			<dt class="flex items-center gap-1.5 font-medium">
+				<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR.hasty}"></span>
+				Hasty
+			</dt>
+			<dd class="text-base-content/65">Fast but error-prone — speed outpacing accuracy.</dd>
+
+			<dt class="flex items-center gap-1.5 font-medium">
+				<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR.fluency}"></span>
+				Fluency
+			</dt>
+			<dd class="text-base-content/65">Accurate but slow — needs speed work.</dd>
+
+			<dt class="flex items-center gap-1.5 font-medium">
+				<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR.healthy}"></span>
+				Healthy
+			</dt>
+			<dd class="text-base-content/65">Fast and accurate — the goal.</dd>
+		</dl>
+	</details>
 </div>

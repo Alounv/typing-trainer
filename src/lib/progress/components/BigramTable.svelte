@@ -30,7 +30,13 @@
 		return b.replace(/ /g, '\u2423');
 	}
 
-	type SortKey = 'bigram' | 'classification' | 'meanTime' | 'errorRate' | 'occurrences' | 'priority';
+	type SortKey =
+		| 'bigram'
+		| 'classification'
+		| 'meanTime'
+		| 'errorRate'
+		| 'occurrences'
+		| 'priority';
 	type SortDir = 'asc' | 'desc';
 
 	let sortKey = $state<SortKey>('priority');
@@ -160,11 +166,7 @@
 						</button>
 					</th>
 					<th class="text-right">
-						<button
-							type="button"
-							class="table-sort-btn"
-							onclick={() => toggleSort('occurrences')}
-						>
+						<button type="button" class="table-sort-btn" onclick={() => toggleSort('occurrences')}>
 							Occ.{sortIndicator('occurrences')}
 						</button>
 					</th>
