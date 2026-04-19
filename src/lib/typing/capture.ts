@@ -13,25 +13,30 @@ export interface CaptureCallbacks {
 }
 
 /**
- * Keys that represent modifier presses on their own — dropped because they
- * don't produce characters. (Ctrl/Cmd + key shortcuts are handled separately.)
- */
-const MODIFIER_KEYS = new Set(['Control', 'Shift', 'Alt', 'Meta', 'CapsLock']);
-
-/**
  * Svelte attachment that captures typing on the attached element.
  *
- * - Event buffer is a plain array (not `$state`) so the display doesn't re-render
- *   on every keystroke; consumers subscribe via `onPositionChange` instead.
- * - Backspace moves the cursor but does NOT delete prior events — the first
- *   input at each position is what counts; retypes are separate events resolved
- *   in post-processing.
- * - Node must be focusable and focused (`tabindex="0"`).
+ * Requires the node to be an `<input>` / `<textarea>` (anything that fires
+ * `beforeinput`). We intercept `beforeinput` rather than `keydown` because:
+ *
+ *   - Dead-key composition (e.g. `^` + `o` → `ô`, or macOS option+e + e → `é`)
+ *     is surfaced by the browser as a single composed character, not as two
+ *     independent keystrokes. `keydown` only sees the raw physical keys.
+ *   - OS-level editing shortcuts (OPT+Backspace = delete word, CMD+Backspace
+ *     = delete to line start) are reported via semantic `inputType` values.
+ *
+ * Strategy: `preventDefault` on `beforeinput` so the input element itself
+ * stays empty — we own state. IME composition is the exception: we let the
+ * browser compose in the input, then pick up the result from `compositionend`
+ * and clear the value.
+ *
+ * Backspace moves the cursor but does NOT delete prior events — the first
+ * input at each position is what counts; retypes are separate events resolved
+ * in post-processing.
  */
 export function keystrokeCapture(
 	config: CaptureConfig,
 	callbacks: CaptureCallbacks = {}
-): Attachment<HTMLElement> {
+): Attachment<HTMLInputElement | HTMLTextAreaElement> {
 	return (node) => {
 		const text = config.text;
 		const events: KeystrokeEvent[] = [];
@@ -60,31 +65,17 @@ export function keystrokeCapture(
 		}
 
 		let position = 0;
+		// While an IME composition is in flight we let the browser manage the
+		// input's value. Committing to our buffer waits for `compositionend`.
+		let composing = false;
 
-		function handleKeydown(e: KeyboardEvent) {
-			if (MODIFIER_KEYS.has(e.key)) return;
-			// Ctrl/Cmd-chorded keys are shortcuts — let them through to the browser.
-			if (e.ctrlKey || e.metaKey) return;
-
-			if (e.key === 'Backspace') {
-				if (position > 0) {
-					position--;
-					callbacks.onPositionChange?.(position);
-				}
-				e.preventDefault();
-				return;
-			}
-
-			// Printable single-char keys only. Filters out Tab, Arrow*, Enter, F-keys, etc.
-			if (e.key.length !== 1) return;
-
-			// Past the end of the expected text — ignore further input.
+		function insertChar(ch: string) {
 			if (position >= text.length) return;
 
 			const event: KeystrokeEvent = {
 				timestamp: performance.now() - startTime,
 				expected: text[position],
-				actual: e.key,
+				actual: ch,
 				position,
 				wordIndex: wordIndexByPosition[position],
 				positionInWord: positionInWordByPosition[position]
@@ -94,15 +85,88 @@ export function keystrokeCapture(
 
 			position++;
 			callbacks.onPositionChange?.(position);
-			e.preventDefault();
 
 			if (position >= text.length) {
-				// Snapshot so the consumer can't mutate our internal buffer.
 				callbacks.onComplete?.(events.slice());
 			}
 		}
 
-		node.addEventListener('keydown', handleKeydown);
-		return () => node.removeEventListener('keydown', handleKeydown);
+		function insertString(data: string) {
+			// Iterate with a for..of to split on Unicode code points rather than
+			// UTF-16 code units — so an emoji or surrogate-paired char counts as
+			// one keystroke, not two.
+			for (const ch of data) insertChar(ch);
+		}
+
+		function moveBackBy(n: number) {
+			if (n <= 0 || position === 0) return;
+			position = Math.max(0, position - n);
+			callbacks.onPositionChange?.(position);
+		}
+
+		function deleteWord() {
+			if (position === 0) return;
+			// Standard "delete word" semantics: skip trailing spaces, then
+			// delete back to the previous space boundary. So "hello world |"
+			// collapses to "hello |".
+			let p = position;
+			while (p > 0 && text[p - 1] === ' ') p--;
+			while (p > 0 && text[p - 1] !== ' ') p--;
+			position = p;
+			callbacks.onPositionChange?.(position);
+		}
+
+		function handleBeforeInput(e: InputEvent) {
+			// While composing, let the browser mutate the input freely; we'll
+			// commit on `compositionend`.
+			if (composing) return;
+
+			// Always own the state — never let the input accumulate characters.
+			e.preventDefault();
+
+			switch (e.inputType) {
+				case 'insertText':
+				case 'insertReplacementText':
+					if (e.data) insertString(e.data);
+					break;
+				case 'deleteContentBackward':
+					moveBackBy(1);
+					break;
+				case 'deleteWordBackward':
+					// OPT+Backspace. Silent cursor move, matching plain Backspace.
+					deleteWord();
+					break;
+				case 'deleteSoftLineBackward':
+				case 'deleteHardLineBackward':
+					// CMD+Backspace. Silent jump to start of the current run.
+					moveBackBy(position);
+					break;
+				// insertFromPaste / insertFromDrop / anything else: swallowed
+				// by the preventDefault above. Paste is deliberately blocked
+				// so the trainer can't be gamed.
+			}
+		}
+
+		function handleCompositionStart() {
+			composing = true;
+		}
+
+		function handleCompositionEnd(e: CompositionEvent) {
+			composing = false;
+			if (e.data) insertString(e.data);
+			// The browser wrote the composed text into the input; wipe it so
+			// subsequent input events start from a clean slate.
+			node.value = '';
+		}
+
+		node.addEventListener('beforeinput', handleBeforeInput as EventListener);
+		node.addEventListener('compositionstart', handleCompositionStart);
+		node.addEventListener('compositionend', handleCompositionEnd as EventListener);
+
+		return () => {
+			node.removeEventListener('beforeinput', handleBeforeInput as EventListener);
+			node.removeEventListener('compositionstart', handleCompositionStart);
+			node.removeEventListener('compositionend', handleCompositionEnd as EventListener);
+		};
 	};
 }
