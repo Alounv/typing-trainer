@@ -18,12 +18,16 @@
 	import { stashPlannedSession } from '$lib/scheduler/handoff';
 	import { activateBonusRound } from '$lib/scheduler/bonus-round';
 	import type { PlannedSession } from '$lib/scheduler/types';
+	import { computeSessionDelta, type SessionDelta as SessionDeltaModel } from '$lib/session/delta';
+	import SessionDelta from '$lib/session/components/SessionDelta.svelte';
 
 	type LoadState =
 		| { status: 'loading' }
 		| {
 				status: 'ready';
 				summary: SessionSummary;
+				/** Post-session delta vs recent history. Null only when `computeSessionDelta` is skipped (never today, but defensive). */
+				delta: SessionDeltaModel;
 				next: PlannedSession | undefined;
 				/** Snapshot for `activateBonusRound` when the user starts another round from here. */
 				completedToday: Partial<Record<SessionType, number>>;
@@ -50,9 +54,14 @@
 				return;
 			}
 			const dashboard = await loadDashboardData({ recentSessions });
+			// `recentSessions` contains the just-saved session; `computeSessionDelta`
+			// excludes it internally when building the baseline so we don't need to
+			// pre-filter here.
+			const delta = computeSessionDelta(summary, recentSessions);
 			state = {
 				status: 'ready',
 				summary,
+				delta,
 				next: dashboard.plan[0],
 				completedToday: dashboard.completedToday
 			};
@@ -153,6 +162,8 @@
 				</div>
 			</dl>
 		</section>
+
+		<SessionDelta delta={state.delta} />
 
 		<!--
 			Slowest bigrams as tiles, not a table. The bigram glyph itself is

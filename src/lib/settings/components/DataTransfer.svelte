@@ -115,7 +115,9 @@
 
 	async function confirmImport() {
 		if (!pendingImport) return;
-		const payload = pendingImport;
+		// Dexie calls IndexedDB's structured-clone on writes; Svelte's $state proxy
+		// isn't cloneable (DataCloneError). Snapshot to a plain object at the boundary.
+		const payload = $state.snapshot(pendingImport) as ExportFile;
 		pendingImport = null;
 		confirmDialog?.close();
 		status = { kind: 'working', message: 'Importing…' };
