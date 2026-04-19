@@ -1,5 +1,6 @@
-import type { CorpusConfig, CorpusData, FrequencyTable, QuoteBank } from './types';
+import type { CorpusConfig, CorpusData, FrequencyTable, Quote, QuoteBank } from './types';
 import { loadCorpus } from './loader';
+import { normalizeTypographicChars } from './normalize';
 
 /**
  * Languages with a shipped bigram frequency table. Kept separate from
@@ -113,17 +114,23 @@ const QUOTE_LOADERS: Record<QuoteBankLanguage, () => Promise<QuoteBank>> = {
 		// `[min, max]` shape. Double-cast via `unknown` — the data is author-
 		// controlled and the schema is stable; a narrower runtime validator
 		// would be overkill for a build-time asset.
-		return mod.default as unknown as QuoteBank;
+		return normalizeQuoteBank(mod.default as unknown as QuoteBank);
 	},
 	fr: async () => {
 		const mod = await import('./data/french-quotes.json');
-		// JSON imports type as `number[][]` which won't narrow to our tuple
-		// `[min, max]` shape. Double-cast via `unknown` — the data is author-
-		// controlled and the schema is stable; a narrower runtime validator
-		// would be overkill for a build-time asset.
-		return mod.default as unknown as QuoteBank;
+		return normalizeQuoteBank(mod.default as unknown as QuoteBank);
 	}
 };
+
+// Normalize each quote's text and recompute its length — ellipsis → `...`
+// changes char count. Leaves `id`, `source`, and bank metadata alone.
+function normalizeQuoteBank(bank: QuoteBank): QuoteBank {
+	const quotes: Quote[] = bank.quotes.map((q) => {
+		const text = normalizeTypographicChars(q.text);
+		return { ...q, text, length: text.length };
+	});
+	return { ...bank, quotes };
+}
 
 export function hasQuoteBank(language: string): language is QuoteBankLanguage {
 	return (QUOTE_BANK_LANGUAGES as readonly string[]).includes(language);

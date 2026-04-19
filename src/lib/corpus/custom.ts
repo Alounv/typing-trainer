@@ -1,4 +1,5 @@
 import type { CorpusConfig, CorpusData, FrequencyTable } from './types';
+import { normalizeTypographicChars } from './normalize';
 
 /** Warn boundary for "too small for reliable diagnostics" — not a hard reject. */
 export const MIN_CUSTOM_BIGRAMS = 500;
@@ -37,7 +38,11 @@ export interface ImportOptions {
  * not NLP). Word frequencies are raw counts, not Zipf-approximated.
  */
 export function importCustomText(text: string, options: ImportOptions = {}): CustomCorpusImport {
-	const tokens = tokenize(text);
+	// Flatten smart punctuation before tokenizing — the tokenizer treats only
+	// ASCII `'` as a word-internal separator, so a curly apostrophe in "d'abord"
+	// would otherwise split the word into two tokens.
+	const normalized = normalizeTypographicChars(text);
+	const tokens = tokenize(normalized);
 	const wordFrequencies = countWords(tokens);
 	const bigramFrequencies = deriveBigramFrequencies(wordFrequencies);
 
@@ -48,7 +53,7 @@ export function importCustomText(text: string, options: ImportOptions = {}): Cus
 		id: options.id ?? 'custom',
 		language: options.language ?? 'custom',
 		wordlistId: options.id ?? 'custom',
-		customText: text
+		customText: normalized
 	};
 
 	const missingFromBase = options.baseForOverlap
