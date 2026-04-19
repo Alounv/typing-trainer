@@ -5,7 +5,11 @@ describe('normalizeTypographicChars', () => {
 	// One row per mapping — adding a key without adding a row fails the table.
 	it.each([
 		{ label: 'left single quote', input: '\u2018hi\u2018', expected: "'hi'" },
-		{ label: 'right single quote / typographic apostrophe', input: "can\u2019t", expected: "can't" },
+		{
+			label: 'right single quote / typographic apostrophe',
+			input: 'can\u2019t',
+			expected: "can't"
+		},
 		{ label: 'left double quote', input: '\u201Chello', expected: '"hello' },
 		{ label: 'right double quote', input: 'hello\u201D', expected: 'hello"' },
 		{ label: 'en dash', input: 'page 1\u20132', expected: 'page 1-2' },
@@ -32,8 +36,7 @@ describe('normalizeTypographicChars', () => {
 	});
 
 	it('is idempotent', () => {
-		const input =
-			"It\u2019s 09:00\u202F\u2014 she said \u201Cthanks\u201D, then trailed off\u2026";
+		const input = 'It\u2019s 09:00\u202F\u2014 she said \u201Cthanks\u201D, then trailed off\u2026';
 		const once = normalizeTypographicChars(input);
 		expect(normalizeTypographicChars(once)).toBe(once);
 	});
