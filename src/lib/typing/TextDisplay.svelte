@@ -160,9 +160,17 @@
 	type scale ever changes. `overflow-y-hidden` hides the scrollbar;
 	programmatic `scrollTo` still works in modern browsers.
 -->
+<!--
+	Two-layer structure. The outer viewport owns scrolling + `position: relative`
+	for the absolutely-positioned cursor overlay. The inner `text-flow` div
+	owns `whitespace-pre-wrap` so only the per-character spans sit in a
+	whitespace-preserving context — otherwise Svelte's compiled whitespace
+	text node between the cursor `<div>` and the first span renders as a
+	visible leading space at the start of every drill.
+-->
 <div
 	bind:this={viewportEl}
-	class="relative max-h-[18rem] overflow-y-hidden font-mono text-2xl leading-loose tracking-wide break-normal whitespace-pre-wrap"
+	class="relative max-h-[18rem] overflow-y-hidden font-mono text-2xl leading-loose tracking-wide break-normal"
 	aria-label="Drill text"
 >
 	<!--
@@ -180,16 +188,18 @@
 		aria-hidden="true"
 	></div>
 
-	{#each text as char, i (i)}
-		{@const state = stateFor(i, position, errorPositions, correctedPositions)}
-		{@const ghost = ghostPosition !== undefined && i === ghostPosition && i > position}
-		<span
-			class="relative transition-colors duration-75 motion-reduce:transition-none {stateClasses[
-				state
-			]} {ghost ? 'rounded-sm border-b border-secondary/60 bg-secondary/15' : ''}"
-			data-state={state}
-			data-pos={i}
-			data-ghost={ghost || undefined}>{char}</span
-		>
-	{/each}
+	<div class="whitespace-pre-wrap">
+		{#each text as char, i (i)}
+			{@const state = stateFor(i, position, errorPositions, correctedPositions)}
+			{@const ghost = ghostPosition !== undefined && i === ghostPosition && i > position}
+			<span
+				class="relative transition-colors duration-75 motion-reduce:transition-none {stateClasses[
+					state
+				]} {ghost ? 'rounded-sm border-b border-secondary/60 bg-secondary/15' : ''}"
+				data-state={state}
+				data-pos={i}
+				data-ghost={ghost || undefined}>{char}</span
+			>
+		{/each}
+	</div>
 </div>
