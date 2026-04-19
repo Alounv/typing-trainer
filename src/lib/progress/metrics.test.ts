@@ -5,11 +5,12 @@ import {
 	buildWpmSeries,
 	buildBigramTrend,
 	summarizeBigrams,
+	aggregateLastNOccurrences,
 	countGraduations,
 	WPM_ROLLING_WINDOW
 } from './metrics';
 import type { SessionSummary } from '../session/types';
-import type { BigramAggregate, BigramClassification } from '../bigram/types';
+import type { BigramAggregate, BigramClassification, BigramSample } from '../bigram/types';
 
 // Small session factory so tests stay readable. Only the fields the metrics
 // layer actually reads need values; the rest are defaulted.
@@ -181,6 +182,96 @@ describe('summarizeBigrams', () => {
 		// 'common' has lower raw badness but 100× the frequency — should rank first.
 		const rows = summarizeBigrams(sessions, { rare: 1, common: 100 });
 		expect(rows[0].bigram).toBe('common');
+	});
+});
+
+function cleanSamples(n: number, timing: number): BigramSample[] {
+	return Array.from({ length: n }, () => ({ correct: true, timing }));
+}
+
+describe('aggregateLastNOccurrences', () => {
+	it('returns undefined when no session in the set carries samples', () => {
+		const sessions = [session('s1', 100, 50, [agg('th', 's1')])];
+		expect(aggregateLastNOccurrences(sessions, 'th')).toBeUndefined();
+	});
+
+	it('pools samples newest → oldest up to the window', () => {
+		const sessions = [
+			session('s1', 100, 50, [
+				agg('th', 's1', {
+					samples: [
+						{ correct: true, timing: 10 },
+						{ correct: true, timing: 20 },
+						{ correct: true, timing: 30 },
+						{ correct: true, timing: 40 }
+					]
+				})
+			]),
+			session('s2', 200, 50, [
+				agg('th', 's2', {
+					samples: [
+						{ correct: true, timing: 100 },
+						{ correct: true, timing: 200 },
+						{ correct: true, timing: 300 }
+					]
+				})
+			])
+		];
+		// s2 (newest) fills 3 slots; the remaining 2 come from the tail of s1.
+		const rolling = aggregateLastNOccurrences(sessions, 'th', 5)!;
+		expect(rolling.occurrences).toBe(5);
+		expect(rolling.meanTime).toBeCloseTo((100 + 200 + 300 + 30 + 40) / 5);
+	});
+
+	it('skips legacy sessions (no samples) and uses only sessions that have them', () => {
+		const sessions = [
+			session('s1', 100, 50, [agg('th', 's1', { errorRate: 0.5 })]), // legacy
+			session('s2', 200, 50, [agg('th', 's2', { samples: cleanSamples(3, 120) })])
+		];
+		const rolling = aggregateLastNOccurrences(sessions, 'th', 10)!;
+		expect(rolling.occurrences).toBe(3);
+		expect(rolling.meanTime).toBe(120);
+		expect(rolling.errorRate).toBe(0);
+	});
+
+	it('yields NaN meanTime when no pooled sample has a timing', () => {
+		const sessions = [
+			session('s1', 100, 50, [
+				agg('th', 's1', {
+					samples: [
+						{ correct: false, timing: null },
+						{ correct: false, timing: null }
+					]
+				})
+			])
+		];
+		const rolling = aggregateLastNOccurrences(sessions, 'th', 10)!;
+		expect(Number.isNaN(rolling.meanTime)).toBe(true);
+		expect(rolling.errorRate).toBe(1);
+	});
+});
+
+describe('summarizeBigrams — sliding window', () => {
+	it('classifies from the rolling window, not the latest session in isolation', () => {
+		// Latest session alone has 3 occurrences (below MIN_OCCURRENCES) — without
+		// pooling this would fall back to 'unclassified' despite rich history.
+		const sessions = [
+			session('s1', 100, 50, [agg('th', 's1', { samples: cleanSamples(40, 80) })]),
+			session('s2', 200, 50, [agg('th', 's2', { samples: cleanSamples(3, 80) })])
+		];
+		const th = summarizeBigrams(sessions).find((r) => r.bigram === 'th')!;
+		expect(th.classification).toBe('healthy');
+		expect(th.meanTime).toBe(80);
+	});
+
+	it('falls back to the latest session aggregate when no session has samples', () => {
+		const sessions = [
+			session('s1', 100, 50, [agg('th', 's1', { classification: 'hasty', errorRate: 0.2 })]),
+			session('s2', 200, 50, [agg('th', 's2', { classification: 'healthy', errorRate: 0.02 })])
+		];
+		const th = summarizeBigrams(sessions).find((r) => r.bigram === 'th')!;
+		expect(th.classification).toBe('healthy');
+		expect(th.errorRate).toBeCloseTo(0.02);
 	});
 });
 

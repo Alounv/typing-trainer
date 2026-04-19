@@ -1,5 +1,5 @@
 import type { KeystrokeEvent } from '../typing/types';
-import type { BigramAggregate } from './types';
+import type { BigramAggregate, BigramSample } from './types';
 import { classifyBigram, type ClassificationThresholds } from './classification';
 
 /**
@@ -16,9 +16,7 @@ export function extractBigramAggregates(
 	const sorted = [...events].sort((a, b) => a.position - b.position);
 
 	interface Bucket {
-		occurrences: number;
-		errorCount: number;
-		cleanTimings: number[];
+		samples: BigramSample[];
 	}
 	const buckets = new Map<string, Bucket>();
 
@@ -30,37 +28,36 @@ export function extractBigramAggregates(
 		const key = left.expected + right.expected;
 		let bucket = buckets.get(key);
 		if (!bucket) {
-			bucket = { occurrences: 0, errorCount: 0, cleanTimings: [] };
+			bucket = { samples: [] };
 			buckets.set(key, bucket);
 		}
 
-		bucket.occurrences++;
-		if (right.actual !== right.expected) bucket.errorCount++;
-
 		const leftCorrect = left.actual === left.expected;
 		const rightCorrect = right.actual === right.expected;
-		if (leftCorrect && rightCorrect) {
-			bucket.cleanTimings.push(right.timestamp - left.timestamp);
-		}
+		bucket.samples.push({
+			correct: rightCorrect,
+			timing: leftCorrect && rightCorrect ? right.timestamp - left.timestamp : null
+		});
 	}
 
 	const out: BigramAggregate[] = [];
 	for (const [bigram, b] of buckets) {
-		const meanTime = mean(b.cleanTimings);
-		const stdTime = sampleStd(b.cleanTimings, meanTime);
-		const errorRate = b.errorCount / b.occurrences;
+		const cleanTimings = b.samples.map((s) => s.timing).filter((t): t is number => t !== null);
+		const meanTime = mean(cleanTimings);
+		const stdTime = sampleStd(cleanTimings, meanTime);
+		const errorCount = b.samples.reduce((n, s) => n + (s.correct ? 0 : 1), 0);
+		const occurrences = b.samples.length;
+		const errorRate = errorCount / occurrences;
 		out.push({
 			bigram,
 			sessionId,
-			occurrences: b.occurrences,
+			occurrences,
 			meanTime,
 			stdTime,
-			errorCount: b.errorCount,
+			errorCount,
 			errorRate,
-			classification: classifyBigram(
-				{ occurrences: b.occurrences, meanTime, errorRate },
-				thresholds
-			)
+			classification: classifyBigram({ occurrences, meanTime, errorRate }, thresholds),
+			samples: b.samples
 		});
 	}
 	return out;

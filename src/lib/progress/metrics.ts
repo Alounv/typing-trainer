@@ -1,7 +1,11 @@
-import type { BigramAggregate, BigramClassification } from '../bigram/types';
+import type { BigramAggregate, BigramClassification, BigramSample } from '../bigram/types';
 import type { SessionSummary } from '../session/types';
 import type { FrequencyTable } from '../corpus/types';
-import { DEFAULT_THRESHOLDS, type ClassificationThresholds } from '../bigram/classification';
+import {
+	classifyBigram,
+	DEFAULT_THRESHOLDS,
+	type ClassificationThresholds
+} from '../bigram/classification';
 
 /**
  * Rolling average with a trailing window. For positions before the window is
@@ -54,6 +58,10 @@ export function rollingStdDev(values: readonly number[], window: number): (numbe
 export const WPM_ROLLING_WINDOW = 7;
 /** Sparkline depth for per-bigram mean transition time. Spec §10.6. */
 export const BIGRAM_SPARKLINE_DEPTH = 8;
+
+/** Pooled-samples window for per-bigram classification. Big enough to resist
+ *  single-session outliers, small enough to track recent behavior. */
+export const BIGRAM_CLASSIFICATION_WINDOW = 50;
 
 /**
  * Single point on a per-session trend chart. Shared shape across metrics so
@@ -169,17 +177,60 @@ export interface BigramSummary {
 	trend: BigramTrendPoint[];
 }
 
+export interface RollingBigramAggregate {
+	occurrences: number;
+	meanTime: number;
+	errorRate: number;
+}
+
 /**
- * Aggregate all observed bigrams across the given sessions into table rows.
- * For each bigram, the `classification`/`meanTime`/`errorRate` come from the
- * most recent session that observed it (the latest snapshot the user has seen);
- * `occurrences` sums across all sessions (lifetime count, so rare bigrams
- * don't look exaggeratedly fresh).
+ * Pool the last `window` per-occurrence samples for `bigram`, newest session
+ * first. Legacy sessions without `samples` are skipped. Returns `undefined`
+ * when no session in the set carries samples for this bigram.
+ */
+export function aggregateLastNOccurrences(
+	sessions: readonly SessionSummary[],
+	bigram: string,
+	window: number = BIGRAM_CLASSIFICATION_WINDOW
+): RollingBigramAggregate | undefined {
+	if (window < 1) throw new RangeError('window must be ≥ 1');
+	const ordered = [...sessions].sort((a, b) => b.timestamp - a.timestamp);
+
+	const pooled: BigramSample[] = [];
+	for (const s of ordered) {
+		const agg = s.bigramAggregates.find((a) => a.bigram === bigram);
+		if (!agg || !agg.samples) continue;
+		const remaining = window - pooled.length;
+		if (remaining <= 0) break;
+		// Take the tail of each session so the window tracks the user's most
+		// recent attempts within a long session, not its warm-up.
+		const tail = agg.samples.slice(Math.max(0, agg.samples.length - remaining));
+		pooled.push(...tail);
+		if (pooled.length >= window) break;
+	}
+
+	if (pooled.length === 0) return undefined;
+
+	const timings = pooled.map((s) => s.timing).filter((t): t is number => t !== null);
+	const errorCount = pooled.reduce((n, s) => n + (s.correct ? 0 : 1), 0);
+	return {
+		occurrences: pooled.length,
+		meanTime: timings.length === 0 ? NaN : timings.reduce((a, b) => a + b, 0) / timings.length,
+		errorRate: errorCount / pooled.length
+	};
+}
+
+/**
+ * Aggregate all observed bigrams into table rows. Class/meanTime/errorRate
+ * come from the rolling window (see `aggregateLastNOccurrences`) so a small
+ * recent session can't mask a well-established bigram. `occurrences` is the
+ * lifetime sum. Legacy data without samples falls back to the latest aggregate.
  */
 export function summarizeBigrams(
 	sessions: readonly SessionSummary[],
 	corpus?: FrequencyTable,
-	thresholds: ClassificationThresholds = DEFAULT_THRESHOLDS
+	thresholds: ClassificationThresholds = DEFAULT_THRESHOLDS,
+	window: number = BIGRAM_CLASSIFICATION_WINDOW
 ): BigramSummary[] {
 	// Sessions oldest-first so the final pass overwrites with the newest snapshot.
 	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
@@ -194,16 +245,21 @@ export function summarizeBigrams(
 	}
 
 	const rows: BigramSummary[] = [];
-	for (const [bigram, agg] of latest) {
+	for (const [bigram, latestAgg] of latest) {
+		const rolling = aggregateLastNOccurrences(sessions, bigram, window);
+		const classification = rolling ? classifyBigram(rolling, thresholds) : latestAgg.classification;
+		const meanTime = rolling ? rolling.meanTime : latestAgg.meanTime;
+		const errorRate = rolling ? rolling.errorRate : latestAgg.errorRate;
+
 		const trend = buildBigramTrend(sessions, bigram);
-		const badness = badness1D(agg, thresholds);
+		const badness = badness1D({ meanTime, errorRate }, thresholds);
 		const freq = corpus?.[bigram] ?? 1;
 		rows.push({
 			bigram,
-			classification: agg.classification,
-			meanTime: agg.meanTime,
-			errorRate: agg.errorRate,
-			occurrences: occurrences.get(bigram) ?? agg.occurrences,
+			classification,
+			meanTime,
+			errorRate,
+			occurrences: occurrences.get(bigram) ?? latestAgg.occurrences,
 			priorityScore: badness * freq,
 			trend
 		});
@@ -220,7 +276,10 @@ export function summarizeBigrams(
  * the same formula applied to any BigramAggregate. If these ever drift, the
  * table and the diagnostic priority list will stop agreeing.
  */
-function badness1D(agg: BigramAggregate, thresholds: ClassificationThresholds): number {
+function badness1D(
+	agg: Pick<BigramAggregate, 'meanTime' | 'errorRate'>,
+	thresholds: ClassificationThresholds
+): number {
 	const slowRatio = Number.isFinite(agg.meanTime)
 		? Math.max(0, agg.meanTime / thresholds.speedMs - 1)
 		: 0;

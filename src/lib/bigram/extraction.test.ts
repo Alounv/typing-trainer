@@ -161,6 +161,45 @@ describe('extractBigramAggregates — boundaries', () => {
 	});
 });
 
+describe('extractBigramAggregates — samples', () => {
+	it('emits one sample per occurrence, in observation order', () => {
+		// "thth" — two "th" occurrences, both clean; timings 100 and 100.
+		const result = extractBigramAggregates(
+			[ev(0, 't', 't', 0), ev(1, 'h', 'h', 100), ev(2, 't', 't', 200), ev(3, 'h', 'h', 300)],
+			's1'
+		);
+		const th = result.find((r) => r.bigram === 'th')!;
+		expect(th.samples).toEqual([
+			{ correct: true, timing: 100 },
+			{ correct: true, timing: 100 }
+		]);
+	});
+
+	it('sample.timing is null whenever either side of the pair was wrong', () => {
+		// First "th": pos 0 wrong → timing null, but right was correct so correct=true.
+		// Second "th": pos 3 wrong → right wrong so correct=false, timing null.
+		const result = extractBigramAggregates(
+			[ev(0, 't', 'x', 100), ev(1, 'h', 'h', 200), ev(2, 't', 't', 300), ev(3, 'h', 'y', 400)],
+			's1'
+		);
+		const th = result.find((r) => r.bigram === 'th')!;
+		expect(th.samples).toEqual([
+			{ correct: true, timing: null },
+			{ correct: false, timing: null }
+		]);
+	});
+
+	it('samples length equals occurrences, and errorCount matches correct=false count', () => {
+		const result = extractBigramAggregates(
+			[ev(0, 'a', 'a', 0), ev(1, 'b', 'x', 100), ev(2, 'a', 'a', 200), ev(3, 'b', 'b', 300)],
+			's1'
+		);
+		const ab = result.find((r) => r.bigram === 'ab')!;
+		expect(ab.samples!).toHaveLength(ab.occurrences);
+		expect(ab.samples!.filter((s) => !s.correct).length).toBe(ab.errorCount);
+	});
+});
+
 describe('extractBigramAggregates — invariants', () => {
 	it('preserves total pair count across all aggregates', () => {
 		// Property: sum(occurrences) === number of consecutive adjacent pairs in input.
