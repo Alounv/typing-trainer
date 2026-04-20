@@ -18,8 +18,8 @@ import {
 	type GraduationEvent,
 	type MilestoneEvent
 } from '../progress';
-import { loadDashboardData, type PlannedSession } from '../practice';
-import type { SessionSummary, SessionType } from '../core';
+import { loadDashboardData, type PlannedSession, type PlanSlotKey } from '../practice';
+import type { SessionSummary } from '../core';
 
 /** Matches the dashboard's recent-session window; the planner only peeks a few. */
 const RECENT_WINDOW = 20;
@@ -37,7 +37,7 @@ export type SummaryViewModel =
 			/** First item in today's remaining plan — the "Next session" CTA target. */
 			next: PlannedSession | undefined;
 			/** Snapshot for `activateBonusRound` when the user starts another round. */
-			completedToday: Partial<Record<SessionType, number>>;
+			completedToday: Partial<Record<PlanSlotKey, number>>;
 	  };
 
 export async function loadSummaryContext(id: string): Promise<SummaryViewModel> {

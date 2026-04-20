@@ -6,6 +6,34 @@
 import type { SessionConfig, SessionSummary, UserSettings, DiagnosticReport } from '../core';
 
 /**
+ * Slot-level key for completed-today accounting. Splits `bigram-drill` by
+ * mode so accuracy and speed slots are counted independently.
+ */
+export type PlanSlotKey =
+	| 'diagnostic'
+	| 'bigram-drill/accuracy'
+	| 'bigram-drill/speed'
+	| 'real-text';
+
+/** Drill without a mode falls back to accuracy, matching the direct-nav default. */
+export function planSlotKey(config: SessionConfig): PlanSlotKey {
+	if (config.type === 'bigram-drill') {
+		return config.drillMode === 'speed' ? 'bigram-drill/speed' : 'bigram-drill/accuracy';
+	}
+	return config.type;
+}
+
+/** Session-shaped overload so callers don't reconstruct a `SessionConfig`. */
+export function planSlotKeyForSession(
+	session: Pick<SessionSummary, 'type' | 'drillMode'>
+): PlanSlotKey {
+	if (session.type === 'bigram-drill') {
+		return session.drillMode === 'speed' ? 'bigram-drill/speed' : 'bigram-drill/accuracy';
+	}
+	return session.type;
+}
+
+/**
  * Why the planner emitted a given entry. Drives the dashboard copy
  * ("Time for your weekly diagnostic", "Warm-up drill", …) and lets
  * tests assert behavior without string-matching UI labels.

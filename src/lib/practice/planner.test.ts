@@ -368,8 +368,8 @@ describe('sliceCompletedFromPlan', () => {
 
 	/**
 	 * Accuracy-only default plan = CYCLES_PER_DAY × [accuracy-drill, real-text]
-	 * → 6 items total. Completing a drill consumes the earliest `bigram-drill`
-	 * slot; real-text credits do the same for their slots. Unused credit (more
+	 * → 6 items total. Completing a drill consumes the earliest accuracy slot;
+	 * real-text credits do the same for their slots. Unused credit (more
 	 * "done" than actual slots) is dropped, not carried over.
 	 */
 	it.each`
@@ -383,7 +383,7 @@ describe('sliceCompletedFromPlan', () => {
 		({ drillsDone, realTextDone, expectedRemaining }) => {
 			const full = dailyPlan();
 			const remaining = sliceCompletedFromPlan(full, {
-				'bigram-drill': drillsDone,
+				'bigram-drill/accuracy': drillsDone,
 				'real-text': realTextDone
 			});
 			expect(remaining).toHaveLength(expectedRemaining);
@@ -391,11 +391,11 @@ describe('sliceCompletedFromPlan', () => {
 	);
 
 	it('preserves interleaving order of surviving items', () => {
-		// 1 drill done → first survivor is the initial real-text (the drill
-		// slot that would have been first is consumed), then the remaining
-		// [drill, real-text, drill, real-text] alternation.
+		// 1 accuracy drill done → first survivor is the initial real-text
+		// (the accuracy slot that would have been first is consumed), then
+		// the remaining [accuracy, real-text, accuracy, real-text] alternation.
 		const full = dailyPlan();
-		const remaining = sliceCompletedFromPlan(full, { 'bigram-drill': 1 });
+		const remaining = sliceCompletedFromPlan(full, { 'bigram-drill/accuracy': 1 });
 		expect(remaining[0].config.type).toBe('real-text');
 		expect(remaining[1].config.type).toBe('bigram-drill');
 	});
@@ -404,8 +404,64 @@ describe('sliceCompletedFromPlan', () => {
 		// A diagnostic-day plan is a single diagnostic item; completing a
 		// drill earlier in the day shouldn't mark it done.
 		const diagPlan = planDailySessions({ recentSessions: [] });
-		const remaining = sliceCompletedFromPlan(diagPlan, { 'bigram-drill': 3 });
+		const remaining = sliceCompletedFromPlan(diagPlan, { 'bigram-drill/accuracy': 3 });
 		expect(remaining).toEqual(diagPlan);
+	});
+
+	/**
+	 * Regression: before we keyed by `PlanSlotKey`, the slicer treated all
+	 * `bigram-drill` completions as interchangeable. In a mixed plan that meant
+	 * a speed completion could consume the accuracy slot (or vice versa),
+	 * leaving the user facing the same drill mode back-to-back. These cases
+	 * pin the fix: each completion consumes the slot for its actual mode.
+	 */
+	describe('drill-mode accounting in mixed plans', () => {
+		/**
+		 * Mixed plan = [accuracy, speed, real-text] × CYCLES_PER_DAY.
+		 * Uses both hasty+acquisition (→ accuracy bucket) and fluency (→ speed
+		 * bucket) so both drill slots are present.
+		 */
+		function mixedPlan() {
+			return planDailySessions({
+				recentSessions: recent('diagnostic'),
+				latestDiagnosticReport: {
+					...report([]),
+					priorityTargets: [pt('th', 'hasty'), pt('er', 'fluency')]
+				}
+			});
+		}
+
+		it('accuracy completion survives the first speed slot', () => {
+			const full = mixedPlan();
+			const remaining = sliceCompletedFromPlan(full, { 'bigram-drill/accuracy': 1 });
+			// First accuracy consumed → speed is next, then real-text, then the second cycle.
+			expect(remaining[0].config.type).toBe('bigram-drill');
+			expect(remaining[0].config.drillMode).toBe('speed');
+			expect(remaining[1].config.type).toBe('real-text');
+		});
+
+		it('speed completion leaves the first accuracy slot intact', () => {
+			const full = mixedPlan();
+			const remaining = sliceCompletedFromPlan(full, { 'bigram-drill/speed': 1 });
+			// Accuracy is still first; the consumed slot is cycle 1's speed.
+			expect(remaining[0].config.type).toBe('bigram-drill');
+			expect(remaining[0].config.drillMode).toBe('accuracy');
+			expect(remaining[1].config.type).toBe('real-text');
+			// Cycle 2 retains its [accuracy, speed, real-text] triple.
+			expect(remaining[2].config.drillMode).toBe('accuracy');
+			expect(remaining[3].config.drillMode).toBe('speed');
+		});
+
+		it('accuracy credit does not consume a speed slot', () => {
+			const full = mixedPlan();
+			// 3 accuracy completions, no speed. Plan has 2 accuracy slots total —
+			// the extra credit must be dropped, not leak into speed.
+			const remaining = sliceCompletedFromPlan(full, { 'bigram-drill/accuracy': 3 });
+			// Both accuracy slots consumed; both speed slots + both real-texts remain.
+			expect(remaining).toHaveLength(4);
+			expect(remaining.filter((p) => p.config.drillMode === 'speed')).toHaveLength(2);
+			expect(remaining.filter((p) => p.config.drillMode === 'accuracy')).toHaveLength(0);
+		});
 	});
 });
 

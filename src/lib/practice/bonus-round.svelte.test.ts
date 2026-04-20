@@ -7,7 +7,7 @@ import { activateBonusRound, applyBonusBaseline, readActiveBaseline } from './bo
  * miss the storage-unavailable guards the module depends on in SSR.
  */
 
-const STORAGE_KEY = 'scheduler.bonusRound';
+const STORAGE_KEY = 'scheduler.bonusRound.v2';
 
 describe('bonus-round', () => {
 	beforeEach(() => {
@@ -24,8 +24,8 @@ describe('bonus-round', () => {
 		});
 
 		it('returns the snapshot right after activation', () => {
-			activateBonusRound({ 'bigram-drill': 2, 'real-text': 1 });
-			expect(readActiveBaseline()).toEqual({ 'bigram-drill': 2, 'real-text': 1 });
+			activateBonusRound({ 'bigram-drill/accuracy': 2, 'real-text': 1 });
+			expect(readActiveBaseline()).toEqual({ 'bigram-drill/accuracy': 2, 'real-text': 1 });
 		});
 
 		it('clears a stale activation from a previous calendar day', () => {
@@ -35,7 +35,7 @@ describe('bonus-round', () => {
 				STORAGE_KEY,
 				JSON.stringify({
 					activatedOnDay: new Date(2000, 0, 1).toDateString(),
-					completedAtActivation: { 'bigram-drill': 3 }
+					completedAtActivation: { 'bigram-drill/accuracy': 3 }
 				})
 			);
 			expect(readActiveBaseline()).toEqual({});
@@ -51,32 +51,44 @@ describe('bonus-round', () => {
 
 	describe('applyBonusBaseline', () => {
 		it('is a no-op when no baseline is active', () => {
-			const completed = { 'bigram-drill': 2, 'real-text': 1 };
+			const completed = { 'bigram-drill/accuracy': 2, 'real-text': 1 };
 			expect(applyBonusBaseline(completed, {})).toEqual(completed);
 		});
 
-		it('returns zero for types whose completions match the baseline exactly', () => {
+		it('returns zero for keys whose completions match the baseline exactly', () => {
 			// Immediately after activating a bonus round, the live counts and
 			// the baseline are identical — effective completed is zero, so
 			// the planner re-emits the full plan.
-			const completed = { 'bigram-drill': 4, 'real-text': 4 };
-			const baseline = { 'bigram-drill': 4, 'real-text': 4 };
+			const completed = { 'bigram-drill/accuracy': 4, 'real-text': 4 };
+			const baseline = { 'bigram-drill/accuracy': 4, 'real-text': 4 };
 			expect(applyBonusBaseline(completed, baseline)).toEqual({});
 		});
 
 		it('carries forward completions past the baseline', () => {
 			// User activated bonus at (4, 4) and has since completed one
-			// more drill → effective is (1, 0).
-			const completed = { 'bigram-drill': 5, 'real-text': 4 };
-			const baseline = { 'bigram-drill': 4, 'real-text': 4 };
-			expect(applyBonusBaseline(completed, baseline)).toEqual({ 'bigram-drill': 1 });
+			// more accuracy drill → effective is (1, 0).
+			const completed = { 'bigram-drill/accuracy': 5, 'real-text': 4 };
+			const baseline = { 'bigram-drill/accuracy': 4, 'real-text': 4 };
+			expect(applyBonusBaseline(completed, baseline)).toEqual({ 'bigram-drill/accuracy': 1 });
+		});
+
+		it('keeps accuracy and speed counts independent', () => {
+			// Baseline captured at (accuracy: 2, speed: 1); user has since done
+			// one more of each. Effective should credit both slots separately —
+			// the old `SessionType`-keyed version would have collapsed these.
+			const completed = { 'bigram-drill/accuracy': 3, 'bigram-drill/speed': 2 };
+			const baseline = { 'bigram-drill/accuracy': 2, 'bigram-drill/speed': 1 };
+			expect(applyBonusBaseline(completed, baseline)).toEqual({
+				'bigram-drill/accuracy': 1,
+				'bigram-drill/speed': 1
+			});
 		});
 
 		it('floors at zero if the baseline somehow exceeds live counts', () => {
 			// Defensive: shouldn't happen in practice, but a clock-skew or
 			// manually-cleared session log shouldn't surface negative credits.
-			const completed = { 'bigram-drill': 1 };
-			const baseline = { 'bigram-drill': 4 };
+			const completed = { 'bigram-drill/accuracy': 1 };
+			const baseline = { 'bigram-drill/accuracy': 4 };
 			expect(applyBonusBaseline(completed, baseline)).toEqual({});
 		});
 	});

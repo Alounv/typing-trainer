@@ -6,7 +6,13 @@
 	 */
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { loadDashboardData, startPlannedSession, type DashboardData } from '$lib/practice';
+	import {
+		loadDashboardData,
+		planSlotKey,
+		startPlannedSession,
+		type DashboardData,
+		type PlanSlotKey
+	} from '$lib/practice';
 
 	type LoadState =
 		| { status: 'loading' }
@@ -14,6 +20,17 @@
 		| { status: 'error'; message: string };
 
 	let state = $state<LoadState>({ status: 'loading' });
+
+	// Debug-panel derived values. At script level because `<details>` isn't a
+	// valid parent for `{@const}` in Svelte 5.
+	const debugEffective = $derived.by<Partial<Record<PlanSlotKey, number>>>(() =>
+		state.status === 'ready'
+			? effectiveCompleted(state.data.completedToday, state.data.bonusBaseline)
+			: {}
+	);
+	const debugConsumed = $derived.by<boolean[]>(() =>
+		state.status === 'ready' ? consumedByKey(state.data.fullPlan, debugEffective) : []
+	);
 
 	onMount(async () => {
 		try {
@@ -30,6 +47,40 @@
 	/** Format the planned word budget for the card headline. */
 	function wordsLabel(wordBudget: number): string {
 		return `${wordBudget} words`;
+	}
+
+	/** Per-position slicer trace for the debug panel. */
+	function consumedByKey(
+		fullPlan: DashboardData['fullPlan'],
+		completedEffective: Partial<Record<PlanSlotKey, number>>
+	): boolean[] {
+		const remaining: Partial<Record<PlanSlotKey, number>> = { ...completedEffective };
+		return fullPlan.map((planned) => {
+			const key = planSlotKey(planned.config);
+			const left = remaining[key] ?? 0;
+			if (left > 0) {
+				remaining[key] = left - 1;
+				return true;
+			}
+			return false;
+		});
+	}
+
+	/** Mirrors `applyBonusBaseline` for display. */
+	function effectiveCompleted(
+		completed: Partial<Record<PlanSlotKey, number>>,
+		baseline: Partial<Record<PlanSlotKey, number>>
+	): Partial<Record<PlanSlotKey, number>> {
+		const out: Partial<Record<PlanSlotKey, number>> = {};
+		const keys = new Set<PlanSlotKey>([
+			...(Object.keys(completed) as PlanSlotKey[]),
+			...(Object.keys(baseline) as PlanSlotKey[])
+		]);
+		for (const k of keys) {
+			const v = (completed[k] ?? 0) - (baseline[k] ?? 0);
+			if (v > 0) out[k] = v;
+		}
+		return out;
 	}
 </script>
 
@@ -205,5 +256,82 @@
 				</a>
 			</section>
 		{/if}
+
+		<!-- Temporary debug panel — rip out once the plan-accounting regression is settled. -->
+		<details
+			class="mt-12 rounded-md border border-dashed border-base-content/30 px-4 py-2 text-xs"
+			data-testid="debug-panel"
+		>
+			<summary class="cursor-pointer font-mono tracking-wide text-base-content/60 uppercase"
+				>Debug · planner inputs</summary
+			>
+			<div class="mt-3 space-y-3 font-mono text-[11px] text-base-content/80">
+				<!-- Strike-through = slicer-consumed by key match (not positional). -->
+				<div>
+					<p class="text-base-content/55">
+						Full plan ({data.fullPlan.length}) → remaining ({data.plan.length}):
+					</p>
+					<ol class="ml-4 list-decimal space-y-0.5">
+						{#each data.fullPlan as planned, i (i)}
+							<li
+								class={debugConsumed[i]
+									? 'text-base-content/35 line-through'
+									: 'text-base-content'}
+							>
+								{planSlotKey(planned.config)}
+							</li>
+						{/each}
+					</ol>
+				</div>
+
+				<div>
+					<p class="text-base-content/55">Completed today (by slot-key):</p>
+					<pre
+						class="ml-4 whitespace-pre-wrap">{JSON.stringify(data.completedToday, null, 2)}</pre>
+				</div>
+
+				<div>
+					<p class="text-base-content/55">Bonus-round baseline (subtracted before slicing):</p>
+					<pre class="ml-4 whitespace-pre-wrap">{JSON.stringify(data.bonusBaseline, null, 2)}</pre>
+				</div>
+
+				<div>
+					<p class="text-base-content/55">Effective completed (completed − baseline):</p>
+					<pre class="ml-4 whitespace-pre-wrap">{JSON.stringify(debugEffective, null, 2)}</pre>
+				</div>
+
+				{#if data.latestDiagnosticReport}
+					{@const report = data.latestDiagnosticReport}
+					<div>
+						<p class="text-base-content/55">
+							Latest diagnostic · baseline {report.baselineWPM.toFixed(1)} → target {report.targetWPM.toFixed(
+								1
+							)} WPM
+						</p>
+						<p class="ml-4">
+							counts: {JSON.stringify(report.counts)}
+						</p>
+						<p class="ml-4">
+							priorityTargets ({report.priorityTargets.length}):
+							{report.priorityTargets
+								.slice(0, 10)
+								.map((p) => `${p.bigram}·${p.classification}`)
+								.join(', ')}
+						</p>
+					</div>
+				{:else}
+					<p class="text-base-content/55">No diagnostic report yet.</p>
+				{/if}
+
+				<div>
+					<p class="text-base-content/55">
+						Graduated from rotation ({data.graduatedFromRotation.size}):
+					</p>
+					<p class="ml-4">
+						{[...data.graduatedFromRotation].join(', ') || '—'}
+					</p>
+				</div>
+			</div>
+		</details>
 	{/if}
 </div>

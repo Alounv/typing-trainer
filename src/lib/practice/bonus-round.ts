@@ -17,9 +17,11 @@
  * user gets yet another full plan. No cap — if someone wants to drill
  * all day, let them.
  */
-import type { SessionType } from '../core';
+import type { PlanSlotKey } from './types';
 
-const STORAGE_KEY = 'scheduler.bonusRound';
+// v2: key shape changed from `SessionType` to `PlanSlotKey`. Stale v1 stashes
+// are ignored rather than migrated (today-only persistence, tiny window).
+const STORAGE_KEY = 'scheduler.bonusRound.v2';
 
 interface BonusRoundState {
 	/**
@@ -29,12 +31,11 @@ interface BonusRoundState {
 	 */
 	activatedOnDay: string;
 	/**
-	 * Snapshot of each session type's "completed today" count at
-	 * activation. Subtracted from the live count so the planner sees
-	 * zero done until the user completes more sessions past this
-	 * baseline.
+	 * Snapshot of each slot's "completed today" count at activation.
+	 * Subtracted from the live count so the planner sees zero done until
+	 * the user completes more sessions past this baseline.
 	 */
-	completedAtActivation: Partial<Record<SessionType, number>>;
+	completedAtActivation: Partial<Record<PlanSlotKey, number>>;
 }
 
 /**
@@ -42,7 +43,7 @@ interface BonusRoundState {
  * we can snapshot the baseline that subsequent completions will be
  * measured against. Silently no-ops in SSR / storage-disabled contexts.
  */
-export function activateBonusRound(completedToday: Partial<Record<SessionType, number>>): void {
+export function activateBonusRound(completedToday: Partial<Record<PlanSlotKey, number>>): void {
 	if (typeof sessionStorage === 'undefined') return;
 	const state: BonusRoundState = {
 		activatedOnDay: new Date().toDateString(),
@@ -62,7 +63,7 @@ export function activateBonusRound(completedToday: Partial<Record<SessionType, n
  * map when there is no active bonus round — callers can treat that as
  * "subtract nothing" without a special-case branch.
  */
-export function readActiveBaseline(): Partial<Record<SessionType, number>> {
+export function readActiveBaseline(): Partial<Record<PlanSlotKey, number>> {
 	if (typeof sessionStorage === 'undefined') return {};
 	const raw = sessionStorage.getItem(STORAGE_KEY);
 	if (raw === null) return {};
@@ -93,19 +94,19 @@ export function readActiveBaseline(): Partial<Record<SessionType, number>> {
  * result equals the input).
  */
 export function applyBonusBaseline(
-	completedToday: Partial<Record<SessionType, number>>,
-	baseline: Partial<Record<SessionType, number>>
-): Partial<Record<SessionType, number>> {
-	const out: Partial<Record<SessionType, number>> = {};
-	const types = new Set<SessionType>([
-		...(Object.keys(completedToday) as SessionType[]),
-		...(Object.keys(baseline) as SessionType[])
+	completedToday: Partial<Record<PlanSlotKey, number>>,
+	baseline: Partial<Record<PlanSlotKey, number>>
+): Partial<Record<PlanSlotKey, number>> {
+	const out: Partial<Record<PlanSlotKey, number>> = {};
+	const keys = new Set<PlanSlotKey>([
+		...(Object.keys(completedToday) as PlanSlotKey[]),
+		...(Object.keys(baseline) as PlanSlotKey[])
 	]);
-	for (const t of types) {
-		const done = completedToday[t] ?? 0;
-		const sub = baseline[t] ?? 0;
+	for (const k of keys) {
+		const done = completedToday[k] ?? 0;
+		const sub = baseline[k] ?? 0;
 		const effective = done - sub;
-		if (effective > 0) out[t] = effective;
+		if (effective > 0) out[k] = effective;
 	}
 	return out;
 }

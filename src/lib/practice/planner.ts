@@ -1,10 +1,16 @@
-import type { DrillMode, PriorityBigram, SessionConfig, SessionType, UserSettings } from '../core';
+import type { DrillMode, PriorityBigram, SessionConfig, UserSettings } from '../core';
 import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 	DEFAULT_REAL_TEXT_WORD_BUDGET,
 	DEFAULT_DIAGNOSTIC_WORD_BUDGET
 } from '../settings';
-import type { SchedulerInput, PlannedSession, PlannedSessionReason } from './types';
+import {
+	planSlotKey,
+	type PlanSlotKey,
+	type SchedulerInput,
+	type PlannedSession,
+	type PlannedSessionReason
+} from './types';
 
 function resolveWordBudgets(settings?: UserSettings) {
 	return {
@@ -255,21 +261,22 @@ function buildDrillRationale(
 }
 
 /**
- * Drop completed-today items from the front of a plan, matched by session type.
- * Preserves interleaving: 2 drills + 1 real-text completed from
- * [drill, rt, drill, rt, drill, rt] leaves [drill, rt, drill, rt, drill].
+ * Drop completed-today items, matched by `PlanSlotKey` so an accuracy
+ * completion consumes the accuracy slot (not any bigram-drill). Preserves
+ * interleaving: [acc, speed, rt, acc, speed, rt] minus 1 acc + 1 rt leaves
+ * [speed, rt, acc, speed, rt].
  */
 export function sliceCompletedFromPlan(
 	plan: readonly PlannedSession[],
-	completedToday: Readonly<Partial<Record<SessionType, number>>>
+	completedToday: Readonly<Partial<Record<PlanSlotKey, number>>>
 ): PlannedSession[] {
-	const remaining: Partial<Record<SessionType, number>> = { ...completedToday };
+	const remaining: Partial<Record<PlanSlotKey, number>> = { ...completedToday };
 	const out: PlannedSession[] = [];
 	for (const item of plan) {
-		const type = item.config.type;
-		const left = remaining[type] ?? 0;
+		const key = planSlotKey(item.config);
+		const left = remaining[key] ?? 0;
 		if (left > 0) {
-			remaining[type] = left - 1;
+			remaining[key] = left - 1;
 			continue;
 		}
 		out.push(item);

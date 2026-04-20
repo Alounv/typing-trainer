@@ -3,14 +3,14 @@
 // into a session route" side-effect so route components never touch
 // `sessionStorage` or `window.location` directly.
 import { resolve } from '$app/paths';
-import type { DiagnosticReport, SessionSummary, SessionType, UserSettings } from '../core';
+import type { DiagnosticReport, SessionSummary, UserSettings } from '../core';
 import { getProfile } from '../settings';
 import { getBigramHistory, getRecentSessions } from '../storage';
 import { findGraduatedBigrams } from './graduation-filter';
 import { planDailySessions, sliceCompletedFromPlan } from './planner';
 import { activateBonusRound, applyBonusBaseline, readActiveBaseline } from './bonus-round';
 import { stashPlannedSession } from './planned';
-import type { PlannedSession } from './types';
+import { planSlotKeyForSession, type PlanSlotKey, type PlannedSession } from './types';
 
 /**
  * How many sessions to pull for cadence + diagnostic-lookup decisions. The
@@ -22,10 +22,14 @@ const RECENT_WINDOW = 20;
 export interface DashboardData {
 	/** Plan with completed-today items stripped. Empty = done for today. */
 	plan: PlannedSession[];
+	/** Full plan before slicing — debug-panel only. */
+	fullPlan: PlannedSession[];
 	/** Named boolean so UI branches on intent, not array-length arithmetic. */
 	allDoneForToday: boolean;
-	/** Raw completed-today counts — needed for "Start another round" bonus baseline. */
-	completedToday: Partial<Record<SessionType, number>>;
+	/** Keyed by `PlanSlotKey` so accuracy and speed drills count independently. */
+	completedToday: Partial<Record<PlanSlotKey, number>>;
+	/** Active bonus-round baseline (subtracted from `completedToday`). */
+	bonusBaseline: Partial<Record<PlanSlotKey, number>>;
 	lastSession?: SessionSummary;
 	latestDiagnosticReport?: DiagnosticReport;
 	graduatedFromRotation: ReadonlySet<string>;
@@ -73,13 +77,16 @@ export async function loadDashboardData(opts: DashboardLoadOptions = {}): Promis
 	// round (if active) subtracts its baseline first → earlier completions
 	// are "forgiven" and the user gets a fresh plan.
 	const completedToday = countCompletedToday(recentSessions);
-	const effectiveCompleted = applyBonusBaseline(completedToday, readActiveBaseline());
+	const bonusBaseline = readActiveBaseline();
+	const effectiveCompleted = applyBonusBaseline(completedToday, bonusBaseline);
 	const plan = sliceCompletedFromPlan(fullPlan, effectiveCompleted);
 
 	return {
 		plan,
+		fullPlan,
 		allDoneForToday: plan.length === 0 && fullPlan.length > 0,
 		completedToday,
+		bonusBaseline,
 		lastSession: recentSessions[0],
 		latestDiagnosticReport,
 		graduatedFromRotation,
@@ -105,7 +112,7 @@ export function startPlannedSession(planned: PlannedSession): void {
  * reading it here — the caller already has the loader's snapshot, and
  * passing it in keeps this function free of storage reads.
  */
-export function startBonusRound(completedToday: Partial<Record<SessionType, number>>): void {
+export function startBonusRound(completedToday: Partial<Record<PlanSlotKey, number>>): void {
 	activateBonusRound(completedToday);
 	// Full reload so `loadDashboardData` re-reads the baseline and the UI
 	// state matches the fresh plan from scratch.
@@ -147,16 +154,17 @@ function routeForPlannedSession(planned: PlannedSession): string {
 	}
 }
 
-// Count sessions per type finished today. "Today" = local calendar day — a rolling
-// 24h window would keep yesterday's late session counted against tomorrow's plan.
+// Per slot-key (bigram-drill splits by mode). "Today" = local calendar day —
+// a rolling 24h window would spill yesterday's late session into tomorrow.
 function countCompletedToday(
 	sessions: readonly SessionSummary[]
-): Partial<Record<SessionType, number>> {
+): Partial<Record<PlanSlotKey, number>> {
 	const today = new Date().toDateString();
-	const out: Partial<Record<SessionType, number>> = {};
+	const out: Partial<Record<PlanSlotKey, number>> = {};
 	for (const s of sessions) {
 		if (new Date(s.timestamp).toDateString() !== today) continue;
-		out[s.type] = (out[s.type] ?? 0) + 1;
+		const key = planSlotKeyForSession(s);
+		out[key] = (out[key] ?? 0) + 1;
 	}
 	return out;
 }

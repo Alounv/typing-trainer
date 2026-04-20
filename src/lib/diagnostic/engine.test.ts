@@ -36,17 +36,16 @@ function wordEvents(start: number, dt: number, w: number, basePos: number): Keys
 
 describe('generateDiagnosticReport', () => {
 	it('fills baseline/target WPM from events, scaling by spec multiplier', () => {
-		// Two 5-char words at 200ms/char → per-word wpm = 5/5 / (800/60000) = 75.
-		// Mean of [75, 75] = 75.
 		const events = [...wordEvents(0, 200, 0, 0), ...wordEvents(2000, 200, 1, 5)];
+		const expectedBaseline = 10 / 5 / (2800 / 60_000);
 		const r = generateDiagnosticReport({
 			sessionId: 's1',
 			timestamp: 42,
 			events,
 			aggregates: []
 		});
-		expect(r.baselineWPM).toBeCloseTo(75, 5);
-		expect(r.targetWPM).toBeCloseTo(75 * TARGET_WPM_MULTIPLIER, 5);
+		expect(r.baselineWPM).toBeCloseTo(expectedBaseline, 5);
+		expect(r.targetWPM).toBeCloseTo(expectedBaseline * TARGET_WPM_MULTIPLIER, 5);
 	});
 
 	it('counts aggregates by classification, dropping unclassified', () => {
