@@ -1,8 +1,4 @@
-<!--
-	Sortable bigram table. Default sort (priorityScore desc) surfaces "slow
-	bigrams the user hits a lot" — same criterion the diagnostic priority list
-	uses, so the table agrees with the report the user saw on onboarding.
--->
+<!-- Sortable bigram table. Default sort matches diagnostic priority-list criterion (priorityScore desc). -->
 <script lang="ts">
 	import type { BigramSummary } from '../metrics';
 	import type { BigramClassification } from '../../core';
@@ -200,7 +196,6 @@
 		</table>
 	</div>
 	{#if truncated}
-		<!-- Show a footer so the user knows the tail is hidden, not missing. -->
 		<p class="mt-2 text-xs text-base-content/55" data-testid="bigram-table-truncation">
 			Showing the top {limit} of {rows.length}
 			bigrams by the current sort. Change the sort to surface a different slice.

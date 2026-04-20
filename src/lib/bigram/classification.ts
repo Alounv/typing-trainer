@@ -1,9 +1,6 @@
 import type { BigramAggregate, BigramClassification } from '../core';
 
-/** Mean transition time at/under which a bigram counts as fast. */
 export const DEFAULT_SPEED_THRESHOLD_MS = 150;
-
-/** Error rate at/above which a bigram counts as error-prone. */
 export const DEFAULT_HIGH_ERROR_THRESHOLD = 0.05;
 
 /** Thresholds driving the 4-way classification. `UserSettings.thresholds` overrides. */
@@ -25,10 +22,7 @@ export const DEFAULT_THRESHOLDS: ClassificationThresholds = {
  */
 export const MIN_OCCURRENCES_FOR_CLASSIFICATION = 10;
 
-/**
- * Pure classification of a single bigram. Boundaries (asymmetric by design):
- *   meanTime ≤ speedMs → fast; errorRate < errorRate → clean.
- */
+/** Classifies a bigram against thresholds. `fast` is `≤`, `clean` is strict `<` — boundaries are asymmetric by design. */
 export function classifyBigram(
 	aggregate: Pick<BigramAggregate, 'occurrences' | 'meanTime' | 'errorRate'>,
 	thresholds: ClassificationThresholds = DEFAULT_THRESHOLDS

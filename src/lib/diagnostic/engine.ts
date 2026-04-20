@@ -13,14 +13,7 @@ import type { KeystrokeEvent } from '../typing';
 import type { FrequencyTable } from '../corpus';
 import { computeTargetWPM, deriveBaselineWPM } from './pacing';
 
-/**
- * Input bundle for {@link generateDiagnosticReport}.
- *
- * `corpusBigramFrequencies` is optional because Phase 4 (corpus loading)
- * hasn't landed yet — passing `undefined` yields a stub `corpusFit`
- * (coverageRatio 0, no undertrained). Once the corpus is wired in, real
- * coverage kicks in automatically.
- */
+/** Input bundle for {@link generateDiagnosticReport}. `corpusBigramFrequencies` undefined → stub `corpusFit` (coverageRatio 0). */
 interface DiagnosticReportInput {
 	sessionId: string;
 	timestamp: number;
@@ -66,8 +59,7 @@ export function generateDiagnosticReport(input: DiagnosticReportInput): Diagnost
 	};
 }
 
-// `unclassified` is dropped — the report surfaces only the four-way set;
-// undertrained coverage is reported separately via corpus fit.
+// `unclassified` → undertrained (reported via corpus fit, not here).
 function countByClassification(aggregates: readonly BigramAggregate[]): DiagnosticReport['counts'] {
 	const counts = { healthy: 0, fluency: 0, hasty: 0, acquisition: 0 };
 	for (const a of aggregates) {
@@ -122,8 +114,6 @@ function buildPriorityTargets(
 			score: badness * freq,
 			meanTime: a.meanTime,
 			errorRate: a.errorRate,
-			// Guard above filtered out `healthy` / `unclassified`, so the narrow
-			// `PriorityBigram.classification` type is satisfied.
 			classification: a.classification
 		});
 	}
@@ -132,18 +122,8 @@ function buildPriorityTargets(
 }
 
 /**
- * Unified badness scalar.
- *
- * `(meanTime / speedMs - 1)` — how much over the speed threshold (0 for
- * exactly-at-threshold, 1 for 2× the threshold). Clamped at 0 so
- * already-fast bigrams don't get negative badness pulling them ahead.
- *
- * `errorRate × ERROR_PENALTY` — weights errors against slowness. 10% error
- * = 1.0 of badness, which trades off against 2× slowness. Inspected by
- * tests so the trade-off is pinned, not drifting.
- *
- * Non-finite `meanTime` (insufficient clean samples) → 0 slowness
- * component; the error rate alone decides.
+ * Unified badness: `max(0, meanTime/speedMs - 1) + errorRate × ERROR_PENALTY`.
+ * 10% error ≈ 2× slowdown (trade-off pinned by tests). Non-finite meanTime → error alone decides.
  */
 function badnessScore(a: BigramAggregate, thresholds: ClassificationThresholds): number {
 	const slowRatio = Number.isFinite(a.meanTime)
@@ -153,15 +133,8 @@ function badnessScore(a: BigramAggregate, thresholds: ClassificationThresholds):
 }
 
 /**
- * Coverage against corpus: what fraction of the bigrams the corpus
- * contains have we observed ≥10 times? Undertrained list is the
- * never-met-the-floor corpus bigrams, ordered by corpus frequency
- * (most common first — those are the ones a user would most want to
- * drill).
- *
- * With no corpus supplied, returns a stubbed `{ coverageRatio: 0,
- * undertrained: [] }` — caller UI should treat 0 + empty list as
- * "corpus data not yet available" rather than "perfectly undercovered".
+ * Coverage: fraction of corpus bigrams observed ≥ threshold. Undertrained sorted by corpus frequency desc.
+ * No corpus → stub `{ coverageRatio: 0, undertrained: [] }`; UI treats this as "not available".
  */
 function buildCorpusFit(
 	aggregates: readonly BigramAggregate[],
@@ -194,7 +167,6 @@ function buildCorpusFit(
 
 type Grouped = Record<Exclude<BigramClassification, 'unclassified'>, BigramAggregate[]>;
 
-/** Bucket aggregates by classification (minus `unclassified`). */
 function groupByClass(aggregates: readonly BigramAggregate[]): Grouped {
 	const groups: Grouped = { healthy: [], fluency: [], hasty: [], acquisition: [] };
 	for (const a of aggregates) {

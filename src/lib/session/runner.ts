@@ -68,9 +68,6 @@ function computeErrorRate(annotated: readonly { expected: string; actual: string
 	return errors / annotated.length;
 }
 
-// SessionRunner: plain TS lifecycle manager for an in-flight session.
-// UI wraps getter output in its own reactive state.
-
 interface SessionRunnerConfig {
 	type: SessionType;
 	text: string;
@@ -104,19 +101,16 @@ export class SessionRunner {
 		this.config = config;
 	}
 
-	/** Record a keystroke. Appends to the log and advances position. */
 	recordEvent(event: KeystrokeEvent): void {
 		this.events_.push(event);
-		// `Math.max` defends against out-of-order events; position only moves forward.
+		// Math.max guards against out-of-order events; position only moves forward.
 		this.position_ = Math.max(this.position_, event.position + 1);
 	}
 
-	/** True once every position in the text has been typed. */
 	isComplete(): boolean {
 		return this.position_ >= this.config.text.length;
 	}
 
-	/** Produce a persistable summary from the accumulated events. */
 	finalize(elapsedMs: number): SessionSummary {
 		return buildSessionSummary({
 			events: this.events_,
@@ -131,12 +125,10 @@ export class SessionRunner {
 		});
 	}
 
-	/** Snapshot of events captured so far. Callers should treat as read-only. */
 	get events(): readonly KeystrokeEvent[] {
 		return this.events_;
 	}
 
-	/** Current cursor position (index of the next char to type). */
 	get position(): number {
 		return this.position_;
 	}

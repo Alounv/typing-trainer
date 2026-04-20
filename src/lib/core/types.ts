@@ -1,20 +1,4 @@
-/**
- * Cross-lib domain types.
- *
- * These shapes are referenced by multiple runtime libs (session, practice,
- * progress, settings, storage, bigram, diagnostic). Keeping them in each
- * originating lib was creating type-level back-edges — every lib that
- * needed `SessionSummary` / `BigramAggregate` re-imported from a lib that
- * transitively depended on it.
- *
- * Homing the types here makes `core` a true DAG leaf — no runtime, no
- * imports from other `$lib/*` modules — and lets the value-level graph
- * stay strictly one-way.
- */
-
-// ──────────────────────────────────────────────────────────────
-// Bigram
-// ──────────────────────────────────────────────────────────────
+/** Cross-lib domain types. `core` is a DAG leaf: no runtime, no `$lib/*` imports. */
 
 /**
  * Maps to training prescription: `healthy` (skip) · `fluency` (speed bursts) ·
@@ -50,10 +34,6 @@ export interface BigramAggregate {
 	/** Absent on legacy pre-sliding-window records; consumers fall back to scalars. */
 	samples?: BigramSample[];
 }
-
-// ──────────────────────────────────────────────────────────────
-// Diagnostic
-// ──────────────────────────────────────────────────────────────
 
 /** Structured output of a diagnostic session. */
 export interface DiagnosticReport {
@@ -98,10 +78,6 @@ export interface PriorityBigram {
 	 */
 	classification: Exclude<BigramClassification, 'healthy' | 'unclassified'>;
 }
-
-// ──────────────────────────────────────────────────────────────
-// Session
-// ──────────────────────────────────────────────────────────────
 
 export type SessionType = 'diagnostic' | 'bigram-drill' | 'real-text';
 
@@ -156,10 +132,6 @@ export interface SessionConfig {
  * `targetWPM` over already-accurate fluency targets.
  */
 export type DrillMode = 'accuracy' | 'speed';
-
-// ──────────────────────────────────────────────────────────────
-// Settings
-// ──────────────────────────────────────────────────────────────
 
 export type Language = 'en' | 'fr';
 

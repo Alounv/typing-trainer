@@ -279,7 +279,6 @@
 					{/each}
 				</ul>
 				{#if hasMix}
-					<!-- Legend, aligned in the value column. -->
 					<span></span>
 					<p class="text-[11px] text-base-content/50">
 						<span

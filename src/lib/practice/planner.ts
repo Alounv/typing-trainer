@@ -1,8 +1,3 @@
-/**
- * Daily session planner. Pure: given recent sessions, the latest diagnostic, and
- * graduated bigrams, decides the next single session — diagnostic or N interleaved
- * drill/real-text mini-sessions. The dashboard re-plans on each completion.
- */
 import type { DrillMode, PriorityBigram, SessionConfig, SessionType, UserSettings } from '../core';
 import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
@@ -11,8 +6,6 @@ import {
 } from '../settings';
 import type { SchedulerInput, PlannedSession, PlannedSessionReason } from './types';
 
-// Word-budget trio from user settings with factory defaults. Only the planner needs
-// all three at once; session routes each need only their own type.
 function resolveWordBudgets(settings?: UserSettings) {
 	return {
 		bigramDrill: settings?.wordBudgets?.bigramDrill ?? DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
@@ -92,18 +85,14 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	const accuracyHasTargets = accuracyMix.priority.length > 0 || accuracyMix.exposure.length > 0;
 	const speedHasTargets = speedMix.priority.length > 0;
 
-	// Nothing to drill at all (everything graduated, no undertrained) →
-	// real-text only, one per cycle. Matches the pre-cycle fallback: the
-	// dashboard still has something to offer the user.
+	// Nothing to drill → real-text only, one per cycle.
 	if (!accuracyHasTargets && !speedHasTargets) {
 		return Array.from({ length: CYCLES_PER_DAY }, () =>
 			realtextPlan(budgets.realText, 'no-targets-left')
 		);
 	}
 
-	// Cycle emitter: [accuracy, speed, real-text] per round, skipping drill
-	// slots whose pool is empty. Real-text always runs — it's the transfer
-	// test that closes each cycle and the one slot that shouldn't be skipped.
+	// [accuracy, speed, real-text] per cycle; empty drill slots skipped, real-text always runs.
 	const plan: PlannedSession[] = [];
 	for (let i = 0; i < CYCLES_PER_DAY; i++) {
 		if (accuracyHasTargets) plan.push(drillPlan(accuracyMix, 'accuracy', budgets.bigramDrill));
@@ -113,8 +102,7 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	return plan;
 }
 
-// Count of non-diagnostic sessions between now and the most recent diagnostic.
-// `recentSessions` is newest-first. Returns Infinity if none found → "definitely due".
+// Infinity if no diagnostic found → "definitely due". `recent` is newest-first.
 function sessionsSinceLastDiagnostic(recent: readonly { type: string }[]): number {
 	for (let i = 0; i < recent.length; i++) {
 		if (recent[i].type === 'diagnostic') return i;

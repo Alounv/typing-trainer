@@ -1,15 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Drill-mix UI: verifies that the priority/exposure split from the planner
- * surfaces correctly on both the dashboard card and the in-session header —
- * the "explicit to the user" requirement.
- *
- * Seeds `sessionStorage` with a crafted `PlannedSession` rather than running
- * a full diagnostic, because (a) we need a deterministic mix and (b) the
- * diagnostic's classifier lands all Playwright-typed bigrams as `healthy`,
- * producing an empty priority list with no exposure either. The drill
- * route's hand-off is the seam this test exploits.
+ * Drill-mix UI: priority/exposure split surfaces on dashboard card + in-session header.
+ * Seeds `sessionStorage` with a crafted `PlannedSession` — deterministic, and avoids the diagnostic
+ * classifier landing every Playwright-typed bigram `healthy` (empty priority, no exposure).
  */
 
 const HANDOFF_KEY = 'scheduler.pendingPlannedSession';
@@ -25,11 +19,7 @@ async function stashDrillPlan(page: Page, mix: SeededMix): Promise<void> {
 			type: 'bigram-drill',
 			wordBudget: 20,
 			bigramsTargeted: [...mix.priority, ...mix.exposure],
-			// Both fixtures are accuracy-mode: undertrained/exposure backfill is
-			// an accuracy-mode concern, and priority hasty/acquisition targets
-			// likewise. The dedicated speed route would carry its own fixtures
-			// (fluency-only, no exposure) — keeping the coverage focused rather
-			// than duplicating the whole test file per mode.
+			// Exposure backfill is accuracy-only; speed route would need its own fluency-only fixtures.
 			drillMode: 'accuracy'
 		},
 		reason: 'default-drill',
@@ -55,19 +45,14 @@ test('mixed drill: priority chips filled, exposure chips dashed, legend visible'
 
 	await page.goto('/session/accuracy-drill');
 
-	// Chips surface aria-labels per source — the semantic hook the UI uses to
-	// carry the priority/exposure distinction to assistive tech. These are now
-	// the only place the priority-vs-exposure distinction appears in text
-	// (the `what` header that used to spell it out was removed — the title +
-	// chip list are enough to convey mix composition).
+	// aria-labels carry priority/exposure distinction (sole textual surface after header removal).
 	const drillList = page.getByRole('list', { name: 'Drill targets' });
 	await expect(drillList.getByLabel('th, diagnosed weakness')).toBeVisible();
 	await expect(drillList.getByLabel('he, diagnosed weakness')).toBeVisible();
 	await expect(drillList.getByLabel('an, new bigram for exposure practice')).toBeVisible();
 	await expect(drillList.getByLabel('in, new bigram for exposure practice')).toBeVisible();
 
-	// Legend appears only in mixed cases; pin the copy so a refactor that
-	// renames "new bigram" in one place and not the other breaks this test.
+	// Legend appears only for mixed lists; pin copy to catch a rename-in-one-place-only refactor.
 	await expect(page.getByText(/new bigram — not enough data yet/i)).toBeVisible();
 });
 

@@ -11,11 +11,7 @@ interface AnnotatedKeystrokeEvent extends KeystrokeEvent {
 	correctionDelay: number;
 }
 
-/**
- * Collapse raw events into first-input-per-position annotations. Pure.
- * The 500ms correction window is UI-only; offline analytics credit any
- * correction regardless of delay.
- */
+/** Collapses raw events into first-input-per-position annotations. Analytics credit any correction regardless of delay. */
 export function annotateFirstInputs(events: readonly KeystrokeEvent[]): AnnotatedKeystrokeEvent[] {
 	const buckets = new Map<number, KeystrokeEvent[]>();
 	for (const e of events) {

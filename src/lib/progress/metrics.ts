@@ -138,8 +138,6 @@ export function buildBigramTrend(
 	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
 	for (const s of ordered) {
 		const agg = s.bigramAggregates.find((a) => a.bigram === bigram);
-		// Skip sessions where we didn't have a clean sample — drawing a flat
-		// line at 0 or NaN would be worse than a shorter series.
 		if (!agg || !Number.isFinite(agg.meanTime)) continue;
 		points.push({
 			sessionId: s.id,
@@ -197,8 +195,7 @@ export function aggregateLastNOccurrences(
 		if (!agg || !agg.samples) continue;
 		const remaining = window - pooled.length;
 		if (remaining <= 0) break;
-		// Take the tail of each session so the window tracks the user's most
-		// recent attempts within a long session, not its warm-up.
+		// Take session tail so the window tracks recent attempts, not warm-up.
 		const tail = agg.samples.slice(Math.max(0, agg.samples.length - remaining));
 		pooled.push(...tail);
 		if (pooled.length >= window) break;
