@@ -1,12 +1,13 @@
 import type { CorpusData } from '../corpus';
 
 /**
- * Bigram drill sequence: target-bearing words (70%) interleaved with filler (30%).
+ * Bigram drill sequence: every word carries at least one target bigram. Filler
+ * words are only a fallback when the corpus produces no target-bearing matches
+ * (e.g. a rare or nonexistent target like "zz") — otherwise the drill stays
+ * 100% target-bearing so keystrokes always exercise the diagnosed weakness.
  * Pure — no timing or pacing. Session runner handles those at drill-time.
  */
 
-/** Default: 70% target-bearing, 30% filler. */
-const DEFAULT_TARGET_RATIO = 0.7;
 /** Default sequence length — enough for a 5-minute session at ~50–80 WPM. */
 const DEFAULT_WORD_COUNT = 80;
 
@@ -20,8 +21,6 @@ export interface BigramDrillInput {
 export interface BigramDrillOptions {
 	/** Total words to generate. Defaults to {@link DEFAULT_WORD_COUNT}. */
 	wordCount?: number;
-	/** Target-word ratio, default 0.7. Clamped to [0, 1] — tolerant of stray slider input. */
-	targetRatio?: number;
 	/** Injectable RNG for tests. Defaults to `Math.random`. */
 	rng?: () => number;
 }
@@ -37,8 +36,8 @@ export interface BigramDrillSequence {
 
 /**
  * Weight scheme: target words = `freq × distinct-targets-contained` (rewards words
- * stressing multiple targets). Filler = freq only — filler exists to keep
- * mechanical rhythm realistic, which 70/30 is designed to protect.
+ * stressing multiple targets). Filler weights are frequency-only and only used
+ * in the degraded no-target-bearing-words case.
  */
 export function generateBigramDrillSequence(input: BigramDrillInput): BigramDrillSequence {
 	if (input.targetBigrams.length === 0) {
@@ -46,7 +45,6 @@ export function generateBigramDrillSequence(input: BigramDrillInput): BigramDril
 	}
 	const options = input.options ?? {};
 	const wordCount = options.wordCount ?? DEFAULT_WORD_COUNT;
-	const ratio = clamp(options.targetRatio ?? DEFAULT_TARGET_RATIO, 0, 1);
 	const rng = options.rng ?? Math.random;
 
 	const { targets, fillers } = partitionCorpus(input.corpus, input.targetBigrams);
@@ -56,17 +54,22 @@ export function generateBigramDrillSequence(input: BigramDrillInput): BigramDril
 		throw new Error('generateBigramDrillSequence: corpus produced no usable words');
 	}
 
+	// 100% target-bearing by construction: the target pool wins whenever it
+	// has anything in it. Filler only fills the whole sequence when the
+	// corpus has no target-bearing words at all (e.g. target "zz"), which
+	// is a degraded state preserved only to avoid an empty drill.
+	const useTargetPool = targets.length > 0;
+	const pool = useTargetPool ? targets : fillers;
+
 	const words: string[] = [];
 	let targetWordCount = 0;
 	let fillerWordCount = 0;
 	const distinctTargets = new Set<string>();
 
 	for (let i = 0; i < wordCount; i++) {
-		const useTarget = (targets.length > 0 && rng() < ratio) || fillers.length === 0;
-		const pool = useTarget ? targets : fillers;
 		const picked = pickWeighted(pool, rng);
 		words.push(picked);
-		if (useTarget) {
+		if (useTargetPool) {
 			targetWordCount++;
 			for (const t of input.targetBigrams) {
 				if (wordMatchesTarget(picked, t)) distinctTargets.add(t);
@@ -156,6 +159,3 @@ function pickWeighted(pool: readonly WeightedWord[], rng: () => number): string 
 	return pool[pool.length - 1].word;
 }
 
-function clamp(value: number, min: number, max: number): number {
-	return Math.max(min, Math.min(max, value));
-}

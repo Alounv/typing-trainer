@@ -24,7 +24,7 @@ export const ACCURACY_PACE_MULTIPLIER = 0.6;
  * targetWPM the diagnostic report already surfaces. Kept as its own constant
  * here so the two callers don't fight over a shared name if one drifts.
  */
-export const SPEED_PACE_MULTIPLIER = 1.17;
+export const SPEED_PACE_MULTIPLIER = 1;
 
 /**
  * Pacer WPM for a drill session. Returns 0 when inputs are unusable — the

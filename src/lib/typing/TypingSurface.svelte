@@ -28,6 +28,10 @@
 		errorPositions?: ReadonlySet<number>;
 		correctedPositions?: ReadonlySet<number>;
 		ghostPosition?: number;
+		/** Forwarded to TextDisplay so the ghost overlay's CSS slide matches the pace. */
+		ghostTransitionMs?: number;
+		/** Forwarded: `ahead` for speed drills, `behind` for accuracy drills. */
+		ghostVisibility?: 'ahead' | 'behind';
 		/** Auto-focus the surface on mount. Default: true. */
 		autoFocus?: boolean;
 		/**
@@ -46,6 +50,8 @@
 		errorPositions,
 		correctedPositions,
 		ghostPosition,
+		ghostTransitionMs,
+		ghostVisibility,
 		autoFocus = true,
 		announceErrors = false,
 		onEvent,
@@ -78,7 +84,15 @@
 	<!-- aria-hidden: the input's aria-label carries the full text; we don't
 	     want a screen reader to announce 100+ per-character spans. -->
 	<div aria-hidden="true">
-		<TextDisplay {text} {position} {errorPositions} {correctedPositions} {ghostPosition} />
+		<TextDisplay
+			{text}
+			{position}
+			{errorPositions}
+			{correctedPositions}
+			{ghostPosition}
+			{ghostTransitionMs}
+			{ghostVisibility}
+		/>
 	</div>
 
 	<!--

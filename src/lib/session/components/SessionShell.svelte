@@ -127,6 +127,17 @@
 	const ghostPosition = $derived(
 		paceWPM > 0 && running ? computeGhostPosition(elapsedMs, paceWPM) : undefined
 	);
+	// ms-per-char at the current pace. Passed to TextDisplay so the ghost
+	// overlay's CSS transition takes exactly that long to slide between
+	// consecutive chars — the next boundary arrives precisely when the
+	// slide ends, producing continuous motion. 5 chars = 1 word.
+	const ghostTransitionMs = $derived(paceWPM > 0 ? 60_000 / (paceWPM * 5) : 0);
+	// Speed drills want forward pressure (ghost ahead); accuracy drills
+	// want slow-down pressure (ghost behind, visible only when the user
+	// has outrun the target pace).
+	const ghostVisibility = $derived<'ahead' | 'behind'>(
+		drillMode === 'accuracy' ? 'behind' : 'ahead'
+	);
 
 	function onEvent(event: KeystrokeEvent) {
 		if (sessionStart === null) {
@@ -168,16 +179,22 @@
 		}
 	}
 
-	// Clock. Ticks at 200ms — fast enough for the WPM readout to feel
-	// live, slow enough that re-computing doesn't thrash on every
-	// keystroke. `performance.now()` for spec-level precision.
+	// Clock. Driven by requestAnimationFrame so the pacer ghost advances
+	// in lockstep with the display refresh — at 200ms setInterval cadence
+	// the ghost visibly stutters next to the real cursor (which moves on
+	// every keystroke). rAF is cheap here: Svelte's fine-grained reactivity
+	// only re-renders the Timer's mm:ss span when the second rolls over,
+	// and only repaints the ghost when its char index changes.
 	$effect(() => {
 		if (!running) return;
 		const anchor = performance.now() - elapsedMs;
-		const id = window.setInterval(() => {
+		let frame = 0;
+		const tick = () => {
 			elapsedMs = performance.now() - anchor;
-		}, 200);
-		return () => window.clearInterval(id);
+			frame = window.requestAnimationFrame(tick);
+		};
+		frame = window.requestAnimationFrame(tick);
+		return () => window.cancelAnimationFrame(frame);
 	});
 </script>
 
@@ -300,6 +317,8 @@
 			{errorPositions}
 			{correctedPositions}
 			{ghostPosition}
+			{ghostTransitionMs}
+			{ghostVisibility}
 			{onEvent}
 		/>
 	</div>

@@ -65,37 +65,22 @@ describe('generateBigramDrillSequence', () => {
 		expect(seq.words).toHaveLength(4);
 	});
 
-	it('respects 70/30 ratio under uniform RNG', () => {
-		// Deterministic RNG: half < 0.7, half ≥ 0.7, cycling.
-		// With wordCount large enough, target/filler should sit near the 70/30 split.
+	it('emits 100% target-bearing words when the target pool is populated', () => {
+		// No ratio knob any more — the drill is 100% target-bearing by design.
+		// Varying RNG across [0,1) must not shift any pick into the filler pool.
 		const seq = generateBigramDrillSequence({
 			targetBigrams: ['th'],
 			corpus: corpus('the of to and a in is it you that he was for on are with as his they be'),
 			options: {
 				wordCount: 100,
-				// Deterministic uniform over [0, 1): i / 100 covers the range.
-
 				rng: (() => {
 					let i = 0;
 					return () => (i++ % 100) / 100;
 				})()
 			}
 		});
-		// 70 picks should be <0.7 → target; 30 picks ≥0.7 → filler.
-		expect(seq.stats.targetWords).toBe(70);
-		expect(seq.stats.fillerWords).toBe(30);
-	});
-
-	it('clamps out-of-range targetRatio', () => {
-		// Ratio of 2.0 → clamped to 1.0 → all target picks.
-		const seq = generateBigramDrillSequence({
-			targetBigrams: ['th'],
-			corpus: corpus('the of to and'),
-			options: { wordCount: 10, targetRatio: 2, rng: () => 0.99 }
-		});
-		// Every `rng()` returns 0.99 ≥ clamped 1.0 → but since ratio clamped to 1,
-		// the `useTarget` check is `rng() < 1.0` which is always true → all target.
-		expect(seq.stats.targetWords).toBe(10);
+		expect(seq.stats.targetWords).toBe(100);
+		expect(seq.stats.fillerWords).toBe(0);
 	});
 
 	it('populates distinctTargets with unique target bigrams the picks stressed', () => {
@@ -109,17 +94,16 @@ describe('generateBigramDrillSequence', () => {
 	});
 
 	it('ignores target bigrams shorter than 2 chars (symmetric with selection.ts)', () => {
-		// Single-char "target" shouldn't partition — word goes to filler.
+		// Single-char "target" shouldn't partition — 'apple' stays in filler.
 		const seq = generateBigramDrillSequence({
 			targetBigrams: ['a', 'th'],
 			corpus: corpus('apple the'),
 			options: { wordCount: 20, rng: () => 0 }
 		});
-		// 'apple' contains no valid target ('th' isn't in it) → filler;
-		// 'the' contains 'th' → target.
-		// With the 70/30 ratio and rng=0 always picking target bucket,
-		// we expect mostly 'the'.
-		expect(seq.words.filter((w) => w === 'the').length).toBeGreaterThan(0);
+		// 'apple' has no valid target ('th' isn't in it) → filler; 'the'
+		// contains 'th' → target. Drill is 100% target-bearing, so every
+		// pick must be 'the'.
+		expect(seq.words.every((w) => w === 'the')).toBe(true);
 	});
 
 	it('treats a leading-space target as "word starts with letter"', () => {
@@ -129,10 +113,10 @@ describe('generateBigramDrillSequence', () => {
 		const seq = generateBigramDrillSequence({
 			targetBigrams: [' a'],
 			corpus: corpus('apple banana cherry almond'),
-			options: { wordCount: 40, rng: () => 0, targetRatio: 1 }
+			options: { wordCount: 40, rng: () => 0 }
 		});
-		// Target pool = words starting with 'a' → 'apple', 'almond'.
-		// With ratio=1 every pick is from that pool.
+		// Target pool = words starting with 'a' → 'apple', 'almond'. Every
+		// pick is from that pool.
 		const targetStarts = seq.words.filter((w) => w.startsWith('a')).length;
 		expect(targetStarts).toBe(seq.words.length);
 		expect(seq.stats.distinctTargets).toBe(1);
@@ -144,7 +128,7 @@ describe('generateBigramDrillSequence', () => {
 		const seq = generateBigramDrillSequence({
 			targetBigrams: ['e '],
 			corpus: corpus('apple table of the tree'),
-			options: { wordCount: 40, rng: () => 0, targetRatio: 1 }
+			options: { wordCount: 40, rng: () => 0 }
 		});
 		const targetEnds = seq.words.filter((w) => w.endsWith('e')).length;
 		expect(targetEnds).toBe(seq.words.length);
@@ -157,7 +141,7 @@ describe('generateBigramDrillSequence', () => {
 		const seq = generateBigramDrillSequence({
 			targetBigrams: ['  ', 'th'],
 			corpus: corpus('the other thing'),
-			options: { wordCount: 10, rng: () => 0, targetRatio: 1 }
+			options: { wordCount: 10, rng: () => 0 }
 		});
 		// Only 'th' is a valid matchable target here.
 		expect(seq.stats.distinctTargets).toBeLessThanOrEqual(1);

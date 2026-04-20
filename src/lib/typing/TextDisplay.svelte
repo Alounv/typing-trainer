@@ -25,11 +25,32 @@
 		/** Subset of `errorPositions` where the user later typed the correct char. */
 		correctedPositions?: ReadonlySet<number>;
 		/**
-		 * Optional pacer ghost position. When set and strictly ahead of
-		 * `position`, the char at that index gets a secondary highlight
-		 * marking "where the pacer expects you to be".
+		 * Optional pacer ghost position. When set, an overlay bar is drawn
+		 * at that char marking "where the pacer expects you to be". The bar
+		 * slides between positions via a CSS transition — see
+		 * `ghostTransitionMs`. Whether it renders when ahead or behind the
+		 * user is controlled by `ghostVisibility`.
 		 */
 		ghostPosition?: number;
+		/**
+		 * Duration of the ghost overlay's inter-char slide, in ms. Set by
+		 * the parent to the pace's ms-per-char so the ghost arrives at the
+		 * next character exactly when it's due, producing continuous motion
+		 * instead of char-to-char snaps. Defaults to 150ms for a visible
+		 * glide when the caller doesn't know the pace.
+		 */
+		ghostTransitionMs?: number;
+		/**
+		 * Which side of the cursor the ghost is allowed to appear on.
+		 * - `ahead` (speed drills): visible only when strictly *ahead* — its
+		 *   job is to pull the user forward; hiding it once the user catches
+		 *   up removes the pressure and signals "you made it."
+		 * - `behind` (accuracy drills): visible only when strictly *behind*
+		 *   — its job is to apply slow-down pressure; it only shows how far
+		 *   the user has over-sped past the target pace.
+		 * Defaults to `ahead` to match the historical behavior.
+		 */
+		ghostVisibility?: 'ahead' | 'behind';
 	}
 
 	let {
@@ -37,7 +58,9 @@
 		position,
 		errorPositions = new Set<number>(),
 		correctedPositions = new Set<number>(),
-		ghostPosition
+		ghostPosition,
+		ghostTransitionMs = 150,
+		ghostVisibility = 'ahead'
 	}: Props = $props();
 
 	// Per-keystroke hot path: we deliberately do NOT build a $derived array
@@ -107,6 +130,13 @@
 	 */
 	let cursorRect = $state({ x: 0, y: 0, w: 0, h: 0, ready: false });
 
+	/**
+	 * Pacer ghost geometry, same pattern as `cursorRect`. Hidden (via
+	 * `ready = false`) whenever the ghost is behind the user or absent —
+	 * the overlay shouldn't render *on* the user's cursor.
+	 */
+	let ghostRect = $state({ x: 0, y: 0, w: 0, h: 0, ready: false });
+
 	$effect(() => {
 		// Re-run when position changes. Relies on the viewport being
 		// `position: relative` so the span's `offsetTop` is measured from
@@ -140,6 +170,37 @@
 			top: lineTop,
 			behavior: prefersReducedMotion() ? 'instant' : 'smooth'
 		});
+	});
+
+	/**
+	 * Ghost overlay placement. Same measurement strategy as the cursor,
+	 * but keyed on `ghostPosition`. Guarded on `ghostPosition > position`
+	 * so the ghost disappears once the user catches up rather than
+	 * sitting beneath the cursor bar.
+	 */
+	$effect(() => {
+		if (!viewportEl) return;
+		// Visibility is side-dependent: `ahead` hides once the user catches
+		// up to or passes the ghost; `behind` hides while the user is still
+		// at or behind it. Equality hides in both cases so the overlay never
+		// sits directly beneath the cursor bar.
+		const hidden =
+			ghostPosition === undefined ||
+			(ghostVisibility === 'ahead' ? ghostPosition <= position : ghostPosition >= position);
+		if (hidden) {
+			ghostRect = { x: 0, y: 0, w: 0, h: 0, ready: false };
+			return;
+		}
+		const spans = viewportEl.getElementsByTagName('span');
+		const ghostSpan = spans[ghostPosition as number] as HTMLElement | undefined;
+		if (!ghostSpan) return;
+		ghostRect = {
+			x: ghostSpan.offsetLeft,
+			y: ghostSpan.offsetTop,
+			w: ghostSpan.offsetWidth,
+			h: ghostSpan.offsetHeight,
+			ready: true
+		};
 	});
 
 	/**
@@ -188,17 +249,32 @@
 		aria-hidden="true"
 	></div>
 
+	<!--
+		Pacer ghost overlay. Draws beneath the char glyphs (the spans sit in
+		a sibling div with higher stacking via default flow order + the z-0
+		we leave implicit on the ghost). Transition duration is supplied by
+		the parent as ms-per-char so the slide across a character completes
+		exactly as the ghost is due to arrive at the next one — visually
+		continuous motion rather than per-frame snaps.
+	-->
+	<div
+		class="pointer-events-none absolute top-0 left-0 rounded-sm border-b border-secondary/60 bg-secondary/15 transition-[transform,width,height,opacity] ease-linear motion-reduce:transition-none"
+		style="transform: translate({ghostRect.x}px, {ghostRect.y}px); width: {ghostRect.w}px; height: {ghostRect.h}px; opacity: {ghostRect.ready
+			? 1
+			: 0}; transition-duration: {ghostTransitionMs}ms"
+		aria-hidden="true"
+		data-testid="pacer-ghost"
+	></div>
+
 	<div class="whitespace-pre-wrap">
 		{#each text as char, i (i)}
 			{@const state = stateFor(i, position, errorPositions, correctedPositions)}
-			{@const ghost = ghostPosition !== undefined && i === ghostPosition && i > position}
 			<span
 				class="relative transition-colors duration-75 motion-reduce:transition-none {stateClasses[
 					state
-				]} {ghost ? 'rounded-sm border-b border-secondary/60 bg-secondary/15' : ''}"
+				]}"
 				data-state={state}
-				data-pos={i}
-				data-ghost={ghost || undefined}>{char}</span
+				data-pos={i}>{char}</span
 			>
 		{/each}
 	</div>
