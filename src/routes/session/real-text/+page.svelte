@@ -36,7 +36,6 @@
 		type="real-text"
 		text={state.text}
 		title="Real text"
-		what="Literary prose in your language, drawn from the quote bank. Real sentence structure, real punctuation, real rhythm."
 		approach="Where drill precision becomes typing flow. Keep moving; errors are recorded but never blocking."
 	/>
 {/if}

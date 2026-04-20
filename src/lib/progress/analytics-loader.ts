@@ -23,7 +23,7 @@ const SESSION_CAP = 500;
  * is missing or points at a no-longer-supported corpus. */
 const FALLBACK_CORPUS_ID = 'en';
 
-export interface AnalyticsInputs {
+interface AnalyticsInputs {
 	sessions: SessionSummary[];
 	profile: UserSettings | undefined;
 	/** `undefined` when the corpus chunk failed to load — consumers treat it as "no frequency weighting". */

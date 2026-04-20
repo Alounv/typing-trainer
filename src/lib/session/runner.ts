@@ -8,7 +8,7 @@ import type { DrillMode, SessionSummary, SessionType } from '../core';
  * `events` is the raw log (retypes included); this function annotates them
  * before bigram extraction so callers don't have to remember that.
  */
-export interface BuildSessionSummaryInput {
+interface BuildSessionSummaryInput {
 	events: readonly KeystrokeEvent[];
 	type: SessionType;
 	/** Total drill length in characters — needed because `events` only covers what the user actually typed if they aborted. */
@@ -71,7 +71,7 @@ function computeErrorRate(annotated: readonly { expected: string; actual: string
 // SessionRunner: plain TS lifecycle manager for an in-flight session.
 // UI wraps getter output in its own reactive state.
 
-export interface SessionRunnerConfig {
+interface SessionRunnerConfig {
 	type: SessionType;
 	text: string;
 	/**

@@ -6,7 +6,7 @@ import type { CorpusConfig, CorpusData, FrequencyTable } from './types';
  * missing weights → equal split.
  */
 
-export interface MergeOptions {
+interface MergeOptions {
 	/** Parallel to `corpora`. Missing/mismatched → equal. Non-finite/negative → 0. */
 	weights?: readonly number[];
 	/** Id for merged config. Defaults to `merge:a+b+…`. */

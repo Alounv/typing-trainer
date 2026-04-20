@@ -5,7 +5,7 @@ import { normalizeTypographicChars } from './normalize';
 export const MIN_CUSTOM_BIGRAMS = 500;
 
 /** Result of importing a block of user text. */
-export interface CustomCorpusImport {
+interface CustomCorpusImport {
 	data: CorpusData;
 	stats: {
 		/** Tokens after tokenization; may differ from whitespace-split if punctuation was stripped. */
@@ -23,7 +23,7 @@ export interface CustomCorpusImport {
 	missingFromBase?: string[];
 }
 
-export interface ImportOptions {
+interface ImportOptions {
 	/** Id for the resulting `CorpusConfig`. Defaults to `'custom'`. */
 	id?: string;
 	/** Language label; `'custom'` when unknown. */

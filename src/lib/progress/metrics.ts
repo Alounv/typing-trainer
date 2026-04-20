@@ -52,11 +52,11 @@ export function rollingStdDev(values: readonly number[], window: number): (numbe
 /** Smoothing window for WPM trend. Spec §10.6 calls for a 7-session average. */
 export const WPM_ROLLING_WINDOW = 7;
 /** Sparkline depth for per-bigram mean transition time. Spec §10.6. */
-export const BIGRAM_SPARKLINE_DEPTH = 8;
+const BIGRAM_SPARKLINE_DEPTH = 8;
 
 /** Pooled-samples window for per-bigram classification. Big enough to resist
  *  single-session outliers, small enough to track recent behavior. */
-export const BIGRAM_CLASSIFICATION_WINDOW = 50;
+const BIGRAM_CLASSIFICATION_WINDOW = 50;
 
 /**
  * Single point on a per-session trend chart. Shared shape across metrics so
@@ -84,7 +84,7 @@ export type WpmPoint = TrendPoint & { wpm: number };
  * Generic trend builder. Sessions can be in any order; the series is emitted
  * oldest-first so rolling windows look at the past, not the future.
  */
-export function buildMetricSeries(
+function buildMetricSeries(
 	sessions: readonly SessionSummary[],
 	accessor: (s: SessionSummary) => number
 ): TrendPoint[] {
@@ -172,7 +172,7 @@ export interface BigramSummary {
 	trend: BigramTrendPoint[];
 }
 
-export interface RollingBigramAggregate {
+interface RollingBigramAggregate {
 	occurrences: number;
 	meanTime: number;
 	errorRate: number;

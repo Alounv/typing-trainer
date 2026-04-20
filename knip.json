@@ -2,18 +2,13 @@
 	"$schema": "https://unpkg.com/knip@6/schema.json",
 	"entry": [
 		"src/app.html",
-		"src/app.d.ts",
-		"src/hooks.{client,server}.{ts,js}",
 		"src/routes/**/+{page,layout,error}.{svelte,ts,js}",
-		"src/routes/**/+{page,layout}.server.{ts,js}",
-		"src/routes/**/+server.{ts,js}",
 		"vite.config.{ts,js}",
 		"svelte.config.{js,ts}",
 		"playwright.config.{ts,js}",
 		"eslint.config.{js,ts}",
-		"tests/**/*.{ts,js}",
 		"e2e/**/*.{ts,js}"
 	],
 	"project": ["src/**/*.{ts,js,svelte}"],
-	"ignoreBinaries": ["tsgo"]
+	"ignoreDependencies": ["daisyui", "tailwindcss"]
 }

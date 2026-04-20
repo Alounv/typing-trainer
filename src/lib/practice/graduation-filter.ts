@@ -9,7 +9,7 @@ import type { BigramAggregate } from '../core';
 export const CONSECUTIVE_HEALTHY_SESSIONS = 3;
 
 /** Injectable so tests can pass a pure fixture; prod passes `getBigramHistory`. */
-export type BigramHistoryLookup = (bigram: string) => Promise<BigramAggregate[]>;
+type BigramHistoryLookup = (bigram: string) => Promise<BigramAggregate[]>;
 
 /**
  * Subset of `candidates` to drop from rotation. A bigram graduates when its most

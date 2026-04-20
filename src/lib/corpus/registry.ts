@@ -8,8 +8,7 @@ import { normalizeTypographicChars } from './normalize';
  * share a single language-level table — the bigram distribution is a
  * property of the language, not the wordlist.
  */
-export const BIGRAM_LANGUAGES = ['en', 'fr'] as const;
-export type BigramLanguage = (typeof BIGRAM_LANGUAGES)[number];
+type BigramLanguage = 'en' | 'fr';
 
 const BIGRAM_LOADERS: Record<BigramLanguage, () => Promise<FrequencyTable>> = {
 	en: async () => {
@@ -99,7 +98,7 @@ export async function loadBuiltinCorpus(id: BuiltinCorpusId): Promise<CorpusData
  * (or a custom corpus) — we shouldn't pretend quotes are always available.
  */
 export const QUOTE_BANK_LANGUAGES = ['en', 'fr'] as const;
-export type QuoteBankLanguage = (typeof QUOTE_BANK_LANGUAGES)[number];
+type QuoteBankLanguage = (typeof QUOTE_BANK_LANGUAGES)[number];
 
 const QUOTE_LOADERS: Record<QuoteBankLanguage, () => Promise<QuoteBank>> = {
 	/*

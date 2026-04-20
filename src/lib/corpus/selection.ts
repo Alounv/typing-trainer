@@ -17,7 +17,7 @@ const DEFAULT_WORD_COUNT = 12;
  */
 const TARGET_BOOST = 5;
 
-export interface SelectionOptions {
+interface SelectionOptions {
 	/** How many words in the synthesized sentence. Minimum 8 enforced. */
 	wordCount?: number;
 	/** Words containing these bigrams get a frequency boost. Empty → no bias. */

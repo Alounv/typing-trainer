@@ -4,7 +4,7 @@ import type { KeystrokeEvent } from './types';
  * Keystroke event after correction lookahead. One per position (the first input);
  * retypes collapse into the annotations on that event.
  */
-export interface AnnotatedKeystrokeEvent extends KeystrokeEvent {
+interface AnnotatedKeystrokeEvent extends KeystrokeEvent {
 	/** True if the user retyped a correct character at this position later. */
 	corrected: boolean;
 	/** Ms between the first input and the correcting retype. 0 if never corrected. */

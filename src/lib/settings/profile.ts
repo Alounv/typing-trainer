@@ -57,22 +57,11 @@ export function withDefaults(stored: UserSettings): UserSettings {
 /**
  * Raw profile as stored. `undefined` before first save (pre-onboarding) —
  * preserved so callers that care about that distinction (e.g. "is this a
- * fresh user?") can still detect it. Most callers should use
- * `loadProfile()` instead, which applies defaults.
+ * fresh user?") can still detect it.
  */
 export async function getProfile(): Promise<UserSettings | undefined> {
 	const record = await db.profile.get(SINGLETON_ID);
 	return record?.settings;
-}
-
-/**
- * Profile with defaults applied — a ready-to-consume shape for anything
- * that just needs "the current settings" without caring whether the user
- * has saved yet.
- */
-export async function loadProfile(): Promise<UserSettings> {
-	const stored = await getProfile();
-	return stored ? withDefaults(stored) : buildDefaultProfile();
 }
 
 export async function saveProfile(settings: UserSettings): Promise<void> {

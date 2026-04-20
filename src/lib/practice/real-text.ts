@@ -18,7 +18,7 @@ const QUOTE_SEPARATOR = ' ';
 /** 1400 chars ≈ 5 min at 60 WPM. */
 const DEFAULT_TARGET_LENGTH_CHARS = 1400;
 
-export interface RealTextInput {
+interface RealTextInput {
 	/** Preferred source: a quote bank for the session's language. */
 	quoteBank?: QuoteBank;
 	/** Fallback when no quote bank. Both omitted → throws. */
@@ -28,7 +28,7 @@ export interface RealTextInput {
 	options?: RealTextOptions;
 }
 
-export interface RealTextOptions {
+interface RealTextOptions {
 	/** Target character count; default 1400. Actual output may exceed by one chunk. */
 	targetLengthChars?: number;
 	/** Length-bucket filter for the quote path. Ignored by the word-synth fallback. */
@@ -42,11 +42,11 @@ export interface RealTextOptions {
 }
 
 /** Provenance of each assembled chunk — lets UI render source lines. */
-export type RealTextSegment =
+type RealTextSegment =
 	| { kind: 'quote'; text: string; quote: Quote }
 	| { kind: 'synth'; text: string };
 
-export interface RealTextSequence {
+interface RealTextSequence {
 	/** Concatenated passage — feeds directly into the typing surface. */
 	text: string;
 	segments: RealTextSegment[];

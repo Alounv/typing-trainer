@@ -18,10 +18,3 @@ export interface CaptureConfig {
 	text: string;
 	correctionWindowMs?: number;
 }
-
-/**
- * A backspace within this window of the mistyped keystroke counts as a
- * correction of that keystroke. Beyond it, the backspace is an independent
- * edit and the original error stays on the record.
- */
-export const DEFAULT_CORRECTION_WINDOW_MS = 500;

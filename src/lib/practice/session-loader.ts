@@ -50,7 +50,7 @@ const RECENT_WINDOW = 20;
  */
 const SEED_TARGETS = ['th', 'he', 'in', 'er', 'an'] as const;
 
-export interface BigramDrillSessionInputs {
+interface BigramDrillSessionInputs {
 	text: string;
 	targets: readonly string[];
 	/** Subset of `targets` backfilled as exposure; empty for pure-priority drills. */
@@ -69,11 +69,11 @@ export interface BigramDrillSessionInputs {
 	baselineWPM: number;
 }
 
-export interface RealTextSessionInputs {
+interface RealTextSessionInputs {
 	text: string;
 }
 
-export interface DiagnosticSessionInputs {
+interface DiagnosticSessionInputs {
 	text: string;
 	corpusBigramFrequencies: FrequencyTable;
 }

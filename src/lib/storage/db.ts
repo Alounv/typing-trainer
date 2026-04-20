@@ -19,7 +19,7 @@ export interface ProfileRecord {
  *
  * To migrate: bump `version(n)` with a new `.stores(...)` — never mutate v1.
  */
-export class TypingTrainerDB extends Dexie {
+class TypingTrainerDB extends Dexie {
 	sessions!: EntityTable<SessionSummary, 'id'>;
 	bigramRecords!: EntityTable<BigramAggregate & { key: string }, 'key'>;
 	profile!: EntityTable<ProfileRecord, 'id'>;

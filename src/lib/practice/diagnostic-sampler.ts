@@ -10,7 +10,7 @@ import { generateRealTextSequence } from './real-text';
 /** ~5–8 min of typing at 60 WPM — enough samples per top bigram without dragging. */
 export const DEFAULT_DIAGNOSTIC_CHAR_TARGET = 700;
 
-export interface DiagnosticSamplerOptions {
+interface DiagnosticSamplerOptions {
 	/** Overrides the default char target (mostly for tests). */
 	targetChars?: number;
 	/** Injectable RNG so tests and replay can pin output. */
@@ -23,7 +23,7 @@ export interface DiagnosticSamplerOptions {
 	quoteBank?: QuoteBank;
 }
 
-export interface DiagnosticPassage {
+interface DiagnosticPassage {
 	text: string;
 	stats: {
 		chars: number;

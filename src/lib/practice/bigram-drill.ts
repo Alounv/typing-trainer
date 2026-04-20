@@ -11,21 +11,21 @@ import type { CorpusData } from '../corpus';
 /** Default sequence length — enough for a 5-minute session at ~50–80 WPM. */
 const DEFAULT_WORD_COUNT = 80;
 
-export interface BigramDrillInput {
+interface BigramDrillInput {
 	/** Bigrams to drill. Caller has already ranked/filtered; empty array throws. */
 	targetBigrams: readonly string[];
 	corpus: CorpusData;
 	options?: BigramDrillOptions;
 }
 
-export interface BigramDrillOptions {
+interface BigramDrillOptions {
 	/** Total words to generate. Defaults to {@link DEFAULT_WORD_COUNT}. */
 	wordCount?: number;
 	/** Injectable RNG for tests. Defaults to `Math.random`. */
 	rng?: () => number;
 }
 
-export interface BigramDrillSequence {
+interface BigramDrillSequence {
 	/** Flat space-joined string — feeds the typing surface directly. */
 	text: string;
 	/** Same content as `text`, split into individual words. */

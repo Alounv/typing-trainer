@@ -38,7 +38,7 @@ export interface DashboardData {
 	recentSessions: readonly SessionSummary[];
 }
 
-export interface DashboardLoadOptions {
+interface DashboardLoadOptions {
 	/**
 	 * Optional pre-fetched recent sessions. Passed in by the summary page so
 	 * the delta + graduation + milestone computations share the fetch with

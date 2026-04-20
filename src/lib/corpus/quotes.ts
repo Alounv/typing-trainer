@@ -10,7 +10,7 @@ import type { Quote, QuoteBank, QuoteLengthGroup } from './types';
  */
 const TARGET_OCCURRENCE_MULTIPLIER = 1.5;
 
-export interface SelectQuoteOptions {
+interface SelectQuoteOptions {
 	/**
 	 * Bigrams we want the quote to contain. An empty or missing list →
 	 * uniform sampling. The boost is multiplicative per occurrence, so a

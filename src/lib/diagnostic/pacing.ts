@@ -12,7 +12,7 @@ const TRIM_DECILE = 0.1;
 /**
  * Per-word WPM sample. Exported mainly for tests and debug inspection.
  */
-export interface WordWPMSample {
+interface WordWPMSample {
 	/** Word text (as typed, from `expected` — not what the user hit). */
 	word: string;
 	/** Characters in the word, including a trailing space if present. */

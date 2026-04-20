@@ -21,7 +21,7 @@ import { computeTargetWPM, deriveBaselineWPM } from './pacing';
  * (coverageRatio 0, no undertrained). Once the corpus is wired in, real
  * coverage kicks in automatically.
  */
-export interface DiagnosticReportInput {
+interface DiagnosticReportInput {
 	sessionId: string;
 	timestamp: number;
 	events: readonly KeystrokeEvent[];
