@@ -3,7 +3,6 @@ import type { DrillMode } from '../core';
 /** Accuracy drills push *below* baseline — hasty/acquisition bigrams need slow-down pressure, not speed-up. */
 export const ACCURACY_PACE_MULTIPLIER = 0.6;
 
-/** Mirrors `TARGET_WPM_MULTIPLIER` in `diagnostic/pacing.ts`. Separate constants so the two callers can't silently diverge. */
 export const SPEED_PACE_MULTIPLIER = 1;
 
 /** Returns 0 when baseline is unusable (first-run, no diagnostic); caller skips ghost rendering. */

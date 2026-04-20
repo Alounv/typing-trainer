@@ -14,7 +14,7 @@ export function loadCorpus(
 	return { config, wordFrequencies, bigramFrequencies };
 }
 
-// Whitespace split for pre-normalized flat lists. Custom-text imports use a smarter tokenizer.
+// Whitespace split for pre-normalized flat lists.
 function tokenize(raw: string): string[] {
 	return raw.split(/\s+/).filter((w) => w.length > 0);
 }

@@ -15,9 +15,9 @@ import { countGraduations, WPM_ROLLING_WINDOW } from '../progress';
 /** How far a metric must move from its rolling baseline to clear the "flat" band. */
 const FLAT_BAND_PCT = 0.03;
 
-export type MetricVerdict = 'up' | 'down' | 'flat' | 'first';
+type MetricVerdict = 'up' | 'down' | 'flat' | 'first';
 
-export interface MetricDelta {
+interface MetricDelta {
 	current: number;
 	/** Average of the last `WPM_ROLLING_WINDOW` sessions BEFORE `current`. */
 	rollingAvg: number | null;
@@ -28,7 +28,7 @@ export interface MetricDelta {
 	verdict: MetricVerdict;
 }
 
-export interface BigramDelta {
+interface BigramDelta {
 	/**
 	 * Number of distinct bigrams this session drilled / encountered. For
 	 * `bigram-drill` sessions we take `bigramsTargeted`; for other types we
@@ -42,7 +42,7 @@ export interface BigramDelta {
 	regressed: number;
 }
 
-export interface ErrorFloorInfo {
+interface ErrorFloorInfo {
 	current: number;
 	threshold: number;
 	/** True when `current` is at or below the spec's high-error threshold. */

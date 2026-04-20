@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeTargetWPM, deriveBaselineWPM, TARGET_WPM_MULTIPLIER } from './pacing';
+import { deriveBaselineWPM } from './pacing';
 import type { KeystrokeEvent } from '../typing/types';
 
 function ev(
@@ -31,16 +31,6 @@ function word(
 	}
 	return out;
 }
-
-describe('computeTargetWPM', () => {
-	it('multiplies baseline by the target-WPM constant', () => {
-		expect(computeTargetWPM(60)).toBeCloseTo(60 * TARGET_WPM_MULTIPLIER, 5);
-	});
-
-	it('returns 0 when baseline is 0', () => {
-		expect(computeTargetWPM(0)).toBe(0);
-	});
-});
 
 describe('deriveBaselineWPM', () => {
 	it('returns 0 for empty events', () => {

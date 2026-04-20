@@ -2,10 +2,8 @@
 export interface CorpusConfig {
 	id: string;
 	language: string;
-	/** Built-in wordlist reference, e.g. `"en"` or a custom-corpus id. */
+	/** Built-in wordlist reference, e.g. `"en"`. */
 	wordlistId: string;
-	/** User-supplied text for custom corpora. */
-	customText?: string;
 }
 
 /** `token` → raw count or normalized weight. Callers interpret the units. */

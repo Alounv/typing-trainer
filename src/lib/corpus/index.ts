@@ -2,8 +2,8 @@
  * `corpus` lib — public API surface.
  *
  * Text-corpus registry, loading, sentence/quote selection. The
- * `normalize`, `merge`, and `custom` helpers are used only within the
- * corpus lib (ingestion pipeline) and stay internal.
+ * `normalize` helper is used only within the corpus lib (ingestion
+ * pipeline) and stays internal.
  */
 export * from './types';
 export * from './registry';
