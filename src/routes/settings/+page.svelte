@@ -284,8 +284,7 @@
 				<h2 id="threshold-heading" class="text-xl font-semibold tracking-tight">Thresholds</h2>
 			</div>
 			<p class="max-w-xl text-sm text-base-content/65">
-				When a bigram counts as fast or error-prone. Defaults are spec-derived (§3.1) — change only
-				if you know what you're doing.
+				When a bigram counts as fast or error-prone.
 			</p>
 
 			<dl class="divide-y divide-base-300 border-y border-base-300">

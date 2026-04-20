@@ -6,12 +6,7 @@
 	 */
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import {
-		loadDashboardData,
-		startPlannedSession,
-		startBonusRound,
-		type DashboardData
-	} from '$lib/practice';
+	import { loadDashboardData, startPlannedSession, type DashboardData } from '$lib/practice';
 
 	type LoadState =
 		| { status: 'loading' }
@@ -39,11 +34,26 @@
 </script>
 
 <div class="mx-auto max-w-3xl space-y-12">
-	<header class="space-y-3">
-		<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
-			Typing Trainer · v0.1
-		</p>
-		<h1 class="text-4xl font-semibold tracking-tight text-base-content">Today's plan</h1>
+	<header class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+		<div class="space-y-3">
+			<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
+				Typing Trainer · v0.1
+			</p>
+			<h1 class="text-4xl font-semibold tracking-tight text-base-content">Today's plan</h1>
+		</div>
+		<!--
+			Always-visible "restart plan" affordance. Completing a diagnostic
+			is itself the reset — it snapshots today's completions as the new
+			baseline — so this is just a link into the diagnostic route rather
+			than a separate button with its own side effect.
+		-->
+		<a
+			href={resolve('/session/diagnostic')}
+			class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
+			data-testid="restart-plan"
+		>
+			Restart plan — run a new diagnostic →
+		</a>
 	</header>
 
 	{#if state.status === 'loading'}
@@ -54,23 +64,14 @@
 		{@const data = state.data}
 
 		{#if data.allDoneForToday}
-			{@const completed = data.completedToday}
 			<!--
-				Day done. Deliberately quiet — celebration is reserved for structural
-				change. "Start another round" snapshots today's completions as the
-				new baseline so the planner re-emits a full plan on reload.
+				Day done. Deliberately quiet — celebration is reserved for
+				structural change. The restart-plan link in the header is the
+				escape hatch for anyone who wants to keep practising.
 			-->
 			<section class="space-y-3" data-testid="day-complete">
 				<h2 class="text-2xl font-semibold text-base-content">Today's plan is done.</h2>
 				<p class="text-base-content/65">Rest is part of the work. Come back tomorrow.</p>
-				<button
-					type="button"
-					class="btn btn-sm"
-					onclick={() => startBonusRound(completed)}
-					data-testid="start-another-round"
-				>
-					Start another round
-				</button>
 			</section>
 		{/if}
 

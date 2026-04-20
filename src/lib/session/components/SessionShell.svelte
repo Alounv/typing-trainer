@@ -20,6 +20,7 @@
 	import { SessionRunner } from '../runner';
 	import { computeGhostPosition, paceForMode } from '../pacer';
 	import { saveSession } from '../persistence';
+	import { resetPlanForFreshDiagnostic } from '$lib/practice';
 	import Timer from './Timer.svelte';
 	import StatsBar from './StatsBar.svelte';
 
@@ -172,6 +173,12 @@
 				summary.diagnosticReport = buildDiagnosticReport(summary, runner.events);
 			}
 			await saveSession(summary);
+			// Completing a diagnostic is the user-facing "restart the plan"
+			// action — snapshot today's completions so the dashboard re-emits
+			// a fresh plan from scratch rather than crediting earlier drills.
+			if (summary.type === 'diagnostic') {
+				await resetPlanForFreshDiagnostic();
+			}
 			await goto(resolve('/session/[id]/summary', { id: summary.id }));
 		} catch (err) {
 			saving = false;
