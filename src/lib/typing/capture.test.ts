@@ -217,7 +217,7 @@ describe('keystrokeCapture', () => {
 		expect(positions.at(-1)).toBe(0);
 	});
 
-	it('deleteSoftLineBackward (CMD+Backspace) jumps silently to position 0', () => {
+	it('deleteSoftLineBackward / deleteHardLineBackward (CMD+Backspace) is ignored', () => {
 		const onEvent = vi.fn();
 		const positions: number[] = [];
 		const { beforeInput } = attach('hello world', {
@@ -226,9 +226,14 @@ describe('keystrokeCapture', () => {
 		});
 
 		for (const ch of 'hello wo') beforeInput('insertText', ch);
-		beforeInput('deleteSoftLineBackward');
+		const soft = beforeInput('deleteSoftLineBackward');
+		const hard = beforeInput('deleteHardLineBackward');
 
-		expect(positions.at(-1)).toBe(0);
+		// Cursor must stay put — no "nuke everything" shortcut.
+		expect(positions.at(-1)).toBe(8);
+		// Still prevented so the input element itself never accumulates text.
+		expect(soft.defaultPrevented).toBe(true);
+		expect(hard.defaultPrevented).toBe(true);
 		expect(onEvent).toHaveBeenCalledTimes(8);
 	});
 

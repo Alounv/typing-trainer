@@ -23,6 +23,9 @@ export interface CaptureCallbacks {
  *     independent keystrokes. `keydown` only sees the raw physical keys.
  *   - OS-level editing shortcuts (OPT+Backspace = delete word, CMD+Backspace
  *     = delete to line start) are reported via semantic `inputType` values.
+ *     We honor OPT+Backspace as "back one word" but deliberately ignore
+ *     CMD+Backspace — wiping the whole drill with one keystroke is almost
+ *     always unintended.
  *
  * Strategy: `preventDefault` on `beforeinput` so the input element itself
  * stays empty — we own state. IME composition is the exception: we let the
@@ -136,11 +139,11 @@ export function keystrokeCapture(
 					// OPT+Backspace. Silent cursor move, matching plain Backspace.
 					deleteWord();
 					break;
-				case 'deleteSoftLineBackward':
-				case 'deleteHardLineBackward':
-					// CMD+Backspace. Silent jump to start of the current run.
-					moveBackBy(position);
-					break;
+				// deleteSoftLineBackward / deleteHardLineBackward (CMD+Backspace):
+				// deliberately ignored. Wiping the whole drill with one keystroke
+				// is almost always an accident, and recovering loses all the
+				// timing/error context the learner needed to see. OPT+Backspace
+				// is the supported "big undo".
 				// insertFromPaste / insertFromDrop / anything else: swallowed
 				// by the preventDefault above. Paste is deliberately blocked
 				// so the trainer can't be gamed.
