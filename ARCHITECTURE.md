@@ -97,9 +97,9 @@ flowchart TB
 
 ## Main flows
 
-- **Dashboard (`/`)** — calls `practice/dashboard-loader` which fetches recent sessions, runs the planner, and returns the next planned session(s). The loader also exposes `startPlannedSession` / `startBonusRound` so the route doesn't touch `sessionStorage` or `window.location` directly.
+- **Dashboard (`/`)** — calls `practice/dashboard-loader` which fetches recent sessions, runs the planner, and returns the next planned session(s). The loader also exposes `startPlannedSession` / `startFreshPlan` so the route doesn't touch `sessionStorage` or `window.location` directly.
 - **Session write-path (`/session/*`)** — route calls a `practice/session-loader` (`prepareBigramDrillSession` / `prepareRealTextSession` / `prepareDiagnosticSession`) to get ready-to-render text + metadata. The loader consumes any `practice/planned` hand-off stashed by the dashboard. `SessionShell` → `TypingSurface` captures raw keystrokes → `typing/postprocess` annotates → `session/runner` aggregates (delegating bigram math to `bigram/extraction`) → `SessionSummary` persisted via `session/persistence`.
-- **Summary (`/session/[id]/summary`)** — `session/summary-loader` fetches the session + recent history, runs `session/delta`, `progress/celebrations`, and a shared `practice/dashboard-loader` call (reusing the same `recentSessions`), and returns one view-model. The route is render-only plus the `startPlannedSession` / `startBonusRound` hand-off actions.
+- **Summary (`/session/[id]/summary`)** — `session/summary-loader` fetches the session + recent history, runs `session/delta`, `progress/celebrations`, and a shared `practice/dashboard-loader` call (reusing the same `recentSessions`), and returns one view-model. The route is render-only plus the `startPlannedSession` / `startFreshPlan` hand-off actions.
 - **Analytics (`/analytics`)** — `progress/analytics-loader` returns sessions + profile + corpus frequencies + pre-computed trend series (via `progress/metrics`), and the charts render them.
 - **Settings (`/settings`)** — reads/writes `settings/profile`; delegates export/import UI to `DataTransfer`, which talks to `settings/data-transfer`.
 

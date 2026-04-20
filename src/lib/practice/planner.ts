@@ -47,7 +47,8 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 		latestDiagnosticReport,
 		graduatedFromRotation,
 		drillTargetCount = DEFAULT_DRILL_TARGET_COUNT,
-		userSettings
+		userSettings,
+		planStartedAt
 	} = input;
 
 	const budgets = resolveWordBudgets(userSettings);
@@ -92,13 +93,35 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	const speedHasTargets = speedMix.priority.length > 0;
 
 	// Nothing to drill → real-text only, one per cycle.
-	if (!accuracyHasTargets && !speedHasTargets) {
-		return Array.from({ length: CYCLES_PER_DAY }, () =>
-			realtextPlan(budgets.realText, 'no-targets-left')
-		);
+	const drillPlanItems: PlannedSession[] =
+		!accuracyHasTargets && !speedHasTargets
+			? Array.from({ length: CYCLES_PER_DAY }, () =>
+					realtextPlan(budgets.realText, 'no-targets-left')
+				)
+			: buildDrillCycles(accuracyMix, speedMix, budgets, accuracyHasTargets, speedHasTargets);
+
+	// Fresh-plan diagnostic: "Start fresh plan" bumps the plan-window cursor.
+	// If the latest diagnostic on file predates that cursor the user's targets
+	// are stale from the fresh-plan perspective — prepend a diagnostic so the
+	// first thing they see is "refresh your baseline."
+	if (planStartedAt && latestDiagnosticReport.timestamp < planStartedAt) {
+		return [
+			diagnosticPlan('fresh-plan-diagnostic', undefined, budgets.diagnostic),
+			...drillPlanItems
+		];
 	}
 
-	// [accuracy, speed, real-text] per cycle; empty drill slots skipped, real-text always runs.
+	return drillPlanItems;
+}
+
+// [accuracy, speed, real-text] per cycle; empty drill slots skipped, real-text always runs.
+function buildDrillCycles(
+	accuracyMix: { priority: string[]; exposure: string[] },
+	speedMix: { priority: string[]; exposure: string[] },
+	budgets: { bigramDrill: number; realText: number; diagnostic: number },
+	accuracyHasTargets: boolean,
+	speedHasTargets: boolean
+): PlannedSession[] {
 	const plan: PlannedSession[] = [];
 	for (let i = 0; i < CYCLES_PER_DAY; i++) {
 		if (accuracyHasTargets) plan.push(drillPlan(accuracyMix, 'accuracy', budgets.bigramDrill));
@@ -185,7 +208,10 @@ export function selectSpeedDrillMix(
 function diagnosticPlan(
 	reason: Extract<
 		PlannedSessionReason,
-		'first-run-diagnostic' | 'cadence-diagnostic' | 'missing-report-diagnostic'
+		| 'first-run-diagnostic'
+		| 'cadence-diagnostic'
+		| 'missing-report-diagnostic'
+		| 'fresh-plan-diagnostic'
 	>,
 	sessionsSince: number | undefined,
 	wordBudget: number
@@ -197,7 +223,8 @@ function diagnosticPlan(
 	const labels: Record<typeof reason, string> = {
 		'first-run-diagnostic': 'First diagnostic',
 		'cadence-diagnostic': 'Weekly diagnostic',
-		'missing-report-diagnostic': 'Diagnostic'
+		'missing-report-diagnostic': 'Diagnostic',
+		'fresh-plan-diagnostic': 'Fresh-plan diagnostic'
 	};
 	const rationales: Record<typeof reason, string> = {
 		'first-run-diagnostic': 'Establishes your baseline WPM and highlights which bigrams to drill.',
@@ -206,7 +233,9 @@ function diagnosticPlan(
 				? `${sessionsSince} sessions since your last diagnostic — time to refresh targets.`
 				: 'Refreshes your drill targets and baseline.',
 		'missing-report-diagnostic':
-			'No diagnostic on file — running one now so drills have current targets.'
+			'No diagnostic on file — running one now so drills have current targets.',
+		'fresh-plan-diagnostic':
+			'Start of a fresh plan — refresh the baseline so the drills below use current targets.'
 	};
 	return {
 		config,

@@ -9,7 +9,7 @@ import { getBigramHistory, getRecentSessions } from '../storage';
 import { buildLivePriorityTargets } from '../progress';
 import { findGraduatedBigrams } from './graduation-filter';
 import { planDailySessions, sliceCompletedFromPlan } from './planner';
-import { activateBonusRound, applyBonusBaseline, readActiveBaseline } from './bonus-round';
+import { readPlanStartedAt, setPlanStartedAt } from './plan-window';
 import { stashPlannedSession } from './planned';
 import { planSlotKeyForSession, type PlanSlotKey, type PlannedSession } from './types';
 
@@ -27,10 +27,13 @@ export interface DashboardData {
 	fullPlan: PlannedSession[];
 	/** Named boolean so UI branches on intent, not array-length arithmetic. */
 	allDoneForToday: boolean;
-	/** Keyed by `PlanSlotKey` so accuracy and speed drills count independently. */
+	/** Sessions completed since the effective plan-window cutoff. */
 	completedToday: Partial<Record<PlanSlotKey, number>>;
-	/** Active bonus-round baseline (subtracted from `completedToday`). */
-	bonusBaseline: Partial<Record<PlanSlotKey, number>>;
+	/**
+	 * Active plan-window cursor (ms). `0` when no override is active — the
+	 * cutoff is just start-of-calendar-day. Debug-panel only.
+	 */
+	planStartedAt: number;
 	lastSession?: SessionSummary;
 	latestDiagnosticReport?: DiagnosticReport;
 	graduatedFromRotation: ReadonlySet<string>;
@@ -77,27 +80,28 @@ export async function loadDashboardData(opts: DashboardLoadOptions = {}): Promis
 	const priorityBigrams = reportForPlanner?.priorityTargets.map((p) => p.bigram) ?? [];
 	const graduatedFromRotation = await findGraduatedBigrams(priorityBigrams, getBigramHistory);
 
+	const planStartedAt = readPlanStartedAt();
+	const cutoffMs = Math.max(startOfCalendarDayMs(), planStartedAt);
+
 	const fullPlan = planDailySessions({
 		recentSessions,
 		latestDiagnosticReport: reportForPlanner,
 		graduatedFromRotation,
-		userSettings
+		userSettings,
+		planStartedAt
 	});
 
-	// Strip done-today from the planner's stateless full-day output. Bonus
-	// round (if active) subtracts its baseline first → earlier completions
-	// are "forgiven" and the user gets a fresh plan.
-	const completedToday = countCompletedToday(recentSessions);
-	const bonusBaseline = readActiveBaseline();
-	const effectiveCompleted = applyBonusBaseline(completedToday, bonusBaseline);
-	const plan = sliceCompletedFromPlan(fullPlan, effectiveCompleted);
+	// Only the slice since `cutoffMs` counts toward today's plan. The natural
+	// day-rollover and the manual "Start fresh plan" action share one mechanism.
+	const completedToday = countCompletedSince(recentSessions, cutoffMs);
+	const plan = sliceCompletedFromPlan(fullPlan, completedToday);
 
 	return {
 		plan,
 		fullPlan,
 		allDoneForToday: plan.length === 0 && fullPlan.length > 0,
 		completedToday,
-		bonusBaseline,
+		planStartedAt,
 		lastSession: recentSessions[0],
 		latestDiagnosticReport,
 		graduatedFromRotation,
@@ -118,15 +122,13 @@ export function startPlannedSession(planned: PlannedSession): void {
 }
 
 /**
- * Hand-off action: activate a bonus round and bounce the user back to the
- * dashboard so a fresh plan renders. Takes `completedToday` rather than
- * reading it here — the caller already has the loader's snapshot, and
- * passing it in keeps this function free of storage reads.
+ * Hand-off action: snapshot `now` as the new plan-window cursor, then reload
+ * the dashboard. Earlier completions fall outside the cutoff and the planner
+ * emits a fresh plan (with a diagnostic prepended when the latest on file
+ * predates the cutoff — see `planDailySessions`).
  */
-export function startBonusRound(completedToday: Partial<Record<PlanSlotKey, number>>): void {
-	activateBonusRound(completedToday);
-	// Full reload so `loadDashboardData` re-reads the baseline and the UI
-	// state matches the fresh plan from scratch.
+export function startFreshPlan(): void {
+	setPlanStartedAt(Date.now());
 	window.location.href = resolve('/');
 }
 
@@ -151,19 +153,26 @@ function routeForPlannedSession(planned: PlannedSession): string {
 	}
 }
 
-// Per slot-key (bigram-drill splits by mode). "Today" = local calendar day —
-// a rolling 24h window would spill yesterday's late session into tomorrow.
-function countCompletedToday(
-	sessions: readonly SessionSummary[]
+// Per slot-key (bigram-drill splits by mode). `cutoffMs` is the effective
+// plan-window start — normally start-of-day, bumped forward when the user
+// clicks "Start fresh plan".
+function countCompletedSince(
+	sessions: readonly SessionSummary[],
+	cutoffMs: number
 ): Partial<Record<PlanSlotKey, number>> {
-	const today = new Date().toDateString();
 	const out: Partial<Record<PlanSlotKey, number>> = {};
 	for (const s of sessions) {
-		if (new Date(s.timestamp).toDateString() !== today) continue;
+		if (s.timestamp < cutoffMs) continue;
 		const key = planSlotKeyForSession(s);
 		out[key] = (out[key] ?? 0) + 1;
 	}
 	return out;
+}
+
+function startOfCalendarDayMs(): number {
+	const d = new Date();
+	d.setHours(0, 0, 0, 0);
+	return d.getTime();
 }
 
 // Pull the most recent diagnostic's attached report. `undefined` when no

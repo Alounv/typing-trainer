@@ -9,7 +9,7 @@
 	import {
 		loadDashboardData,
 		planSlotKey,
-		startBonusRound,
+		startFreshPlan,
 		startPlannedSession,
 		type DashboardData,
 		type PlanSlotKey
@@ -22,15 +22,10 @@
 
 	let state = $state<LoadState>({ status: 'loading' });
 
-	// Debug-panel derived values. At script level because `<details>` isn't a
-	// valid parent for `{@const}` in Svelte 5.
-	const debugEffective = $derived.by<Partial<Record<PlanSlotKey, number>>>(() =>
-		state.status === 'ready'
-			? effectiveCompleted(state.data.completedToday, state.data.bonusBaseline)
-			: {}
-	);
+	// Script-level `$derived` for the debug panel — `<details>` can't host
+	// `{@const}` in Svelte 5.
 	const debugConsumed = $derived.by<boolean[]>(() =>
-		state.status === 'ready' ? consumedByKey(state.data.fullPlan, debugEffective) : []
+		state.status === 'ready' ? consumedByKey(state.data.fullPlan, state.data.completedToday) : []
 	);
 
 	onMount(async () => {
@@ -53,9 +48,9 @@
 	/** Per-position slicer trace for the debug panel. */
 	function consumedByKey(
 		fullPlan: DashboardData['fullPlan'],
-		completedEffective: Partial<Record<PlanSlotKey, number>>
+		completed: Partial<Record<PlanSlotKey, number>>
 	): boolean[] {
-		const remaining: Partial<Record<PlanSlotKey, number>> = { ...completedEffective };
+		const remaining: Partial<Record<PlanSlotKey, number>> = { ...completed };
 		return fullPlan.map((planned) => {
 			const key = planSlotKey(planned.config);
 			const left = remaining[key] ?? 0;
@@ -65,23 +60,6 @@
 			}
 			return false;
 		});
-	}
-
-	/** Mirrors `applyBonusBaseline` for display. */
-	function effectiveCompleted(
-		completed: Partial<Record<PlanSlotKey, number>>,
-		baseline: Partial<Record<PlanSlotKey, number>>
-	): Partial<Record<PlanSlotKey, number>> {
-		const out: Partial<Record<PlanSlotKey, number>> = {};
-		const keys = new Set<PlanSlotKey>([
-			...(Object.keys(completed) as PlanSlotKey[]),
-			...(Object.keys(baseline) as PlanSlotKey[])
-		]);
-		for (const k of keys) {
-			const v = (completed[k] ?? 0) - (baseline[k] ?? 0);
-			if (v > 0) out[k] = v;
-		}
-		return out;
 	}
 </script>
 
@@ -93,18 +71,15 @@
 			</p>
 			<h1 class="text-4xl font-semibold tracking-tight text-base-content">Today's plan</h1>
 		</div>
-		<!-- Snapshot today's completions as a new bonus-round baseline → fresh plan. -->
-		{#if state.status === 'ready'}
-			{@const completed = state.data.completedToday}
-			<button
-				type="button"
-				class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
-				data-testid="restart-plan"
-				onclick={() => startBonusRound(completed)}
-			>
-				Start fresh plan →
-			</button>
-		{/if}
+		<!-- Bump the plan-window cursor to now → fresh plan on next load. -->
+		<button
+			type="button"
+			class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
+			data-testid="restart-plan"
+			onclick={() => startFreshPlan()}
+		>
+			Start fresh plan →
+		</button>
 	</header>
 
 	{#if state.status === 'loading'}
@@ -283,18 +258,17 @@
 				</div>
 
 				<div>
-					<p class="text-base-content/55">Completed today (by slot-key):</p>
+					<p class="text-base-content/55">Completed since cutoff (by slot-key):</p>
 					<pre class="ml-4 whitespace-pre-wrap">{JSON.stringify(data.completedToday, null, 2)}</pre>
 				</div>
 
 				<div>
-					<p class="text-base-content/55">Bonus-round baseline (subtracted before slicing):</p>
-					<pre class="ml-4 whitespace-pre-wrap">{JSON.stringify(data.bonusBaseline, null, 2)}</pre>
-				</div>
-
-				<div>
-					<p class="text-base-content/55">Effective completed (completed − baseline):</p>
-					<pre class="ml-4 whitespace-pre-wrap">{JSON.stringify(debugEffective, null, 2)}</pre>
+					<p class="text-base-content/55">
+						Plan-window cursor:
+						{data.planStartedAt
+							? new Date(data.planStartedAt).toLocaleTimeString()
+							: 'none (using start-of-day)'}
+					</p>
 				</div>
 
 				{#if data.latestDiagnosticReport}

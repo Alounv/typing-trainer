@@ -42,6 +42,7 @@ export type PlannedSessionReason =
 	| 'first-run-diagnostic'
 	| 'cadence-diagnostic'
 	| 'missing-report-diagnostic'
+	| 'fresh-plan-diagnostic'
 	| 'default-drill'
 	| 'default-realtext';
 
@@ -95,4 +96,10 @@ export interface SchedulerInput {
 	 * thresholds, language/corpus. Absent = factory defaults.
 	 */
 	userSettings?: UserSettings;
+	/**
+	 * Plan-window cursor (ms). When set, the planner prepends a diagnostic
+	 * if the latest one on file is older than this cutoff — "Start fresh
+	 * plan" wants refreshed targets. `0` / `undefined` disables the check.
+	 */
+	planStartedAt?: number;
 }

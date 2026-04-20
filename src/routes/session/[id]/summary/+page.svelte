@@ -12,7 +12,7 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { loadSummaryContext, type SummaryViewModel } from '$lib/session';
-	import { startPlannedSession, startBonusRound } from '$lib/practice';
+	import { startPlannedSession, startFreshPlan } from '$lib/practice';
 	import type { BigramAggregate, SessionSummary } from '$lib/core';
 	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/bigram';
 	import SessionDelta from '$lib/session/components/SessionDelta.svelte';
@@ -283,14 +283,13 @@
 					Back to dashboard
 				</a>
 			{:else}
-				{@const completed = state.completedToday}
 				<a href={resolve('/')} class="btn btn-lg btn-primary" data-testid="day-complete-cta"
 					>Day complete · Back to dashboard</a
 				>
 				<button
 					type="button"
 					class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
-					onclick={() => startBonusRound(completed)}
+					onclick={() => startFreshPlan()}
 					data-testid="summary-start-another-round"
 				>
 					Start another round

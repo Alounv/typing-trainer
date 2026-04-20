@@ -118,6 +118,45 @@ describe('planDailySessions — diagnostic triggers', () => {
 			}
 		}
 	);
+
+	/**
+	 * Fresh-plan prepend: when "Start fresh plan" has been clicked (planStartedAt
+	 * is a recent timestamp), the latest diagnostic is "stale" from the fresh-plan
+	 * perspective unless it was run after the cursor. The planner prepends a
+	 * diagnostic in that case so the user refreshes their baseline before drilling.
+	 */
+	describe('fresh-plan diagnostic', () => {
+		it('prepends a diagnostic when last one predates planStartedAt', () => {
+			const plan = planDailySessions({
+				recentSessions: recent('diagnostic'),
+				// report() builds with timestamp: 0; planStartedAt = 1000 ⇒ stale.
+				latestDiagnosticReport: report(['th']),
+				planStartedAt: 1000
+			});
+			expect(plan[0].reason).toBe('fresh-plan-diagnostic');
+			expect(plan[0].config.type).toBe('diagnostic');
+			// Rest of the day follows.
+			expect(plan.length).toBeGreaterThan(1);
+			expect(plan[1].config.type).toBe('bigram-drill');
+		});
+
+		it('does not prepend when last diagnostic is newer than planStartedAt', () => {
+			const plan = planDailySessions({
+				recentSessions: recent('diagnostic'),
+				latestDiagnosticReport: { ...report(['th']), timestamp: 5000 },
+				planStartedAt: 1000
+			});
+			expect(plan[0].reason).not.toBe('fresh-plan-diagnostic');
+		});
+
+		it('does nothing when planStartedAt is unset', () => {
+			const plan = planDailySessions({
+				recentSessions: recent('diagnostic'),
+				latestDiagnosticReport: report(['th'])
+			});
+			expect(plan[0].reason).not.toBe('fresh-plan-diagnostic');
+		});
+	});
 });
 
 describe('planDailySessions — default daily structure', () => {
