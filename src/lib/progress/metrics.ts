@@ -1,6 +1,15 @@
-import type { BigramAggregate, BigramClassification, BigramSample, SessionSummary } from '../core';
+import type {
+	BigramAggregate,
+	BigramClassification,
+	BigramSample,
+	PriorityBigram,
+	SessionSummary
+} from '../core';
 import { classifyBigram, DEFAULT_THRESHOLDS, type ClassificationThresholds } from '../bigram';
 import type { FrequencyTable } from '../corpus';
+
+/** Mirrors `PRIORITY_TARGETS_TOP_N` in the diagnostic engine. */
+const LIVE_PRIORITY_TARGETS_TOP_N = 10;
 
 /**
  * Rolling average with a trailing window. For positions before the window is
@@ -260,6 +269,33 @@ export function summarizeBigrams(
 	// Default sort: highest priority first. Components can re-sort as needed.
 	rows.sort((a, b) => b.priorityScore - a.priorityScore);
 	return rows;
+}
+
+/**
+ * `PriorityBigram[]` built from the live rolling-window classification
+ * (via `summarizeBigrams`) instead of a frozen diagnostic snapshot — so
+ * drill target selection tracks current behaviour.
+ */
+export function buildLivePriorityTargets(
+	sessions: readonly SessionSummary[],
+	corpus?: FrequencyTable,
+	thresholds: ClassificationThresholds = DEFAULT_THRESHOLDS,
+	limit: number = LIVE_PRIORITY_TARGETS_TOP_N
+): PriorityBigram[] {
+	const rows = summarizeBigrams(sessions, corpus, thresholds);
+	const out: PriorityBigram[] = [];
+	for (const r of rows) {
+		if (r.classification === 'healthy' || r.classification === 'unclassified') continue;
+		out.push({
+			bigram: r.bigram,
+			score: r.priorityScore,
+			meanTime: r.meanTime,
+			errorRate: r.errorRate,
+			classification: r.classification
+		});
+		if (out.length >= limit) break;
+	}
+	return out;
 }
 
 /**

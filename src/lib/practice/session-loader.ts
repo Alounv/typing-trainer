@@ -26,6 +26,7 @@ import {
 	DEFAULT_DIAGNOSTIC_WORD_BUDGET
 } from '../settings';
 import { getBigramHistory, getRecentSessions } from '../storage';
+import { buildLivePriorityTargets } from '../progress';
 import { consumePlannedSession } from './planned';
 import { generateBigramDrillSequence } from './bigram-drill';
 import { generateRealTextSequence } from './real-text';
@@ -42,12 +43,7 @@ const FALLBACK_CORPUS_ID: BuiltinCorpusId = 'en';
 /** Mirrors dashboard-loader's window so direct nav matches dashboard-sourced nav. */
 const RECENT_WINDOW = 20;
 
-/**
- * Seed targets used only when no diagnostic has ever run (and therefore
- * nothing in storage to prioritize). Once a diagnostic exists, drill
- * targets always come from its priority list — even on direct nav /
- * refresh, to stay consistent with what the dashboard would pick.
- */
+/** Cold-start fallback when live priority + undertrained are both empty. */
 const SEED_TARGETS = ['th', 'he', 'in', 'er', 'an'] as const;
 
 interface BigramDrillSessionInputs {
@@ -100,6 +96,7 @@ export async function prepareDrillSession(routeMode: DrillMode): Promise<BigramD
 		profile?.wordBudgets?.bigramDrill ??
 		DEFAULT_BIGRAM_DRILL_WORD_BUDGET;
 	const corpusId = resolveCorpusId(profile);
+	const corpus = await loadBuiltinCorpus(corpusId);
 
 	const fromPlan =
 		planned?.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0
@@ -107,11 +104,10 @@ export async function prepareDrillSession(routeMode: DrillMode): Promise<BigramD
 			: null;
 	// Direct-nav mix selection is scoped to the route's mode so hitting
 	// /accuracy-drill doesn't pull fluency targets and vice versa.
-	const resolved = fromPlan ?? (await resolveDirectNavMix(routeMode));
+	const resolved = fromPlan ?? (await resolveDirectNavMix(routeMode, corpus.bigramFrequencies));
 
 	const exposure = resolved.mix?.exposure ?? [];
 
-	const corpus = await loadBuiltinCorpus(corpusId);
 	const seq = generateBigramDrillSequence({
 		targetBigrams: resolved.targets,
 		corpus,
@@ -195,29 +191,33 @@ export async function prepareDiagnosticSession(): Promise<DiagnosticSessionInput
 }
 
 /**
- * Pick targets without a dashboard hand-off. Mirrors the planner's per-mode
- * selection so direct nav and plan nav agree on what each route drills.
- * Falls back to SEED_TARGETS when there's no diagnostic on file OR the
- * selected mix is empty for this mode (e.g. no fluency targets on the
- * speed route yet — we still want to let the user practice).
+ * Direct-nav mix, mirroring the planner. Priority comes from the live
+ * rolling-window view; undertrained still comes from the last diagnostic's
+ * `corpusFit` (not derivable from session history). SEED_TARGETS only if
+ * the resulting mix is empty.
  */
-async function resolveDirectNavMix(mode: DrillMode): Promise<{
+async function resolveDirectNavMix(
+	mode: DrillMode,
+	corpusFrequencies: FrequencyTable | undefined
+): Promise<{
 	targets: readonly string[];
 	mix?: { priority: string[]; exposure: string[] };
 }> {
 	const recent = await getRecentSessions(RECENT_WINDOW);
-	const report = recent.find((s) => s.type === 'diagnostic')?.diagnosticReport;
-	if (!report) return { targets: SEED_TARGETS };
 
-	const priorityBigrams = report.priorityTargets.map((p) => p.bigram);
+	const priorityTargets = buildLivePriorityTargets(recent, corpusFrequencies);
+	const undertrained =
+		recent.find((s) => s.type === 'diagnostic')?.diagnosticReport?.corpusFit.undertrained ?? [];
+
+	const priorityBigrams = priorityTargets.map((p) => p.bigram);
 	const graduated = await findGraduatedBigrams(priorityBigrams, getBigramHistory);
 
 	const mix =
 		mode === 'speed'
-			? selectSpeedDrillMix(report.priorityTargets, graduated, DEFAULT_DRILL_TARGET_COUNT)
+			? selectSpeedDrillMix(priorityTargets, graduated, DEFAULT_DRILL_TARGET_COUNT)
 			: selectAccuracyDrillMix(
-					report.priorityTargets,
-					report.corpusFit.undertrained,
+					priorityTargets,
+					undertrained,
 					graduated,
 					DEFAULT_DRILL_TARGET_COUNT
 				);

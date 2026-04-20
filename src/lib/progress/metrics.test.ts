@@ -6,6 +6,7 @@ import {
 	buildBigramTrend,
 	summarizeBigrams,
 	aggregateLastNOccurrences,
+	buildLivePriorityTargets,
 	countGraduations,
 	tallyClassificationMix,
 	WPM_ROLLING_WINDOW
@@ -277,6 +278,59 @@ describe('summarizeBigrams — sliding window', () => {
 		const th = summarizeBigrams(sessions).find((r) => r.bigram === 'th')!;
 		expect(th.classification).toBe('healthy');
 		expect(th.errorRate).toBeCloseTo(0.02);
+	});
+});
+
+describe('buildLivePriorityTargets', () => {
+	function bigramSession(
+		id: string,
+		timestamp: number,
+		bigram: string,
+		samples: BigramSample[]
+	): SessionSummary {
+		return session(id, timestamp, 50, [
+			agg(bigram, id, { occurrences: samples.length, samples })
+		]);
+	}
+
+	it('returns [] when no session carries classifiable data', () => {
+		expect(buildLivePriorityTargets([])).toEqual([]);
+	});
+
+	it('excludes healthy and unclassified rows', () => {
+		const sessions = [
+			bigramSession('s1', 100, 'fast', cleanSamples(20, 80)),
+			bigramSession('s2', 200, 'sparse', cleanSamples(3, 400))
+		];
+		expect(buildLivePriorityTargets(sessions)).toEqual([]);
+	});
+
+	it('classifies bigrams from pooled samples', () => {
+		const hastySamples: BigramSample[] = Array.from({ length: 20 }, (_, i) => ({
+			correct: i % 5 !== 0,
+			timing: 120
+		}));
+		const sessions = [
+			bigramSession('s1', 100, 'fl', cleanSamples(20, 300)),
+			bigramSession('s2', 200, 'ht', hastySamples)
+		];
+		const byBigram = new Map(buildLivePriorityTargets(sessions).map((t) => [t.bigram, t]));
+		expect(byBigram.get('fl')?.classification).toBe('fluency');
+		expect(byBigram.get('ht')?.classification).toBe('hasty');
+	});
+
+	it('orders by priority score and honours the limit', () => {
+		const bad: BigramSample[] = Array.from({ length: 20 }, (_, i) => ({
+			correct: i % 3 !== 0,
+			timing: 500
+		}));
+		const sessions = [
+			bigramSession('s1', 100, 'ra', bad),
+			bigramSession('s2', 200, 'co', bad)
+		];
+		const ranked = buildLivePriorityTargets(sessions, { ra: 1, co: 100 });
+		expect(ranked[0].bigram).toBe('co');
+		expect(buildLivePriorityTargets(sessions, { ra: 1, co: 100 }, undefined, 1)).toHaveLength(1);
 	});
 });
 

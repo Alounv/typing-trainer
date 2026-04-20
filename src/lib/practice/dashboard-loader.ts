@@ -6,6 +6,7 @@ import { resolve } from '$app/paths';
 import type { DiagnosticReport, SessionSummary, UserSettings } from '../core';
 import { getProfile } from '../settings';
 import { getBigramHistory, getRecentSessions } from '../storage';
+import { buildLivePriorityTargets } from '../progress';
 import { findGraduatedBigrams } from './graduation-filter';
 import { planDailySessions, sliceCompletedFromPlan } from './planner';
 import { activateBonusRound, applyBonusBaseline, readActiveBaseline } from './bonus-round';
@@ -63,12 +64,22 @@ export async function loadDashboardData(opts: DashboardLoadOptions = {}): Promis
 	const latestDiagnosticReport = findLatestDiagnosticReport(recentSessions);
 	const userSettings = await getProfile();
 
-	const priorityBigrams = latestDiagnosticReport?.priorityTargets.map((p) => p.bigram) ?? [];
+	// Override priorityTargets with the live view so drill mix tracks current
+	// behaviour. Baseline/cadence/undertrained still come from the original
+	// report, which is returned unchanged for UI display.
+	const reportForPlanner: DiagnosticReport | undefined = latestDiagnosticReport
+		? {
+				...latestDiagnosticReport,
+				priorityTargets: buildLivePriorityTargets(recentSessions)
+			}
+		: undefined;
+
+	const priorityBigrams = reportForPlanner?.priorityTargets.map((p) => p.bigram) ?? [];
 	const graduatedFromRotation = await findGraduatedBigrams(priorityBigrams, getBigramHistory);
 
 	const fullPlan = planDailySessions({
 		recentSessions,
-		latestDiagnosticReport,
+		latestDiagnosticReport: reportForPlanner,
 		graduatedFromRotation,
 		userSettings
 	});
