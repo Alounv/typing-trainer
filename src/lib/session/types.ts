@@ -1,5 +1,5 @@
-import type { BigramAggregate } from '../bigram/types';
-import type { DiagnosticReport } from '../diagnostic/types';
+import type { BigramAggregate } from '../bigram';
+import type { DiagnosticReport } from '../diagnostic';
 
 export type SessionType = 'diagnostic' | 'bigram-drill' | 'real-text';
 

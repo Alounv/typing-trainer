@@ -6,8 +6,8 @@
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { loadAnalyticsInputs } from '$lib/progress/analytics-loader';
 	import {
+		loadAnalyticsInputs,
 		buildErrorRateSeries,
 		buildWpmSeries,
 		countGraduations,
@@ -17,13 +17,13 @@
 		type ClassificationMix,
 		type TrendPoint,
 		type WpmPoint
-	} from '$lib/progress/metrics';
+	} from '$lib/progress';
 	import WpmChart from '$lib/progress/components/WpmChart.svelte';
 	import ErrorRateChart from '$lib/progress/components/ErrorRateChart.svelte';
 	import BigramTable from '$lib/progress/components/BigramTable.svelte';
 	import ClassificationBar from '$lib/progress/components/ClassificationBar.svelte';
-	import type { SessionSummary } from '$lib/session/types';
-	import type { DiagnosticReport } from '$lib/diagnostic/types';
+	import type { SessionSummary } from '$lib/session';
+	import type { DiagnosticReport } from '$lib/diagnostic';
 
 	type LoadState =
 		| { status: 'loading' }

@@ -7,11 +7,10 @@
  * code-split chunk), we still want the WPM chart to render —
  * `summarizeBigrams` falls back to `freq=1` when the corpus is absent.
  */
-import { getRecentSessions } from '../storage/service';
-import { getProfile, type UserSettings } from '../settings/profile';
-import { isBuiltinCorpusId, loadBuiltinCorpus } from '../corpus/registry';
-import type { FrequencyTable } from '../corpus/types';
-import type { SessionSummary } from '../session/types';
+import { getRecentSessions } from '../storage';
+import { getProfile, type UserSettings } from '../settings';
+import { isBuiltinCorpusId, loadBuiltinCorpus, type FrequencyTable } from '../corpus';
+import type { SessionSummary } from '../session';
 
 /**
  * A user could theoretically rack up thousands of sessions. 500 is a soft

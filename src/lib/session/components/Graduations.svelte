@@ -8,7 +8,7 @@
 	 * over decorative glyphs. Mount unconditionally; renders nothing when
 	 * empty.
 	 */
-	import type { GraduationEvent } from '../../progress/celebrations';
+	import type { GraduationEvent } from '../../progress';
 
 	interface Props {
 		events: readonly GraduationEvent[];

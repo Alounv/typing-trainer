@@ -1,8 +1,6 @@
 import { v4 as uuid } from 'uuid';
-import type { KeystrokeEvent } from '../typing/types';
-import { annotateFirstInputs } from '../typing/postprocess';
-import { extractBigramAggregates } from '../bigram/extraction';
-import type { ClassificationThresholds } from '../bigram/classification';
+import { annotateFirstInputs, type KeystrokeEvent } from '../typing';
+import { extractBigramAggregates, type ClassificationThresholds } from '../bigram';
 import type { SessionSummary, SessionType } from './types';
 
 /**

@@ -9,7 +9,7 @@
 	 * Renders nothing when `event` is null, so the summary page can mount it
 	 * unconditionally.
 	 */
-	import type { MilestoneEvent } from '../../progress/celebrations';
+	import type { MilestoneEvent } from '../../progress';
 
 	interface Props {
 		event: MilestoneEvent | null;

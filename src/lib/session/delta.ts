@@ -1,7 +1,10 @@
 import type { SessionSummary } from './types';
-import type { BigramAggregate, BigramClassification } from '../bigram/types';
-import { countGraduations, WPM_ROLLING_WINDOW } from '../progress/metrics';
-import { DEFAULT_HIGH_ERROR_THRESHOLD } from '../bigram/classification';
+import {
+	type BigramAggregate,
+	type BigramClassification,
+	DEFAULT_HIGH_ERROR_THRESHOLD
+} from '../bigram';
+import { countGraduations, WPM_ROLLING_WINDOW } from '../progress';
 
 /**
  * Session delta — the post-session "how did this compare?" view model.

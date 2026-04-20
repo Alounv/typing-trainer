@@ -6,7 +6,7 @@
  * only thing that still reaches directly into `storage/db` is this
  * file — everything above it calls `saveSession` and never sees Dexie.
  */
-import { db, bigramRecordKey } from '../storage/db';
+import { db, bigramRecordKey } from '../storage';
 import type { SessionSummary } from './types';
 
 /**

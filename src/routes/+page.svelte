@@ -6,11 +6,12 @@
 	 */
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { loadDashboardData, type DashboardData } from '$lib/practice/dashboard-loader';
-	import { stashPlannedSession } from '$lib/session/planned';
-	import { activateBonusRound } from '$lib/practice/bonus-round';
-	import type { PlannedSession } from '$lib/practice/types';
-	import type { SessionType } from '$lib/session/types';
+	import {
+		loadDashboardData,
+		startPlannedSession,
+		startBonusRound,
+		type DashboardData
+	} from '$lib/practice';
 
 	type LoadState =
 		| { status: 'loading' }
@@ -30,27 +31,6 @@
 			};
 		}
 	});
-
-	/** Route path for a planned session's type. */
-	function routeFor(type: SessionType): string {
-		switch (type) {
-			case 'diagnostic':
-				return resolve('/session/diagnostic');
-			case 'bigram-drill':
-				return resolve('/session/bigram-drill');
-			case 'real-text':
-				return resolve('/session/real-text');
-		}
-	}
-
-	function startSession(planned: PlannedSession) {
-		// Stash the planned config so the session route can pick up the
-		// scheduler's chosen target bigrams / duration. Navigation happens
-		// after the stash so the handoff is in place before the route
-		// reads it on mount.
-		stashPlannedSession(planned);
-		window.location.href = routeFor(planned.config.type);
-	}
 
 	/** Format the planned word budget for the card headline. */
 	function wordsLabel(wordBudget: number): string {
@@ -86,12 +66,7 @@
 				<button
 					type="button"
 					class="btn btn-sm"
-					onclick={() => {
-						activateBonusRound(completed);
-						// Full reload so `loadDashboardData` re-reads the baseline
-						// and the UI state matches the fresh plan from scratch.
-						window.location.reload();
-					}}
+					onclick={() => startBonusRound(completed)}
 					data-testid="start-another-round"
 				>
 					Start another round
@@ -128,7 +103,7 @@
 						<button
 							type="button"
 							class="btn tracking-wide btn-primary"
-							onclick={() => startSession(planned)}
+							onclick={() => startPlannedSession(planned)}
 							data-testid={`start-${planned.config.type}`}
 						>
 							Start →

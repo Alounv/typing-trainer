@@ -1,11 +1,13 @@
-import type { BigramAggregate, BigramClassification, BigramSample } from '../bigram/types';
-import type { SessionSummary } from '../session/types';
-import type { FrequencyTable } from '../corpus/types';
 import {
+	type BigramAggregate,
+	type BigramClassification,
+	type BigramSample,
 	classifyBigram,
 	DEFAULT_THRESHOLDS,
 	type ClassificationThresholds
-} from '../bigram/classification';
+} from '../bigram';
+import type { SessionSummary } from '../session';
+import type { FrequencyTable } from '../corpus';
 
 /**
  * Rolling average with a trailing window. For positions before the window is

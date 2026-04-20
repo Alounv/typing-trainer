@@ -15,11 +15,11 @@
 	import { resolve } from '$app/paths';
 	import { SvelteSet } from 'svelte/reactivity';
 	import TypingSurface from '$lib/typing/TypingSurface.svelte';
-	import type { KeystrokeEvent } from '$lib/typing/types';
-	import type { SessionType, SessionSummary } from '$lib/session/types';
-	import type { DiagnosticReport } from '$lib/diagnostic/types';
-	import { SessionRunner } from '$lib/session/runner';
-	import { saveSession } from '$lib/session/persistence';
+	import type { KeystrokeEvent } from '$lib/typing';
+	import type { DiagnosticReport } from '$lib/diagnostic';
+	import type { SessionType, SessionSummary } from '../types';
+	import { SessionRunner } from '../runner';
+	import { saveSession } from '../persistence';
 	import Timer from './Timer.svelte';
 	import StatsBar from './StatsBar.svelte';
 

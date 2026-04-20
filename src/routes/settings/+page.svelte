@@ -21,15 +21,14 @@
 		withDefaults,
 		type Language,
 		type UserSettings
-	} from '$lib/settings/profile';
+	} from '$lib/settings';
+	import { DEFAULT_SPEED_THRESHOLD_MS, DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/bigram';
 	import {
-		DEFAULT_SPEED_THRESHOLD_MS,
-		DEFAULT_HIGH_ERROR_THRESHOLD
-	} from '$lib/bigram/classification';
-	import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from '$lib/practice/bigram-drill';
-	import { DEFAULT_REAL_TEXT_WORD_BUDGET } from '$lib/practice/real-text';
-	import { DEFAULT_DIAGNOSTIC_WORD_BUDGET } from '$lib/practice/diagnostic-sampler';
-	import type { BuiltinCorpusId } from '$lib/corpus/registry';
+		DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
+		DEFAULT_REAL_TEXT_WORD_BUDGET,
+		DEFAULT_DIAGNOSTIC_WORD_BUDGET
+	} from '$lib/practice';
+	import type { BuiltinCorpusId } from '$lib/corpus';
 	import DataTransfer from '$lib/settings/DataTransfer.svelte';
 
 	// One corpus per language now — the `corpusIds` array on the profile

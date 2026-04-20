@@ -4,7 +4,7 @@
  * distribution, no target biasing needed). Falls back to word-synth from the
  * corpus when the language has no quote bank. RNG is injectable for tests.
  */
-import type { CorpusData, QuoteBank } from '../corpus/types';
+import type { CorpusData, QuoteBank } from '../corpus';
 import { generateRealTextSequence } from './real-text';
 
 /** ~5–8 min of typing at 60 WPM — enough samples per top bigram without dragging. */

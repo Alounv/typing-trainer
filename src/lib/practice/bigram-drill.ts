@@ -1,4 +1,4 @@
-import type { CorpusData } from '../corpus/types';
+import type { CorpusData } from '../corpus';
 
 /**
  * Bigram drill sequence: target-bearing words (70%) interleaved with filler (30%).

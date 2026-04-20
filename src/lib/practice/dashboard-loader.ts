@@ -1,13 +1,16 @@
-// Dashboard data loader. Bridges the pure planner to async storage so the
-// component only handles render. Outside the component so tests don't mount.
-import type { DiagnosticReport } from '../diagnostic/types';
-import type { SessionSummary, SessionType } from '../session/types';
-import type { UserSettings } from '../settings/profile';
-import { getProfile } from '../settings/profile';
-import { getBigramHistory, getRecentSessions } from '../storage/service';
+// Dashboard data loader + hand-off actions. Bridges the pure planner to async
+// storage so components only handle render, and owns the "Start → navigate
+// into a session route" side-effect so route components never touch
+// `sessionStorage` or `window.location` directly.
+import { resolve } from '$app/paths';
+import type { DiagnosticReport } from '../diagnostic';
+import type { SessionSummary, SessionType } from '../session';
+import { getProfile, type UserSettings } from '../settings';
+import { getBigramHistory, getRecentSessions } from '../storage';
 import { findGraduatedBigrams } from './graduation-filter';
 import { planDailySessions, sliceCompletedFromPlan } from './planner';
-import { applyBonusBaseline, readActiveBaseline } from './bonus-round';
+import { activateBonusRound, applyBonusBaseline, readActiveBaseline } from './bonus-round';
+import { stashPlannedSession } from './planned';
 import type { PlannedSession } from './types';
 
 /**
@@ -84,6 +87,46 @@ export async function loadDashboardData(opts: DashboardLoadOptions = {}): Promis
 		userSettings,
 		recentSessions
 	};
+}
+
+/**
+ * Hand-off action: stash the planned config for the target route to pick up,
+ * then navigate. Full-page navigation (not SvelteKit `goto`) matches the
+ * prior behaviour where each session route remounts cleanly with its
+ * freshly-consumed plan — avoids surprising state leaking across routes.
+ */
+export function startPlannedSession(planned: PlannedSession): void {
+	stashPlannedSession(planned);
+	window.location.href = routeForSessionType(planned.config.type);
+}
+
+/**
+ * Hand-off action: activate a bonus round and bounce the user back to the
+ * dashboard so a fresh plan renders. Takes `completedToday` rather than
+ * reading it here — the caller already has the loader's snapshot, and
+ * passing it in keeps this function free of storage reads.
+ */
+export function startBonusRound(completedToday: Partial<Record<SessionType, number>>): void {
+	activateBonusRound(completedToday);
+	// Full reload so `loadDashboardData` re-reads the baseline and the UI
+	// state matches the fresh plan from scratch.
+	window.location.href = resolve('/');
+}
+
+/**
+ * Route path for a planned session's type. Kept inside the loader so every
+ * "start a planned session" caller routes identically — previously every
+ * route component had its own copy of this switch.
+ */
+function routeForSessionType(type: SessionType): string {
+	switch (type) {
+		case 'diagnostic':
+			return resolve('/session/diagnostic');
+		case 'bigram-drill':
+			return resolve('/session/bigram-drill');
+		case 'real-text':
+			return resolve('/session/real-text');
+	}
 }
 
 // Count sessions per type finished today. "Today" = local calendar day — a rolling

@@ -13,12 +13,7 @@
 	 * would need invalidation plumbing we don't have yet, and import is
 	 * rare enough that a reload is the honest, bug-free path.
 	 */
-	import {
-		exportAll,
-		importAll,
-		ImportValidationError,
-		type ExportFile
-	} from '$lib/settings/data-transfer';
+	import { exportAll, importAll, ImportValidationError, type ExportFile } from './data-transfer';
 
 	type Status =
 		| { kind: 'idle' }

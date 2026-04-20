@@ -15,12 +15,12 @@ import {
 	isBuiltinCorpusId,
 	loadQuoteBank,
 	hasQuoteBank,
-	type BuiltinCorpusId
-} from '../corpus/registry';
-import type { FrequencyTable } from '../corpus/types';
-import { getProfile, type UserSettings } from '../settings/profile';
-import { getBigramHistory, getRecentSessions } from '../storage/service';
-import { consumePlannedSession } from '../session/planned';
+	type BuiltinCorpusId,
+	type FrequencyTable
+} from '../corpus';
+import { getProfile, type UserSettings } from '../settings';
+import { getBigramHistory, getRecentSessions } from '../storage';
+import { consumePlannedSession } from './planned';
 import { generateBigramDrillSequence, DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from './bigram-drill';
 import { generateRealTextSequence, DEFAULT_REAL_TEXT_WORD_BUDGET } from './real-text';
 import { sampleDiagnosticPassage, DEFAULT_DIAGNOSTIC_WORD_BUDGET } from './diagnostic-sampler';

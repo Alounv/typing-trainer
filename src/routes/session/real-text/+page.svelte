@@ -5,7 +5,7 @@
 	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
-	import { prepareRealTextSession } from '$lib/practice/session-loader';
+	import { prepareRealTextSession } from '$lib/practice';
 
 	type LoadState =
 		| { status: 'loading' }

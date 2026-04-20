@@ -11,24 +11,12 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { loadSummaryContext } from '$lib/session/summary-loader';
-	import type { SessionSummary, SessionType } from '$lib/session/types';
-	import type { BigramAggregate } from '$lib/bigram/types';
-	import { loadDashboardData } from '$lib/practice/dashboard-loader';
-	import { stashPlannedSession } from '$lib/session/planned';
-	import { activateBonusRound } from '$lib/practice/bonus-round';
-	import type { PlannedSession } from '$lib/practice/types';
-	import { computeSessionDelta, type SessionDelta as SessionDeltaModel } from '$lib/session/delta';
+	import { loadSummaryContext, type SummaryViewModel } from '$lib/session';
+	import { startPlannedSession, startBonusRound } from '$lib/practice';
+	import { type BigramAggregate, DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/bigram';
 	import SessionDelta from '$lib/session/components/SessionDelta.svelte';
-	import {
-		detectGraduations,
-		detectMilestone,
-		type GraduationEvent,
-		type MilestoneEvent
-	} from '$lib/progress/celebrations';
 	import Graduations from '$lib/session/components/Graduations.svelte';
 	import MilestoneBanner from '$lib/session/components/MilestoneBanner.svelte';
-	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/bigram/classification';
 
 	/**
 	 * Traffic-light threshold for the error-rate hero. The high-error cutoff
@@ -46,66 +34,16 @@
 		return 'text-success';
 	}
 
-	type LoadState =
-		| { status: 'loading' }
-		| {
-				status: 'ready';
-				summary: SessionSummary;
-				/** Post-session delta vs recent history. Null only when `computeSessionDelta` is skipped (never today, but defensive). */
-				delta: SessionDeltaModel;
-				/** Bigram-level threshold crossings to celebrate this session. Empty when nothing graduated. */
-				graduations: GraduationEvent[];
-				/** WPM milestone crossed this session, or `null` when none. */
-				milestone: MilestoneEvent | null;
-				next: PlannedSession | undefined;
-				/** Snapshot for `activateBonusRound` when the user starts another round from here. */
-				completedToday: Partial<Record<SessionType, number>>;
-		  }
-		| { status: 'missing' }
-		| { status: 'error'; message: string };
+	// The loader supplies everything but the async-lifecycle flags. Keep
+	// `loading` / `error` local — they describe the onMount call itself, not
+	// the view-model's domain state.
+	type LoadState = { status: 'loading' } | { status: 'error'; message: string } | SummaryViewModel;
 
 	let state = $state<LoadState>({ status: 'loading' });
 
 	onMount(async () => {
 		try {
-			// Load the session + recent history. The history feeds the planner
-			// (so the first remaining plan item *is* the real "what's next"),
-			// the delta, graduation detection, and milestone detection — one
-			// fetch shared across four consumers.
-			const { session: summary, recentSessions } = await loadSummaryContext(page.params.id!);
-			if (!summary) {
-				state = { status: 'missing' };
-				return;
-			}
-			const dashboard = await loadDashboardData({ recentSessions });
-			// `recentSessions` contains the just-saved session; `computeSessionDelta`
-			// excludes it internally when building the baseline so we don't need to
-			// pre-filter here.
-			const delta = computeSessionDelta(summary, recentSessions);
-			// Previous session for graduation comparison — most recent prior session
-			// with bigram data. Mirrors the rule used inside `computeSessionDelta`
-			// so the "bigrams graduated" count and the itemised list agree.
-			const prevWithBigrams =
-				recentSessions
-					.filter((s) => s.id !== summary.id && s.bigramAggregates.length > 0)
-					.sort((a, b) => b.timestamp - a.timestamp)[0] ?? null;
-			const graduations = detectGraduations(
-				prevWithBigrams ? prevWithBigrams.bigramAggregates : null,
-				summary.bigramAggregates
-			);
-			// Milestone detection runs on the smoothed WPM series — `detectMilestone`
-			// filters out `summary` from `recentSessions` internally and re-appends
-			// it, so passing the full recent window is safe.
-			const milestone = detectMilestone(summary, recentSessions);
-			state = {
-				status: 'ready',
-				summary,
-				delta,
-				graduations,
-				milestone,
-				next: dashboard.plan[0],
-				completedToday: dashboard.completedToday
-			};
+			state = await loadSummaryContext(page.params.id!);
 		} catch (err) {
 			state = {
 				status: 'error',
@@ -113,33 +51,6 @@
 			};
 		}
 	});
-
-	/** Route path for a planned session's type (mirrors the dashboard). */
-	function routeFor(type: SessionType): string {
-		switch (type) {
-			case 'diagnostic':
-				return resolve('/session/diagnostic');
-			case 'bigram-drill':
-				return resolve('/session/bigram-drill');
-			case 'real-text':
-				return resolve('/session/real-text');
-		}
-	}
-
-	function startNext(planned: PlannedSession) {
-		// Same handoff pattern the dashboard uses: stash the config so the
-		// session route can read its targets / word budget on mount.
-		stashPlannedSession(planned);
-		window.location.href = routeFor(planned.config.type);
-	}
-
-	function startAnotherRound(completedToday: Partial<Record<SessionType, number>>) {
-		// Mirrors the dashboard's "Start another round" button: snapshot
-		// today's completions as the new baseline, then land on the
-		// dashboard where the freshly-re-planned pair of cards is waiting.
-		activateBonusRound(completedToday);
-		window.location.href = resolve('/');
-	}
 
 	/**
 	 * Space-bar shortcut: trigger the primary CTA (next session if planned,
@@ -166,7 +77,7 @@
 
 		event.preventDefault();
 		if (state.next) {
-			startNext(state.next);
+			startPlannedSession(state.next);
 		} else {
 			window.location.href = resolve('/');
 		}
@@ -210,7 +121,7 @@
 	{:else if state.status === 'error'}
 		<p class="text-error" role="alert">Couldn't load session: {state.message}</p>
 	{:else}
-		{@const s = state.summary}
+		{@const s = state.session}
 		{@const slowest = slowestFive(s.bigramAggregates)}
 
 		<!--
@@ -325,7 +236,7 @@
 				<button
 					type="button"
 					class="btn btn-lg btn-primary"
-					onclick={() => startNext(next)}
+					onclick={() => startPlannedSession(next)}
 					data-testid="next-session"
 				>
 					Next session: {next.label} →
@@ -344,7 +255,7 @@
 				<button
 					type="button"
 					class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
-					onclick={() => startAnotherRound(completed)}
+					onclick={() => startBonusRound(completed)}
 					data-testid="summary-start-another-round"
 				>
 					Start another round

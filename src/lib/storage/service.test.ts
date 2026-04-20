@@ -4,19 +4,12 @@
 import 'fake-indexeddb/auto';
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-	clearAll,
-	getBigramHistory,
-	getProfile,
-	getRecentSessions,
-	getSession,
-	saveProfile
-} from './service';
+import { clearAll, getBigramHistory, getRecentSessions, getSession } from './service';
+import { saveProfile } from '../settings/profile';
 import { saveSession } from '../session/persistence';
 import type { SessionSummary } from '../session/types';
 import type { BigramAggregate } from '../bigram/types';
 import type { DiagnosticReport } from '../diagnostic/types';
-import type { UserSettings } from '../settings/profile';
 
 function makeAggregate(overrides: Partial<BigramAggregate> = {}): BigramAggregate {
 	return {
@@ -116,24 +109,6 @@ describe('storage service — round-trip', () => {
 		expect(roundTripped?.diagnosticReport).toEqual(report);
 	});
 
-	it('round-trips user settings (singleton row)', async () => {
-		const settings: UserSettings = {
-			languages: ['fr', 'en'],
-			corpusIds: ['fr', 'en']
-		};
-		await saveProfile(settings);
-		expect(await getProfile()).toEqual(settings);
-
-		// Overwriting replaces — not merges.
-		const next: UserSettings = { ...settings, languages: ['en'] };
-		await saveProfile(next);
-		expect(await getProfile()).toEqual(next);
-	});
-
-	it('returns undefined for the profile before the first save', async () => {
-		expect(await getProfile()).toBeUndefined();
-	});
-
 	it('clearAll wipes every table', async () => {
 		await saveSession(makeSession());
 		await saveProfile({ languages: ['en'], corpusIds: ['en'] });
@@ -142,6 +117,5 @@ describe('storage service — round-trip', () => {
 
 		expect(await getSession('s1')).toBeUndefined();
 		expect(await getBigramHistory('th')).toEqual([]);
-		expect(await getProfile()).toBeUndefined();
 	});
 });

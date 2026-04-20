@@ -3,12 +3,12 @@
  * graduated bigrams, decides the next single session — diagnostic or N interleaved
  * drill/real-text mini-sessions. The dashboard re-plans on each completion.
  */
-import type { SessionConfig, SessionType } from '../session/types';
+import type { SessionConfig, SessionType } from '../session';
+import type { UserSettings } from '../settings';
 import type { SchedulerInput, PlannedSession, PlannedSessionReason } from './types';
 import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from './bigram-drill';
 import { DEFAULT_REAL_TEXT_WORD_BUDGET } from './real-text';
 import { DEFAULT_DIAGNOSTIC_WORD_BUDGET } from './diagnostic-sampler';
-import type { UserSettings } from '../settings/profile';
 
 // Word-budget trio from user settings with factory defaults. Only the planner needs
 // all three at once; session routes each need only their own type.

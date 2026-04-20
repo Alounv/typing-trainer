@@ -1,4 +1,4 @@
-import type { KeystrokeEvent } from '../typing/types';
+import type { KeystrokeEvent } from '../typing';
 
 /** `targetWPM = baselineWPM × this`. 1.17 is modest — reachable, not punitive. */
 export const TARGET_WPM_MULTIPLIER = 1.17;

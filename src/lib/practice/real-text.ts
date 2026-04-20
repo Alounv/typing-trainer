@@ -1,6 +1,11 @@
-import type { CorpusData, Quote, QuoteBank, QuoteLengthGroup } from '../corpus/types';
-import { selectQuote } from '../corpus/quotes';
-import { selectRealTextSentence } from '../corpus/selection';
+import {
+	type CorpusData,
+	type Quote,
+	type QuoteBank,
+	type QuoteLengthGroup,
+	selectQuote,
+	selectRealTextSentence
+} from '../corpus';
 
 /**
  * Real-text passage generation. Prefers a quote bank (real prose with

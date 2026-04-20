@@ -5,7 +5,7 @@
 	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
-	import { prepareBigramDrillSession } from '$lib/practice/session-loader';
+	import { prepareBigramDrillSession } from '$lib/practice';
 
 	type LoadState =
 		| { status: 'loading' }

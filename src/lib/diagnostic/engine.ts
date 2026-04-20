@@ -1,12 +1,13 @@
-import type { BigramAggregate, BigramClassification } from '../bigram/types';
-import type { KeystrokeEvent } from '../typing/types';
-import type { FrequencyTable } from '../corpus/types';
-import type { DiagnosticReport, PriorityBigram } from './types';
 import {
+	type BigramAggregate,
+	type BigramClassification,
 	DEFAULT_THRESHOLDS,
 	MIN_OCCURRENCES_FOR_CLASSIFICATION,
 	type ClassificationThresholds
-} from '../bigram/classification';
+} from '../bigram';
+import type { KeystrokeEvent } from '../typing';
+import type { FrequencyTable } from '../corpus';
+import type { DiagnosticReport, PriorityBigram } from './types';
 import { computeTargetWPM, deriveBaselineWPM } from './pacing';
 
 /**
