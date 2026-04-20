@@ -397,22 +397,20 @@ Exit criterion: you can go to the deployed app, type the passage, and see stored
 
 > Post-session summaries and session-level feedback — what the user sees after every session.
 
-- [ ] **8.1** Session delta card (spec §10.3)
+- [x] **8.1** Session delta card (spec §10.3)
   - WPM in context of rolling average
   - Bigrams drilled + graduated
   - Error floor status
   - Interpretive summary sentence
-- [ ] **8.2** Bad session handling (spec §10.5)
-  - Contextual attribution for drops >15% below average
-  - Exclude outlier sessions from pacing target updates (>25% drop)
-- [ ] **8.3** Graduation events (spec §10.4)
+- ~~**8.2** Bad session handling (spec §10.5)~~ — dropped; no contextual attribution or outlier exclusion, treating every session as signal.
+- [x] **8.3** Graduation events (spec §10.4)
   - Inline callouts in post-session summary
   - Prominent callout when reaching healthy
-- [ ] **8.4** WPM milestones (spec §10.4)
-  - Full-screen acknowledgment at round numbers (60, 70, 80, 90, 100)
-  - Show journey context (sessions taken, starting point)
-- [ ] **8.5** Improvement streaks (spec §10.4)
-  - Per-bigram consecutive improvement tracking
+- [x] **8.4** WPM milestones (spec §10.4)
+  - Inline banner at round numbers (60, 70, 80, 90, 100) — full-screen treatment deferred; everything lives on the summary page
+  - Fires on the 7-session rolling average crossing a threshold, not raw WPM
+  - Journey context ("took N sessions from X baseline") deliberately omitted — the analytics page already shows the WPM trend
+- ~~**8.5** Improvement streaks (spec §10.4)~~ — dropped to keep the schema clean; would need a per-bigram streak counter in `ProgressStore` that nothing else currently consumes.
 
 ---
 
