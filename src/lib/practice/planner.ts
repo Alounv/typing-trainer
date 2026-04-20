@@ -3,7 +3,7 @@
  * graduated bigrams, decides the next single session — diagnostic or N interleaved
  * drill/real-text mini-sessions. The dashboard re-plans on each completion.
  */
-import type { SessionConfig, SessionType, UserSettings } from '../core';
+import type { PriorityBigram, SessionConfig, SessionType, UserSettings } from '../core';
 import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 	DEFAULT_REAL_TEXT_WORD_BUDGET,
@@ -134,6 +134,72 @@ export function selectDrillTargets(
 	}
 
 	return { priority, exposure };
+}
+
+/**
+ * Accuracy-mode selection: priority = `hasty` + `acquisition` targets (both fail
+ * on accuracy — hasty from rushing, acquisition from not yet knowing the
+ * motor pattern); exposure = undertrained corpus backfill, since unmeasured
+ * bigrams are also an error risk. Graduated filter applies; exposure is
+ * deduped against priority.
+ *
+ * Mirror shape of {@link selectDrillTargets} for drop-in replacement once
+ * the planner's rotation lands.
+ */
+export function selectAccuracyDrillMix(
+	priorityTargets: readonly PriorityBigram[],
+	undertrainedBigrams: readonly string[],
+	graduated: ReadonlySet<string> | undefined,
+	count: number
+): { priority: string[]; exposure: string[] } {
+	const filter = graduated ?? new Set<string>();
+
+	const priority: string[] = [];
+	for (const t of priorityTargets) {
+		if (t.classification !== 'hasty' && t.classification !== 'acquisition') continue;
+		if (filter.has(t.bigram)) continue;
+		priority.push(t.bigram);
+		if (priority.length >= count) break;
+	}
+
+	const remaining = count - priority.length;
+	const exposure: string[] = [];
+	if (remaining > 0) {
+		const seen = new Set(priority);
+		for (const b of undertrainedBigrams) {
+			if (filter.has(b)) continue;
+			if (seen.has(b)) continue;
+			exposure.push(b);
+			if (exposure.length >= remaining) break;
+		}
+	}
+
+	return { priority, exposure };
+}
+
+/**
+ * Speed-mode selection: priority = `fluency` targets only (accurate but
+ * slow — the class that benefits from pacer pressure). No exposure pool:
+ * undertrained bigrams go to accuracy mode where the "don't push speed yet"
+ * policy applies. Exposure kept in the return shape for symmetry with
+ * {@link selectAccuracyDrillMix} / `PlannedSession.drillMix`.
+ */
+export function selectSpeedDrillMix(
+	priorityTargets: readonly PriorityBigram[],
+	graduated: ReadonlySet<string> | undefined,
+	count: number
+): { priority: string[]; exposure: string[] } {
+	const filter = graduated ?? new Set<string>();
+
+	const priority: string[] = [];
+	for (const t of priorityTargets) {
+		if (t.classification !== 'fluency') continue;
+		if (filter.has(t.bigram)) continue;
+		priority.push(t.bigram);
+		if (priority.length >= count) break;
+	}
+
+	return { priority, exposure: [] };
 }
 
 function diagnosticPlan(

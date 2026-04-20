@@ -4,7 +4,7 @@
 	 *   - a title + lede (per session type)
 	 *   - a thin progress bar above the drill
 	 *   - the typing surface with live error / corrected-state tracking
-	 *   - a Timer + StatsBar row
+	 *   - a Timer + error-count row (WPM is reserved for the summary)
 	 *
 	 * Wiring: we build a {@link SessionRunner} from the supplied config and
 	 * feed every keystroke event into it. Once the text is fully typed we
@@ -16,8 +16,9 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import TypingSurface from '$lib/typing/TypingSurface.svelte';
 	import type { KeystrokeEvent } from '$lib/typing';
-	import type { DiagnosticReport, SessionType, SessionSummary } from '$lib/core';
+	import type { DiagnosticReport, DrillMode, SessionType, SessionSummary } from '$lib/core';
 	import { SessionRunner } from '../runner';
+	import { computeGhostPosition, paceForMode } from '../pacer';
 	import { saveSession } from '../persistence';
 	import Timer from './Timer.svelte';
 	import StatsBar from './StatsBar.svelte';
@@ -40,6 +41,18 @@
 		 */
 		exposureBigrams?: readonly string[];
 		/**
+		 * Drill treatment mode. Recorded on the persisted summary and drives
+		 * the pacer speed (accuracy → 0.60× baseline, speed → 1.17× baseline).
+		 * Undefined for non-drill types.
+		 */
+		drillMode?: DrillMode;
+		/**
+		 * User's current baseline WPM, from the latest diagnostic report.
+		 * Needed by the pacer to derive a real-time ghost cursor. Absent on
+		 * first-run / no-diagnostic state, in which case the pacer is hidden.
+		 */
+		baselineWPM?: number;
+		/**
 		 * Diagnostic routes pass a builder that turns the just-finalized summary
 		 * (plus its raw events, available in-memory only for this call) into a
 		 * `DiagnosticReport` which is attached to the summary before persistence.
@@ -60,6 +73,8 @@
 		approach,
 		targetBigrams,
 		exposureBigrams,
+		drillMode,
+		baselineWPM,
 		buildDiagnosticReport
 	}: Props = $props();
 
@@ -97,10 +112,21 @@
 	const runner = new SessionRunner({
 		type,
 		text,
-		targetBigrams
+		targetBigrams,
+		drillMode
 	});
 
 	const progressPct = $derived(Math.round((position / text.length) * 100));
+
+	// Pacer wiring. `paceWPM` resolves to 0 when either the session isn't a
+	// drill or the user has no diagnostic baseline — `ghostPosition` stays
+	// undefined in that case, which TextDisplay interprets as "no pacer."
+	// Only read `elapsedMs` once `running` is true so the ghost doesn't crawl
+	// forward before the first keystroke (reading/focus time shouldn't count).
+	const paceWPM = $derived(drillMode && baselineWPM ? paceForMode(drillMode, baselineWPM) : 0);
+	const ghostPosition = $derived(
+		paceWPM > 0 && running ? computeGhostPosition(elapsedMs, paceWPM) : undefined
+	);
 
 	function onEvent(event: KeystrokeEvent) {
 		if (sessionStart === null) {
@@ -268,7 +294,14 @@
 			></div>
 		</div>
 
-		<TypingSurface {text} bind:position {errorPositions} {correctedPositions} {onEvent} />
+		<TypingSurface
+			{text}
+			bind:position
+			{errorPositions}
+			{correctedPositions}
+			{ghostPosition}
+			{onEvent}
+		/>
 	</div>
 
 	<div class="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">

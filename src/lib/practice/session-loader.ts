@@ -18,7 +18,7 @@ import {
 	type BuiltinCorpusId,
 	type FrequencyTable
 } from '../corpus';
-import type { UserSettings } from '../core';
+import type { DrillMode, UserSettings } from '../core';
 import {
 	getProfile,
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
@@ -55,8 +55,18 @@ export interface BigramDrillSessionInputs {
 	targets: readonly string[];
 	/** Subset of `targets` backfilled as exposure; empty for pure-priority drills. */
 	exposure: readonly string[];
-	/** No priority targets at all — drives the exposure-only header copy. */
-	exposureOnly: boolean;
+	/**
+	 * Treatment mode. From a planned session's config when present; otherwise
+	 * defaults to `accuracy` for direct nav — the safer fallback because
+	 * accuracy mode doesn't apply speed pressure to bigrams we don't know
+	 * the classification of.
+	 */
+	drillMode: DrillMode;
+	/**
+	 * Latest diagnostic baseline WPM. Drives pacer speed. 0 when no
+	 * diagnostic has run — the shell then skips ghost rendering.
+	 */
+	baselineWPM: number;
 }
 
 export interface RealTextSessionInputs {
@@ -87,8 +97,6 @@ export async function prepareBigramDrillSession(): Promise<BigramDrillSessionInp
 	const resolved = fromPlan ?? (await resolveDirectNavMix());
 
 	const exposure = resolved.mix?.exposure ?? [];
-	const priorityCount = resolved.mix?.priority?.length ?? resolved.targets.length;
-	const exposureOnly = priorityCount === 0 && exposure.length > 0;
 
 	const corpus = await loadBuiltinCorpus(corpusId);
 	const seq = generateBigramDrillSequence({
@@ -96,7 +104,34 @@ export async function prepareBigramDrillSession(): Promise<BigramDrillSessionInp
 		corpus,
 		options: { wordCount: wordBudget }
 	});
-	return { text: seq.text, targets: resolved.targets, exposure, exposureOnly };
+	// Planned sessions carry the mode forward from the planner. Direct nav has
+	// no planner to defer to; we pick accuracy as the conservative default
+	// (see `drillMode` doc on `BigramDrillSessionInputs`).
+	const drillMode: DrillMode = planned?.config.drillMode ?? 'accuracy';
+
+	// Baseline for the pacer. Independent of the target selection — we always
+	// want the most recent baseline, even when the planner already resolved
+	// targets from an earlier report. Zero when no diagnostic exists, which
+	// the shell interprets as "hide the ghost cursor."
+	const baselineWPM = await getLatestBaselineWPM();
+
+	return {
+		text: seq.text,
+		targets: resolved.targets,
+		exposure,
+		drillMode,
+		baselineWPM
+	};
+}
+
+/**
+ * Latest baseline WPM from the most recent diagnostic report. Returns 0 if no
+ * diagnostic session is on file — caller treats this as "no pacer yet."
+ */
+async function getLatestBaselineWPM(): Promise<number> {
+	const recent = await getRecentSessions(RECENT_WINDOW);
+	const report = recent.find((s) => s.type === 'diagnostic')?.diagnosticReport;
+	return report?.baselineWPM ?? 0;
 }
 
 export async function prepareRealTextSession(): Promise<RealTextSessionInputs> {

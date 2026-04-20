@@ -6,6 +6,7 @@
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
 	import { prepareBigramDrillSession } from '$lib/practice';
+	import type { DrillMode } from '$lib/core';
 
 	type LoadState =
 		| { status: 'loading' }
@@ -15,8 +16,8 @@
 				targets: readonly string[];
 				/** Subset of `targets` backfilled as exposure; empty for pure-priority drills. */
 				exposure: readonly string[];
-				/** No priority targets at all — drives the exposure-only header copy. */
-				exposureOnly: boolean;
+				drillMode: DrillMode;
+				baselineWPM: number;
 		  }
 		| { status: 'error'; message: string };
 
@@ -40,18 +41,22 @@
 {:else if state.status === 'error'}
 	<p class="mx-auto max-w-3xl text-error" role="alert">{state.message}</p>
 {:else}
-	<!-- Header copy flexes by mix — priority-only / mixed / exposure-only. -->
+	<!--
+		Title + instructions flex by drill mode. Accuracy mode targets
+		hasty/acquisition bigrams — pacer runs *below* baseline (0.60×) so
+		the rhythm discourages rushing. Speed mode targets fluency bigrams —
+		pacer runs *above* baseline (1.17×) to push past the current ceiling.
+	-->
 	<SessionShell
 		type="bigram-drill"
 		text={state.text}
-		title="Bigram drill"
-		what={state.exposureOnly
-			? 'Exposure practice on frequent bigrams. Not enough data yet to diagnose specific weaknesses — this drill builds up samples so the next diagnostic can pinpoint them.'
-			: state.exposure.length > 0
-				? 'Targeted practice mixing bigrams your diagnostic flagged as weak with frequent bigrams we still need more data on. The passage over-samples all of them.'
-				: 'Targeted practice on the bigrams your last diagnostic flagged. The passage over-samples them so each target recurs many times per minute.'}
-		approach="Accuracy over speed. Mistype, correct, continue — every transition is measured, so a rushed pass doesn't help."
+		title={state.drillMode === 'speed' ? 'Speed drill' : 'Accuracy drill'}
+		approach={state.drillMode === 'speed'
+			? 'Push the pace. The pacer ghost runs at your target WPM — stay with it or ahead. Accuracy still counts, but this is where you chase speed.'
+			: "Slow down. The pacer ghost runs below your baseline on purpose — let it get ahead if you need to. Hitting every key correctly is the whole point."}
 		targetBigrams={state.targets}
 		exposureBigrams={state.exposure}
+		drillMode={state.drillMode}
+		baselineWPM={state.baselineWPM}
 	/>
 {/if}

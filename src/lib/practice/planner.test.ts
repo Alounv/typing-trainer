@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
 	planDailySessions,
 	sliceCompletedFromPlan,
+	selectAccuracyDrillMix,
+	selectSpeedDrillMix,
 	DIAGNOSTIC_INTERVAL,
 	DEFAULT_DRILL_TARGET_COUNT,
 	PAIRS_PER_DAY
@@ -334,5 +336,99 @@ describe('sliceCompletedFromPlan', () => {
 		const diagPlan = planDailySessions({ recentSessions: [] });
 		const remaining = sliceCompletedFromPlan(diagPlan, { 'bigram-drill': 3 });
 		expect(remaining).toEqual(diagPlan);
+	});
+});
+
+/**
+ * Build a `PriorityBigram` with an explicit class. The default helper up top
+ * hard-codes `fluency`; these tests need a mix of classes to exercise the
+ * accuracy-vs-speed split.
+ */
+function pt(bigram: string, classification: PriorityBigram['classification']): PriorityBigram {
+	return { bigram, score: 1, meanTime: 300, errorRate: 0, classification };
+}
+
+describe('selectAccuracyDrillMix', () => {
+	it('includes hasty and acquisition targets, excludes fluency', () => {
+		const mix = selectAccuracyDrillMix(
+			[pt('th', 'hasty'), pt('er', 'fluency'), pt('in', 'acquisition')],
+			[],
+			undefined,
+			10
+		);
+		expect(mix.priority).toEqual(['th', 'in']);
+		expect(mix.exposure).toEqual([]);
+	});
+
+	it('backfills with undertrained when priority is short of count', () => {
+		const mix = selectAccuracyDrillMix([pt('th', 'hasty')], ['ab', 'cd'], undefined, 3);
+		expect(mix.priority).toEqual(['th']);
+		expect(mix.exposure).toEqual(['ab', 'cd']);
+	});
+
+	it('does not backfill when priority fills the count', () => {
+		const mix = selectAccuracyDrillMix(
+			[pt('th', 'hasty'), pt('in', 'acquisition')],
+			['ab'],
+			undefined,
+			2
+		);
+		expect(mix.priority).toEqual(['th', 'in']);
+		expect(mix.exposure).toEqual([]);
+	});
+
+	it('respects graduated filter on both priority and exposure', () => {
+		const graduated = new Set(['th', 'ab']);
+		const mix = selectAccuracyDrillMix(
+			[pt('th', 'hasty'), pt('in', 'acquisition')],
+			['ab', 'cd'],
+			graduated,
+			4
+		);
+		expect(mix.priority).toEqual(['in']);
+		expect(mix.exposure).toEqual(['cd']);
+	});
+
+	it('dedupes exposure against priority', () => {
+		// Same bigram appearing in both lists — shouldn't double-count.
+		const mix = selectAccuracyDrillMix([pt('th', 'hasty')], ['th', 'ab'], undefined, 3);
+		expect(mix.priority).toEqual(['th']);
+		expect(mix.exposure).toEqual(['ab']);
+	});
+});
+
+describe('selectSpeedDrillMix', () => {
+	it('includes fluency only, excludes hasty and acquisition', () => {
+		const mix = selectSpeedDrillMix(
+			[pt('th', 'hasty'), pt('er', 'fluency'), pt('in', 'acquisition')],
+			undefined,
+			10
+		);
+		expect(mix.priority).toEqual(['er']);
+	});
+
+	it('returns empty exposure regardless of input', () => {
+		// Speed mode has no exposure bucket — undertrained bigrams go to accuracy.
+		const mix = selectSpeedDrillMix([pt('er', 'fluency')], undefined, 10);
+		expect(mix.exposure).toEqual([]);
+	});
+
+	it('respects graduated filter', () => {
+		const graduated = new Set(['er']);
+		const mix = selectSpeedDrillMix(
+			[pt('er', 'fluency'), pt('an', 'fluency')],
+			graduated,
+			10
+		);
+		expect(mix.priority).toEqual(['an']);
+	});
+
+	it('caps priority at count', () => {
+		const mix = selectSpeedDrillMix(
+			[pt('er', 'fluency'), pt('an', 'fluency'), pt('ou', 'fluency')],
+			undefined,
+			2
+		);
+		expect(mix.priority).toEqual(['er', 'an']);
 	});
 });

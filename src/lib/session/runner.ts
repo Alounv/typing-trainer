@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import { annotateFirstInputs, type KeystrokeEvent } from '../typing';
 import { extractBigramAggregates, type ClassificationThresholds } from '../bigram';
-import type { SessionSummary, SessionType } from '../core';
+import type { DrillMode, SessionSummary, SessionType } from '../core';
 
 /**
  * Inputs for turning a finished capture into a persistable summary.
@@ -16,6 +16,8 @@ export interface BuildSessionSummaryInput {
 	/** `performance.now()` relative duration of the session in ms. */
 	durationMs: number;
 	bigramsTargeted?: string[];
+	/** Drill mode — recorded on the summary so it survives a round-trip through storage. */
+	drillMode?: DrillMode;
 	/** Override the default classification thresholds. */
 	thresholds?: ClassificationThresholds;
 	/** Injectable for tests; defaults to `uuid()` + `Date.now()`. */
@@ -42,6 +44,7 @@ export function buildSessionSummary(input: BuildSessionSummaryInput): SessionSum
 		wpm: computeWPM(input.textLength, input.durationMs),
 		errorRate: computeErrorRate(annotated),
 		bigramsTargeted: input.bigramsTargeted,
+		drillMode: input.drillMode,
 		bigramAggregates
 	};
 }
@@ -76,6 +79,8 @@ export interface SessionRunnerConfig {
 	 * analysis (cross-session graduation lives in `practice/graduation-filter`).
 	 */
 	targetBigrams?: readonly string[];
+	/** Drill mode (accuracy / speed). Unused for non-drill types. */
+	drillMode?: DrillMode;
 	/** Injectable so tests get deterministic ids. */
 	idGenerator?: () => string;
 	/** Injectable so tests get deterministic timestamps for `finalize`. */
@@ -119,6 +124,7 @@ export class SessionRunner {
 			textLength: this.config.text.length,
 			durationMs: elapsedMs,
 			bigramsTargeted: this.config.targetBigrams ? [...this.config.targetBigrams] : undefined,
+			drillMode: this.config.drillMode,
 			thresholds: this.config.thresholds,
 			idGenerator: this.config.idGenerator,
 			timestampProvider: this.config.timestampProvider

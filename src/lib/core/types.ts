@@ -116,6 +116,13 @@ export interface SessionSummary {
 	errorRate: number;
 	/** Set for `bigram-drill`, absent for `real-text` and `diagnostic`. */
 	bigramsTargeted?: string[];
+	/**
+	 * Set for `bigram-drill` sessions from the treatment-rotation era forward.
+	 * Absent on legacy drill sessions (pre-rotation) and on non-drill types,
+	 * so consumers must treat `undefined` as "unknown / not applicable" rather
+	 * than a default.
+	 */
+	drillMode?: DrillMode;
 	bigramAggregates: BigramAggregate[];
 	/**
 	 * Populated only for `type === 'diagnostic'`. Computed at save time so the
@@ -133,7 +140,22 @@ export interface SessionConfig {
 	 */
 	wordBudget: number;
 	bigramsTargeted?: string[];
+	/**
+	 * Only meaningful when `type === 'bigram-drill'`. Drives pacer speed and
+	 * on-screen instruction copy: accuracy mode targets `baselineWPM × 0.60`
+	 * for hasty/acquisition bigrams (slow-down pressure), speed mode targets
+	 * `targetWPM` (baseline × 1.17) for fluency bigrams (push-speed pressure).
+	 * Absent on legacy sessions and non-drill types.
+	 */
+	drillMode?: DrillMode;
 }
+
+/**
+ * Which treatment the drill session applies. `accuracy` = no speed pressure,
+ * repetition on hasty/acquisition + undertrained targets. `speed` = pacer at
+ * `targetWPM` over already-accurate fluency targets.
+ */
+export type DrillMode = 'accuracy' | 'speed';
 
 // ──────────────────────────────────────────────────────────────
 // Settings
