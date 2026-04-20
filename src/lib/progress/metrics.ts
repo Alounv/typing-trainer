@@ -288,6 +288,46 @@ function badness1D(
 }
 
 /**
+ * Bucketed counts across the four classified states. Shape-compatible with
+ * `DiagnosticReport.counts` so the classification bar can take either a live
+ * tally or a diagnostic snapshot.
+ *
+ * `unclassified` is surfaced separately because it isn't a point on the
+ * acquisition→healthy ladder — it's "not enough data yet". Consumers decide
+ * whether to show it (e.g. as supporting copy) rather than folding it into
+ * the stacked bar and distorting the mix.
+ */
+export interface ClassificationMix {
+	counts: {
+		healthy: number;
+		fluency: number;
+		hasty: number;
+		acquisition: number;
+	};
+	unclassified: number;
+}
+
+/**
+ * Tally the live classification mix across all bigrams the user has data for.
+ * Uses each row's current classification (sliding-window, thresholds already
+ * applied by `summarizeBigrams`) — i.e. "where do I stand *right now*", not
+ * "where did I stand at the last diagnostic".
+ */
+export function tallyClassificationMix(
+	bigrams: readonly Pick<BigramSummary, 'classification'>[]
+): ClassificationMix {
+	const mix: ClassificationMix = {
+		counts: { healthy: 0, fluency: 0, hasty: 0, acquisition: 0 },
+		unclassified: 0
+	};
+	for (const b of bigrams) {
+		if (b.classification === 'unclassified') mix.unclassified++;
+		else mix.counts[b.classification]++;
+	}
+	return mix;
+}
+
+/**
  * Count how many bigrams transitioned into `healthy` between two diagnostic
  * reports — driven off the latest snapshot in each set. A bigram that wasn't
  * present in the "before" set but is healthy in "after" counts as a

@@ -12,7 +12,9 @@
 		buildWpmSeries,
 		countGraduations,
 		summarizeBigrams,
+		tallyClassificationMix,
 		type BigramSummary,
+		type ClassificationMix,
 		type TrendPoint,
 		type WpmPoint
 	} from '$lib/progress/metrics';
@@ -42,13 +44,22 @@
 				wpm: WpmPoint[];
 				errorRate: TrendPoint[];
 				bigrams: BigramSummary[];
-				/** Most recent diagnostic report, if one exists. */
-				currentDiagnostic: DiagnosticReport | null;
-				/** Second-most-recent diagnostic report. `null` until a second diagnostic lands. */
-				previousDiagnostic: DiagnosticReport | null;
 				/**
-				 * Bigrams that transitioned into `healthy` between the previous and current
-				 * diagnostic. `null` until two diagnostics exist — avoids an ambiguous "0".
+				 * Live tally of classifications across every bigram the user has
+				 * encountered — the "where do I stand *now*" snapshot, driven by
+				 * the same sliding-window logic as the bigram table.
+				 */
+				liveClassification: ClassificationMix;
+				/**
+				 * Most recent diagnostic report. Retained as the comparison row
+				 * ("have I improved since my last diagnostic?"). `null` until the
+				 * user runs their first diagnostic.
+				 */
+				lastDiagnostic: DiagnosticReport | null;
+				/**
+				 * Bigrams that transitioned into `healthy` between the two most
+				 * recent diagnostics. `null` until two diagnostics exist — avoids
+				 * an ambiguous "0".
 				 */
 				graduatedCount: number | null;
 		  }
@@ -84,20 +95,27 @@
 			}
 
 			const diagnosticSessions = pickDiagnosticSessions(sessions);
-			const [currentSession, previousSession] = diagnosticSessions;
+			const [latestDiagnosticSession, previousDiagnosticSession] = diagnosticSessions;
+			// Graduations are a diagnostic-to-diagnostic measurement — unchanged
+			// by the switch to a live "current" row.
 			const graduatedCount =
-				currentSession && previousSession
-					? countGraduations(previousSession.bigramAggregates, currentSession.bigramAggregates)
+				latestDiagnosticSession && previousDiagnosticSession
+					? countGraduations(
+							previousDiagnosticSession.bigramAggregates,
+							latestDiagnosticSession.bigramAggregates
+						)
 					: null;
+
+			const bigrams = summarizeBigrams(sessions, corpusFrequencies);
 
 			state = {
 				status: 'ready',
 				sessions,
 				wpm: buildWpmSeries(sessions),
 				errorRate: buildErrorRateSeries(sessions),
-				bigrams: summarizeBigrams(sessions, corpusFrequencies),
-				currentDiagnostic: currentSession?.diagnosticReport ?? null,
-				previousDiagnostic: previousSession?.diagnosticReport ?? null,
+				bigrams,
+				liveClassification: tallyClassificationMix(bigrams),
+				lastDiagnostic: latestDiagnosticSession?.diagnosticReport ?? null,
 				graduatedCount
 			};
 		} catch (err) {
@@ -154,13 +172,39 @@
 			<div class="flex items-baseline justify-between">
 				<h2 class="text-xl font-semibold">Classification mix</h2>
 			</div>
-			{#if state.currentDiagnostic}
+			{#if state.liveClassification.counts.healthy + state.liveClassification.counts.fluency + state.liveClassification.counts.hasty + state.liveClassification.counts.acquisition > 0}
 				<div class="rounded-lg border border-base-300 bg-base-100 p-4">
 					<ClassificationBar
-						current={state.currentDiagnostic}
-						previous={state.previousDiagnostic}
+						current={{
+							label: 'Current classification',
+							counts: state.liveClassification.counts,
+							// "Now" rather than a date — the row is live, not a snapshot.
+							meta: 'Now'
+						}}
+						previous={state.lastDiagnostic
+							? {
+									label: 'Last diagnostic',
+									counts: state.lastDiagnostic.counts,
+									meta: new Date(state.lastDiagnostic.timestamp).toLocaleDateString(undefined, {
+										month: 'short',
+										day: 'numeric',
+										year: 'numeric'
+									})
+								}
+							: null}
+						previousPlaceholder="Run a diagnostic to compare your current mix against a baseline."
 					/>
 				</div>
+				{#if state.liveClassification.unclassified > 0}
+					<!-- Surface undertrained bigrams as supporting copy rather than
+					     folding them into the bar, so the stacked percentages
+					     reflect classified bigrams only. -->
+					<p class="text-xs text-base-content/55">
+						{state.liveClassification.unclassified}
+						{state.liveClassification.unclassified === 1 ? 'bigram is' : 'bigrams are'} still undertrained
+						(fewer than 10 observations) and excluded from the bar.
+					</p>
+				{/if}
 				{#if state.graduatedCount !== null}
 					<p class="text-sm text-base-content/70" data-testid="graduations-delta">
 						<!--
@@ -183,12 +227,13 @@
 					</p>
 				{/if}
 				<p class="text-xs text-base-content/55">
-					Each segment is a bigram bucket sized by share of the diagnostic. Goal over time: shift
-					the bar toward green (healthy).
+					Each segment is a bigram bucket sized by share of your classified bigrams. Goal over time:
+					shift the bar toward green (healthy).
 				</p>
 			{:else}
 				<p class="text-sm text-base-content/60">
-					Run a diagnostic session to see your bigram distribution.
+					Not enough practice yet — classifications need at least 10 observations per bigram. Keep
+					drilling and this will fill in.
 				</p>
 			{/if}
 		</section>

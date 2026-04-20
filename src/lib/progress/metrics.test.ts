@@ -7,6 +7,7 @@ import {
 	summarizeBigrams,
 	aggregateLastNOccurrences,
 	countGraduations,
+	tallyClassificationMix,
 	WPM_ROLLING_WINDOW
 } from './metrics';
 import type { SessionSummary } from '../session/types';
@@ -294,5 +295,32 @@ describe('countGraduations', () => {
 		const before = [agg('th', 's1', { classification: 'healthy' })];
 		const after = [agg('th', 's2', { classification: 'hasty' })];
 		expect(countGraduations(before, after)).toBe(0);
+	});
+});
+
+describe('tallyClassificationMix', () => {
+	it('counts each classified bigram into its bucket and keeps unclassified separate', () => {
+		const rows = [
+			{ classification: 'healthy' as BigramClassification },
+			{ classification: 'healthy' as BigramClassification },
+			{ classification: 'fluency' as BigramClassification },
+			{ classification: 'hasty' as BigramClassification },
+			{ classification: 'acquisition' as BigramClassification },
+			{ classification: 'acquisition' as BigramClassification },
+			{ classification: 'unclassified' as BigramClassification },
+			{ classification: 'unclassified' as BigramClassification },
+			{ classification: 'unclassified' as BigramClassification }
+		];
+		expect(tallyClassificationMix(rows)).toEqual({
+			counts: { healthy: 2, fluency: 1, hasty: 1, acquisition: 2 },
+			unclassified: 3
+		});
+	});
+
+	it('returns all-zero buckets for an empty input', () => {
+		expect(tallyClassificationMix([])).toEqual({
+			counts: { healthy: 0, fluency: 0, hasty: 0, acquisition: 0 },
+			unclassified: 0
+		});
 	});
 });
