@@ -22,7 +22,6 @@ async function stashDrillPlan(page: Page, mix: SeededMix): Promise<void> {
 			// Exposure backfill is accuracy-only; speed route would need its own fluency-only fixtures.
 			drillMode: 'accuracy'
 		},
-		reason: 'default-drill',
 		label: 'Accuracy drill',
 		rationale: 'test',
 		drillMix: mix

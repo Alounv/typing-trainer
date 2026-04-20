@@ -33,22 +33,8 @@ export function planSlotKeyForSession(
 	return session.type;
 }
 
-/**
- * Why the planner emitted a given entry. Drives the dashboard copy
- * ("Time for your weekly diagnostic", "Warm-up drill", …) and lets
- * tests assert behavior without string-matching UI labels.
- */
-export type PlannedSessionReason =
-	| 'first-run-diagnostic'
-	| 'cadence-diagnostic'
-	| 'missing-report-diagnostic'
-	| 'fresh-plan-diagnostic'
-	| 'default-drill'
-	| 'default-realtext';
-
 export interface PlannedSession {
 	config: SessionConfig;
-	reason: PlannedSessionReason;
 	/** Short human-readable string for the dashboard card. */
 	label: string;
 	/** Optional longer "why this, why now" line. */

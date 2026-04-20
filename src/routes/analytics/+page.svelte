@@ -29,6 +29,9 @@
 		| {
 				status: 'ready';
 				sessions: SessionSummary[];
+				/** Diagnostic-only subset — drives the long-term trend charts so short
+				 * drills and real-text runs don't distort the baseline-ability signal. */
+				diagnosticSessions: SessionSummary[];
 				wpm: WpmPoint[];
 				errorRate: TrendPoint[];
 				bigrams: BigramSummary[];
@@ -69,8 +72,8 @@
 		try {
 			const { sessions, corpusFrequencies } = await loadAnalyticsInputs();
 
-			const diagnosticSessions = pickDiagnosticSessions(sessions);
-			const [latestDiagnosticSession, previousDiagnosticSession] = diagnosticSessions;
+			const diagnosticSessions = sessions.filter((s) => s.type === 'diagnostic');
+			const [latestDiagnosticSession, previousDiagnosticSession] = pickDiagnosticSessions(sessions);
 			// Graduations are a diagnostic-to-diagnostic measurement — unchanged
 			// by the switch to a live "current" row.
 			const graduatedCount =
@@ -86,8 +89,9 @@
 			state = {
 				status: 'ready',
 				sessions,
-				wpm: buildWpmSeries(sessions),
-				errorRate: buildErrorRateSeries(sessions),
+				diagnosticSessions,
+				wpm: buildWpmSeries(diagnosticSessions),
+				errorRate: buildErrorRateSeries(diagnosticSessions),
 				bigrams,
 				liveClassification: tallyClassificationMix(bigrams),
 				lastDiagnostic: latestDiagnosticSession?.diagnosticReport ?? null,
@@ -117,29 +121,30 @@
 			<div class="flex items-baseline justify-between">
 				<h2 class="text-xl font-semibold">WPM trend</h2>
 				<p class="text-sm text-base-content/55">
-					{state.sessions.length}
-					{state.sessions.length === 1 ? 'session' : 'sessions'}
+					{state.diagnosticSessions.length}
+					{state.diagnosticSessions.length === 1 ? 'diagnostic' : 'diagnostics'}
 				</p>
 			</div>
 			<div class="rounded-lg border border-base-300 bg-base-100 p-4">
 				<WpmChart points={state.wpm} />
 			</div>
 			<p class="text-xs text-base-content/55">
-				Dots are individual sessions. The line is a 7-session rolling average; the shaded band is
-				±1σ around that average.
+				Dots are individual diagnostic sessions. The line is a 7-diagnostic rolling average; the
+				shaded band is ±1σ around that average.
 			</p>
 		</section>
 
 		<section class="space-y-3" data-testid="error-rate-trend">
 			<div class="flex items-baseline justify-between">
 				<h2 class="text-xl font-semibold">Error rate</h2>
-				<p class="text-sm text-base-content/55">Per session</p>
+				<p class="text-sm text-base-content/55">Per diagnostic</p>
 			</div>
 			<div class="rounded-lg border border-base-300 bg-base-100 p-4">
 				<ErrorRateChart points={state.errorRate} />
 			</div>
 			<p class="text-xs text-base-content/55">
-				Fraction of keystrokes that were first-input errors. The line smooths across 7 sessions.
+				Fraction of keystrokes that were first-input errors, per diagnostic. The line smooths across
+				7 diagnostics.
 			</p>
 		</section>
 

@@ -4,13 +4,7 @@ import {
 	DEFAULT_REAL_TEXT_WORD_BUDGET,
 	DEFAULT_DIAGNOSTIC_WORD_BUDGET
 } from '../settings';
-import {
-	planSlotKey,
-	type PlanSlotKey,
-	type SchedulerInput,
-	type PlannedSession,
-	type PlannedSessionReason
-} from './types';
+import { planSlotKey, type PlanSlotKey, type SchedulerInput, type PlannedSession } from './types';
 
 function resolveWordBudgets(settings?: UserSettings) {
 	return {
@@ -56,20 +50,38 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	// 1. First-run: user has never completed a session. Need a diagnostic
 	//    before we can compute baseline WPM.
 	if (recentSessions.length === 0) {
-		return [diagnosticPlan('first-run-diagnostic', undefined, budgets.diagnostic)];
+		return [
+			diagnosticPlan(
+				budgets.diagnostic,
+				'First diagnostic',
+				'Establishes your baseline WPM and highlights which bigrams to drill.'
+			)
+		];
 	}
 
 	// 2. Sessions exist but no diagnostic report — manual deletion or schema
 	//    migration. Fail safe with a fresh diagnostic so drill has targets.
 	if (!latestDiagnosticReport) {
-		return [diagnosticPlan('missing-report-diagnostic', undefined, budgets.diagnostic)];
+		return [
+			diagnosticPlan(
+				budgets.diagnostic,
+				'Diagnostic',
+				'No diagnostic on file — running one now so drills have current targets.'
+			)
+		];
 	}
 
 	// 3. Cadence: every DIAGNOSTIC_INTERVAL non-diagnostic sessions, re-run
 	//    so thresholds and priority targets stay current.
 	const since = sessionsSinceLastDiagnostic(recentSessions);
 	if (since >= DIAGNOSTIC_INTERVAL) {
-		return [diagnosticPlan('cadence-diagnostic', since, budgets.diagnostic)];
+		return [
+			diagnosticPlan(
+				budgets.diagnostic,
+				'Weekly diagnostic',
+				`${since} sessions since your last diagnostic — time to refresh targets.`
+			)
+		];
 	}
 
 	// 4. Default daily = treatment cycle. Split the priority list by class so
@@ -106,7 +118,11 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	// first thing they see is "refresh your baseline."
 	if (planStartedAt && latestDiagnosticReport.timestamp < planStartedAt) {
 		return [
-			diagnosticPlan('fresh-plan-diagnostic', undefined, budgets.diagnostic),
+			diagnosticPlan(
+				budgets.diagnostic,
+				'Fresh-plan diagnostic',
+				'Start of a fresh plan — refresh the baseline so the drills below use current targets.'
+			),
 			...drillPlanItems
 		];
 	}
@@ -205,43 +221,11 @@ export function selectSpeedDrillMix(
 	return { priority, exposure: [] };
 }
 
-function diagnosticPlan(
-	reason: Extract<
-		PlannedSessionReason,
-		| 'first-run-diagnostic'
-		| 'cadence-diagnostic'
-		| 'missing-report-diagnostic'
-		| 'fresh-plan-diagnostic'
-	>,
-	sessionsSince: number | undefined,
-	wordBudget: number
-): PlannedSession {
-	const config: SessionConfig = {
-		type: 'diagnostic',
-		wordBudget
-	};
-	const labels: Record<typeof reason, string> = {
-		'first-run-diagnostic': 'First diagnostic',
-		'cadence-diagnostic': 'Weekly diagnostic',
-		'missing-report-diagnostic': 'Diagnostic',
-		'fresh-plan-diagnostic': 'Fresh-plan diagnostic'
-	};
-	const rationales: Record<typeof reason, string> = {
-		'first-run-diagnostic': 'Establishes your baseline WPM and highlights which bigrams to drill.',
-		'cadence-diagnostic':
-			sessionsSince !== undefined
-				? `${sessionsSince} sessions since your last diagnostic — time to refresh targets.`
-				: 'Refreshes your drill targets and baseline.',
-		'missing-report-diagnostic':
-			'No diagnostic on file — running one now so drills have current targets.',
-		'fresh-plan-diagnostic':
-			'Start of a fresh plan — refresh the baseline so the drills below use current targets.'
-	};
+function diagnosticPlan(wordBudget: number, label: string, rationale: string): PlannedSession {
 	return {
-		config,
-		reason,
-		label: labels[reason],
-		rationale: rationales[reason]
+		config: { type: 'diagnostic', wordBudget },
+		label,
+		rationale
 	};
 }
 
@@ -260,7 +244,6 @@ function drillPlan(
 	};
 	return {
 		config,
-		reason: 'default-drill',
 		label: mode === 'speed' ? 'Speed drill' : 'Accuracy drill',
 		rationale: buildDrillRationale(mix, mode),
 		drillMix: mix
@@ -320,7 +303,6 @@ function realtextPlan(wordBudget: number, hint?: 'no-targets-left'): PlannedSess
 	};
 	return {
 		config,
-		reason: 'default-realtext',
 		label: 'Real text',
 		rationale:
 			hint === 'no-targets-left'

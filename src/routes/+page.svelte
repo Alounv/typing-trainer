@@ -111,7 +111,7 @@
 			{#each data.plan as planned, i (i)}
 				<article
 					class="rounded-lg border border-base-300 p-6 transition-colors hover:border-base-content/30"
-					data-testid={`plan-card-${planned.reason}`}
+					data-testid={`plan-card-${planned.config.type}`}
 				>
 					<div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
 						<div class="space-y-1">

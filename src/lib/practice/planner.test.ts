@@ -77,7 +77,7 @@ describe('planDailySessions — diagnostic triggers', () => {
 		const plan = planDailySessions({ recentSessions: [] });
 		expect(plan).toHaveLength(1);
 		expect(plan[0].config.type).toBe('diagnostic');
-		expect(plan[0].reason).toBe('first-run-diagnostic');
+		expect(plan[0].label).toBe('First diagnostic');
 	});
 
 	it('history exists but no diagnostic report → fallback diagnostic', () => {
@@ -85,7 +85,8 @@ describe('planDailySessions — diagnostic triggers', () => {
 			recentSessions: recent('real-text', 'bigram-drill')
 		});
 		expect(plan).toHaveLength(1);
-		expect(plan[0].reason).toBe('missing-report-diagnostic');
+		expect(plan[0].config.type).toBe('diagnostic');
+		expect(plan[0].rationale).toMatch(/no diagnostic on file/i);
 	});
 
 	/**
@@ -111,10 +112,10 @@ describe('planDailySessions — diagnostic triggers', () => {
 				latestDiagnosticReport: report(['th', 'he'])
 			});
 			if (shouldDiagnose) {
-				expect(plan[0].reason).toBe('cadence-diagnostic');
 				expect(plan[0].config.type).toBe('diagnostic');
+				expect(plan[0].label).toBe('Weekly diagnostic');
 			} else {
-				expect(plan[0].reason).toBe('default-drill');
+				expect(plan[0].config.type).toBe('bigram-drill');
 			}
 		}
 	);
@@ -133,8 +134,8 @@ describe('planDailySessions — diagnostic triggers', () => {
 				latestDiagnosticReport: report(['th']),
 				planStartedAt: 1000
 			});
-			expect(plan[0].reason).toBe('fresh-plan-diagnostic');
 			expect(plan[0].config.type).toBe('diagnostic');
+			expect(plan[0].label).toBe('Fresh-plan diagnostic');
 			// Rest of the day follows.
 			expect(plan.length).toBeGreaterThan(1);
 			expect(plan[1].config.type).toBe('bigram-drill');
@@ -146,7 +147,7 @@ describe('planDailySessions — diagnostic triggers', () => {
 				latestDiagnosticReport: { ...report(['th']), timestamp: 5000 },
 				planStartedAt: 1000
 			});
-			expect(plan[0].reason).not.toBe('fresh-plan-diagnostic');
+			expect(plan[0].config.type).not.toBe('diagnostic');
 		});
 
 		it('does nothing when planStartedAt is unset', () => {
@@ -154,7 +155,7 @@ describe('planDailySessions — diagnostic triggers', () => {
 				recentSessions: recent('diagnostic'),
 				latestDiagnosticReport: report(['th'])
 			});
-			expect(plan[0].reason).not.toBe('fresh-plan-diagnostic');
+			expect(plan[0].config.type).not.toBe('diagnostic');
 		});
 	});
 });
