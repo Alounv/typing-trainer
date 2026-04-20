@@ -158,4 +158,3 @@ function pickWeighted(pool: readonly WeightedWord[], rng: () => number): string 
 	}
 	return pool[pool.length - 1].word;
 }
-
