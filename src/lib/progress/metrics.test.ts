@@ -7,6 +7,7 @@ import {
 	summarizeBigrams,
 	aggregateLastNOccurrences,
 	buildLivePriorityTargets,
+	buildLiveUndertrained,
 	countGraduations,
 	tallyClassificationMix,
 	WPM_ROLLING_WINDOW
@@ -326,6 +327,70 @@ describe('buildLivePriorityTargets', () => {
 		const ranked = buildLivePriorityTargets(sessions, { ra: 1, co: 100 });
 		expect(ranked[0].bigram).toBe('co');
 		expect(buildLivePriorityTargets(sessions, { ra: 1, co: 100 }, undefined, 1)).toHaveLength(1);
+	});
+
+	it('scopes the top-N to a specific class when classifications is passed', () => {
+		// Hasty (errors) outranks fluency (merely slow) on the cross-class score,
+		// but a fluency-scoped caller must still see the fluency bigram.
+		const hastySamples: BigramSample[] = Array.from({ length: 20 }, (_, i) => ({
+			correct: i % 5 !== 0,
+			timing: 120
+		}));
+		const sessions = [
+			bigramSession('s1', 100, 'fl', cleanSamples(20, 300)),
+			bigramSession('s2', 200, 'ht', hastySamples)
+		];
+		const fluencyOnly = buildLivePriorityTargets(sessions, undefined, undefined, 10, ['fluency']);
+		expect(fluencyOnly.map((t) => t.bigram)).toEqual(['fl']);
+		const accuracyOnly = buildLivePriorityTargets(sessions, undefined, undefined, 10, [
+			'hasty',
+			'acquisition'
+		]);
+		expect(accuracyOnly.map((t) => t.bigram)).toEqual(['ht']);
+	});
+});
+
+describe('buildLiveUndertrained', () => {
+	function sessionWithCounts(
+		id: string,
+		timestamp: number,
+		counts: Record<string, number>
+	): SessionSummary {
+		const aggregates = Object.entries(counts).map(([bigram, occurrences]) =>
+			agg(bigram, id, { occurrences })
+		);
+		return session(id, timestamp, 50, aggregates);
+	}
+
+	it('returns [] when the corpus is absent', () => {
+		expect(buildLiveUndertrained([], undefined)).toEqual([]);
+	});
+
+	it('returns [] when the corpus is empty', () => {
+		expect(buildLiveUndertrained([], {})).toEqual([]);
+	});
+
+	it('includes corpus bigrams with lifetime occurrences below the threshold', () => {
+		// `th` is well-observed (20); `he` and `in` are not (< 10).
+		const sessions = [sessionWithCounts('s1', 100, { th: 20, he: 3, in: 1 })];
+		const under = buildLiveUndertrained(sessions, { th: 10, he: 8, in: 5 });
+		// `th` must be excluded; the other two remain, sorted by corpus frequency desc.
+		expect(under).toEqual(['he', 'in']);
+	});
+
+	it('sums occurrences across sessions (lifetime, not latest-session)', () => {
+		// 6 + 5 = 11 ≥ 10 → `th` is covered. Single-session reads would miss this.
+		const sessions = [
+			sessionWithCounts('s1', 100, { th: 6 }),
+			sessionWithCounts('s2', 200, { th: 5 })
+		];
+		expect(buildLiveUndertrained(sessions, { th: 10, he: 5 })).toEqual(['he']);
+	});
+
+	it('honors a custom minOccurrences threshold', () => {
+		const sessions = [sessionWithCounts('s1', 100, { th: 4 })];
+		expect(buildLiveUndertrained(sessions, { th: 1 }, 3)).toEqual([]);
+		expect(buildLiveUndertrained(sessions, { th: 1 }, 5)).toEqual(['th']);
 	});
 });
 

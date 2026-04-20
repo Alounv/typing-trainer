@@ -3,10 +3,11 @@
 // into a session route" side-effect so route components never touch
 // `sessionStorage` or `window.location` directly.
 import { resolve } from '$app/paths';
-import type { DiagnosticReport, SessionSummary, UserSettings } from '../core';
+import type { SessionSummary, UserSettings } from '../core';
 import { getProfile } from '../settings';
 import { getBigramHistory, getRecentSessions } from '../storage';
-import { buildLivePriorityTargets } from '../progress';
+import { buildLivePriorityTargets, buildLiveUndertrained } from '../progress';
+import { isBuiltinCorpusId, loadBuiltinCorpus, type FrequencyTable } from '../corpus';
 import { findGraduatedBigrams } from './graduation-filter';
 import { planDailySessions, sliceCompletedFromPlan } from './planner';
 import { readPlanStartedAt, setPlanStartedAt } from './plan-window';
@@ -35,7 +36,6 @@ export interface DashboardData {
 	 */
 	planStartedAt: number;
 	lastSession?: SessionSummary;
-	latestDiagnosticReport?: DiagnosticReport;
 	graduatedFromRotation: ReadonlySet<string>;
 	userSettings?: UserSettings;
 	/**
@@ -55,29 +55,35 @@ interface DashboardLoadOptions {
 	recentSessions?: readonly SessionSummary[];
 }
 
-/**
- * Resolve everything the dashboard needs: planner + graduation filter +
- * latest-diagnostic-report lookup in one await. The report is read straight
- * off the most recent diagnostic's summary — computed once at save time, not
- * replayed here.
- */
+/** Resolve everything the dashboard needs: planner + graduation filter in one await. */
 export async function loadDashboardData(opts: DashboardLoadOptions = {}): Promise<DashboardData> {
 	const recentSessions = opts.recentSessions ?? (await getRecentSessions(RECENT_WINDOW));
 
-	const latestDiagnosticReport = findLatestDiagnosticReport(recentSessions);
 	const userSettings = await getProfile();
+	const corpusFrequencies = await loadCorpusFrequencies(userSettings);
 
-	// Override priorityTargets with the live view so drill mix tracks current
-	// behaviour. Baseline/cadence/undertrained still come from the original
-	// report, which is returned unchanged for UI display.
-	const reportForPlanner: DiagnosticReport | undefined = latestDiagnosticReport
-		? {
-				...latestDiagnosticReport,
-				priorityTargets: buildLivePriorityTargets(recentSessions)
-			}
-		: undefined;
+	// Class-scoped so an error-weighted ranking can't starve the fluency-only
+	// speed drill. See `SchedulerInput` comment.
+	const accuracyPriorityTargets = buildLivePriorityTargets(
+		recentSessions,
+		corpusFrequencies,
+		undefined,
+		undefined,
+		['hasty', 'acquisition']
+	);
+	const speedPriorityTargets = buildLivePriorityTargets(
+		recentSessions,
+		corpusFrequencies,
+		undefined,
+		undefined,
+		['fluency']
+	);
+	const undertrainedBigrams = buildLiveUndertrained(recentSessions, corpusFrequencies);
 
-	const priorityBigrams = reportForPlanner?.priorityTargets.map((p) => p.bigram) ?? [];
+	const priorityBigrams = [
+		...accuracyPriorityTargets.map((p) => p.bigram),
+		...speedPriorityTargets.map((p) => p.bigram)
+	];
 	const graduatedFromRotation = await findGraduatedBigrams(priorityBigrams, getBigramHistory);
 
 	const planStartedAt = readPlanStartedAt();
@@ -85,7 +91,9 @@ export async function loadDashboardData(opts: DashboardLoadOptions = {}): Promis
 
 	const fullPlan = planDailySessions({
 		recentSessions,
-		latestDiagnosticReport: reportForPlanner,
+		accuracyPriorityTargets,
+		speedPriorityTargets,
+		undertrainedBigrams,
 		graduatedFromRotation,
 		userSettings,
 		planStartedAt
@@ -103,7 +111,6 @@ export async function loadDashboardData(opts: DashboardLoadOptions = {}): Promis
 		completedToday,
 		planStartedAt,
 		lastSession: recentSessions[0],
-		latestDiagnosticReport,
 		graduatedFromRotation,
 		userSettings,
 		recentSessions
@@ -175,12 +182,20 @@ function startOfCalendarDayMs(): number {
 	return d.getTime();
 }
 
-// Pull the most recent diagnostic's attached report. `undefined` when no
-// diagnostic exists, or when the diagnostic predates v2 (no report persisted)
-// — planner treats both as "missing report" and schedules a fresh diagnostic.
-function findLatestDiagnosticReport(
-	recentSessions: readonly SessionSummary[]
-): DiagnosticReport | undefined {
-	const latestDiag = recentSessions.find((s) => s.type === 'diagnostic');
-	return latestDiag?.diagnosticReport;
+/** English fallback when the profile is missing or points at an unsupported corpus. */
+const FALLBACK_CORPUS_ID = 'en';
+
+/** Best-effort corpus load; `undefined` degrades undertrained/weighting to a no-op. */
+async function loadCorpusFrequencies(
+	profile: UserSettings | undefined
+): Promise<FrequencyTable | undefined> {
+	try {
+		const pickedId = profile?.corpusIds?.[0];
+		const corpusId = pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
+		const corpus = await loadBuiltinCorpus(corpusId);
+		return corpus.bigramFrequencies;
+	} catch {
+		return undefined;
+	}
 }
+

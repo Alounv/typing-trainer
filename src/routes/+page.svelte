@@ -271,29 +271,6 @@
 					</p>
 				</div>
 
-				{#if data.latestDiagnosticReport}
-					{@const report = data.latestDiagnosticReport}
-					<div>
-						<p class="text-base-content/55">
-							Latest diagnostic · baseline {report.baselineWPM.toFixed(1)} → target {report.targetWPM.toFixed(
-								1
-							)} WPM
-						</p>
-						<p class="ml-4">
-							counts: {JSON.stringify(report.counts)}
-						</p>
-						<p class="ml-4">
-							priorityTargets ({report.priorityTargets.length}):
-							{report.priorityTargets
-								.slice(0, 10)
-								.map((p) => `${p.bigram}·${p.classification}`)
-								.join(', ')}
-						</p>
-					</div>
-				{:else}
-					<p class="text-base-content/55">No diagnostic report yet.</p>
-				{/if}
-
 				<div>
 					<p class="text-base-content/55">
 						Graduated from rotation ({data.graduatedFromRotation.size}):

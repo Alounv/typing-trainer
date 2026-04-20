@@ -18,7 +18,7 @@ import {
 	type BuiltinCorpusId,
 	type FrequencyTable
 } from '../corpus';
-import type { DrillMode, UserSettings } from '../core';
+import type { BigramClassification, DrillMode, UserSettings } from '../core';
 import {
 	getProfile,
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
@@ -26,7 +26,7 @@ import {
 	DEFAULT_DIAGNOSTIC_WORD_BUDGET
 } from '../settings';
 import { getBigramHistory, getRecentSessions } from '../storage';
-import { buildLivePriorityTargets } from '../progress';
+import { buildLivePriorityTargets, buildLiveUndertrained } from '../progress';
 import { consumePlannedSession } from './planned';
 import { generateBigramDrillSequence } from './bigram-drill';
 import { generateRealTextSequence } from './real-text';
@@ -205,9 +205,19 @@ async function resolveDirectNavMix(
 }> {
 	const recent = await getRecentSessions(RECENT_WINDOW);
 
-	const priorityTargets = buildLivePriorityTargets(recent, corpusFrequencies);
+	// Class-scoped per mode; keeps direct-nav selection consistent with the planner.
+	const classes: readonly BigramClassification[] =
+		mode === 'speed' ? ['fluency'] : ['hasty', 'acquisition'];
+	const priorityTargets = buildLivePriorityTargets(
+		recent,
+		corpusFrequencies,
+		undefined,
+		undefined,
+		classes
+	);
+	// Speed mode ignores undertrained — no exposure pool there.
 	const undertrained =
-		recent.find((s) => s.type === 'diagnostic')?.diagnosticReport?.corpusFit.undertrained ?? [];
+		mode === 'accuracy' ? buildLiveUndertrained(recent, corpusFrequencies) : [];
 
 	const priorityBigrams = priorityTargets.map((p) => p.bigram);
 	const graduated = await findGraduatedBigrams(priorityBigrams, getBigramHistory);

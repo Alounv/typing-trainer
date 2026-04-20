@@ -3,7 +3,7 @@
  * file is kept type-only so UI components can import `PlannedSession`
  * without pulling in the planning logic.
  */
-import type { SessionConfig, SessionSummary, UserSettings, DiagnosticReport } from '../core';
+import type { PriorityBigram, SessionConfig, SessionSummary, UserSettings } from '../core';
 
 /**
  * Slot-level key for completed-today accounting. Splits `bigram-drill` by
@@ -59,18 +59,20 @@ export interface SchedulerInput {
 	 */
 	recentSessions: readonly SessionSummary[];
 	/**
-	 * The most recent diagnostic's report. Drives drill target selection.
-	 * `undefined` when the user has never completed a diagnostic — the
-	 * planner then inserts one.
-	 */
-	latestDiagnosticReport?: DiagnosticReport;
-	/**
 	 * Bigrams that the "3 consecutive healthy sessions" filter has
 	 * retired from active drill rotation. Planner removes these from
 	 * the drill's `bigramsTargeted` before emitting. Kept as an input
 	 * (not computed here) so `planDailySessions` stays pure/sync.
 	 */
 	graduatedFromRotation?: ReadonlySet<string>;
+	/**
+	 * Class-scoped priority targets per drill. Split upstream so the accuracy
+	 * drill's error-weighted ranking can't starve the fluency-only speed drill.
+	 */
+	accuracyPriorityTargets: readonly PriorityBigram[];
+	speedPriorityTargets: readonly PriorityBigram[];
+	/** Exposure-backfill pool for the accuracy drill — see `buildLiveUndertrained`. */
+	undertrainedBigrams: readonly string[];
 	/**
 	 * How many top priority bigrams to include in a drill session. Defaults
 	 * to `DEFAULT_DRILL_TARGET_COUNT`; exposed for tests and future user

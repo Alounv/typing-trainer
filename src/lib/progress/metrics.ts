@@ -5,7 +5,12 @@ import type {
 	PriorityBigram,
 	SessionSummary
 } from '../core';
-import { classifyBigram, DEFAULT_THRESHOLDS, type ClassificationThresholds } from '../bigram';
+import {
+	classifyBigram,
+	DEFAULT_THRESHOLDS,
+	MIN_OCCURRENCES_FOR_CLASSIFICATION,
+	type ClassificationThresholds
+} from '../bigram';
 import type { FrequencyTable } from '../corpus';
 
 /** Mirrors `PRIORITY_TARGETS_TOP_N` in the diagnostic engine. */
@@ -275,17 +280,26 @@ export function summarizeBigrams(
  * `PriorityBigram[]` built from the live rolling-window classification
  * (via `summarizeBigrams`) instead of a frozen diagnostic snapshot — so
  * drill target selection tracks current behaviour.
+ *
+ * Pass `classifications` to scope the top-N to a specific set of classes:
+ * the priority score bakes in a 10× error weight, so hasty/acquisition
+ * dominate a cross-class ranking and can starve fluency. Drill callers pass
+ * the class(es) they want — accuracy gets `['hasty', 'acquisition']`, speed
+ * gets `['fluency']`. Default: all non-healthy, non-unclassified.
  */
 export function buildLivePriorityTargets(
 	sessions: readonly SessionSummary[],
 	corpus?: FrequencyTable,
 	thresholds: ClassificationThresholds = DEFAULT_THRESHOLDS,
-	limit: number = LIVE_PRIORITY_TARGETS_TOP_N
+	limit: number = LIVE_PRIORITY_TARGETS_TOP_N,
+	classifications?: readonly BigramClassification[]
 ): PriorityBigram[] {
 	const rows = summarizeBigrams(sessions, corpus, thresholds);
+	const allowed = classifications ? new Set<BigramClassification>(classifications) : undefined;
 	const out: PriorityBigram[] = [];
 	for (const r of rows) {
 		if (r.classification === 'healthy' || r.classification === 'unclassified') continue;
+		if (allowed && !allowed.has(r.classification)) continue;
 		out.push({
 			bigram: r.bigram,
 			score: r.priorityScore,
@@ -296,6 +310,37 @@ export function buildLivePriorityTargets(
 		if (out.length >= limit) break;
 	}
 	return out;
+}
+
+/**
+ * Corpus bigrams with lifetime occurrences below `minOccurrences`, sorted by
+ * corpus frequency desc. Live counterpart to `corpusFit.undertrained` from the
+ * diagnostic engine — reads session history, not a frozen snapshot.
+ */
+export function buildLiveUndertrained(
+	sessions: readonly SessionSummary[],
+	corpus: FrequencyTable | undefined,
+	minOccurrences: number = MIN_OCCURRENCES_FOR_CLASSIFICATION
+): string[] {
+	if (!corpus) return [];
+	const corpusKeys = Object.keys(corpus);
+	if (corpusKeys.length === 0) return [];
+
+	const observed = new Map<string, number>();
+	for (const s of sessions) {
+		for (const agg of s.bigramAggregates) {
+			observed.set(agg.bigram, (observed.get(agg.bigram) ?? 0) + agg.occurrences);
+		}
+	}
+
+	const under: { bigram: string; freq: number }[] = [];
+	for (const key of corpusKeys) {
+		if ((observed.get(key) ?? 0) < minOccurrences) {
+			under.push({ bigram: key, freq: corpus[key] });
+		}
+	}
+	under.sort((a, b) => b.freq - a.freq);
+	return under.map((u) => u.bigram);
 }
 
 /**

@@ -1,4 +1,10 @@
-import type { DrillMode, PriorityBigram, SessionConfig, UserSettings } from '../core';
+import type {
+	DrillMode,
+	PriorityBigram,
+	SessionConfig,
+	SessionSummary,
+	UserSettings
+} from '../core';
 import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 	DEFAULT_REAL_TEXT_WORD_BUDGET,
@@ -38,8 +44,10 @@ export const CYCLES_PER_DAY = 2;
 export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	const {
 		recentSessions,
-		latestDiagnosticReport,
 		graduatedFromRotation,
+		accuracyPriorityTargets,
+		speedPriorityTargets,
+		undertrainedBigrams,
 		drillTargetCount = DEFAULT_DRILL_TARGET_COUNT,
 		userSettings,
 		planStartedAt
@@ -59,9 +67,10 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 		];
 	}
 
-	// 2. Sessions exist but no diagnostic report — manual deletion or schema
+	// 2. Sessions exist but no diagnostic on record — manual deletion or schema
 	//    migration. Fail safe with a fresh diagnostic so drill has targets.
-	if (!latestDiagnosticReport) {
+	const latestDiagnostic = findLatestDiagnostic(recentSessions);
+	if (!latestDiagnostic) {
 		return [
 			diagnosticPlan(
 				budgets.diagnostic,
@@ -90,13 +99,13 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	//    (pacer at 1.17× baseline). Undertrained backfill goes to accuracy —
 	//    unknown bigrams are an error risk, not a speed-ceiling problem.
 	const accuracyMix = selectAccuracyDrillMix(
-		latestDiagnosticReport.priorityTargets,
-		latestDiagnosticReport.corpusFit.undertrained,
+		accuracyPriorityTargets,
+		undertrainedBigrams,
 		graduatedFromRotation,
 		drillTargetCount
 	);
 	const speedMix = selectSpeedDrillMix(
-		latestDiagnosticReport.priorityTargets,
+		speedPriorityTargets,
 		graduatedFromRotation,
 		drillTargetCount
 	);
@@ -116,7 +125,7 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	// If the latest diagnostic on file predates that cursor the user's targets
 	// are stale from the fresh-plan perspective — prepend a diagnostic so the
 	// first thing they see is "refresh your baseline."
-	if (planStartedAt && latestDiagnosticReport.timestamp < planStartedAt) {
+	if (planStartedAt && latestDiagnostic.timestamp < planStartedAt) {
 		return [
 			diagnosticPlan(
 				budgets.diagnostic,
@@ -128,6 +137,10 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	}
 
 	return drillPlanItems;
+}
+
+function findLatestDiagnostic(recent: readonly SessionSummary[]): SessionSummary | undefined {
+	return recent.find((s) => s.type === 'diagnostic');
 }
 
 // [accuracy, speed, real-text] per cycle; empty drill slots skipped, real-text always runs.

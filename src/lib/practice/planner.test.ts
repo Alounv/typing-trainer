@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-	planDailySessions,
+	planDailySessions as planDailySessionsRaw,
 	sliceCompletedFromPlan,
 	selectAccuracyDrillMix,
 	selectSpeedDrillMix,
@@ -13,6 +13,34 @@ import {
 	DEFAULT_REAL_TEXT_WORD_BUDGET
 } from '../settings/defaults';
 import type { SessionSummary, SessionType, DiagnosticReport, PriorityBigram } from '../core/types';
+import type { SchedulerInput } from './types';
+
+/** Test wrapper: projects `report([...])` into the planner's class-scoped fields. */
+type TestInput = Omit<
+	SchedulerInput,
+	'accuracyPriorityTargets' | 'speedPriorityTargets' | 'undertrainedBigrams'
+> &
+	Partial<
+		Pick<
+			SchedulerInput,
+			'accuracyPriorityTargets' | 'speedPriorityTargets' | 'undertrainedBigrams'
+		>
+	> & { latestDiagnosticReport?: DiagnosticReport };
+
+function planDailySessions(input: TestInput) {
+	const targets = input.latestDiagnosticReport?.priorityTargets ?? [];
+	const undertrainedFromReport = input.latestDiagnosticReport?.corpusFit.undertrained ?? [];
+	const { latestDiagnosticReport: _ignored, ...rest } = input;
+	return planDailySessionsRaw({
+		...rest,
+		accuracyPriorityTargets:
+			input.accuracyPriorityTargets ??
+			targets.filter((t) => t.classification === 'hasty' || t.classification === 'acquisition'),
+		speedPriorityTargets:
+			input.speedPriorityTargets ?? targets.filter((t) => t.classification === 'fluency'),
+		undertrainedBigrams: input.undertrainedBigrams ?? undertrainedFromReport
+	});
+}
 
 /**
  * Test helpers. Keep them minimal: the planner only reads `type` and
@@ -143,8 +171,8 @@ describe('planDailySessions — diagnostic triggers', () => {
 
 		it('does not prepend when last diagnostic is newer than planStartedAt', () => {
 			const plan = planDailySessions({
-				recentSessions: recent('diagnostic'),
-				latestDiagnosticReport: { ...report(['th']), timestamp: 5000 },
+				recentSessions: [session('diagnostic', 5000)],
+				latestDiagnosticReport: report(['th']),
 				planStartedAt: 1000
 			});
 			expect(plan[0].config.type).not.toBe('diagnostic');
@@ -560,6 +588,53 @@ describe('selectAccuracyDrillMix', () => {
 		const mix = selectAccuracyDrillMix([pt('th', 'hasty')], ['th', 'ab'], undefined, 3);
 		expect(mix.priority).toEqual(['th']);
 		expect(mix.exposure).toEqual(['ab']);
+	});
+});
+
+describe('planDailySessions — class-scoped priority targets', () => {
+	// Every case needs a diagnostic in recent history so the planner doesn't
+	// trigger the "no diagnostic on file" short-circuit and emit a diagnostic
+	// instead of drills.
+	const recentWithDiag = recent('diagnostic');
+
+	it('uses speedPriorityTargets for the speed drill instead of the cross-class report list', () => {
+		// Report has only hasty bigrams (the cross-class list that would starve
+		// a fluency-only speed drill). speedPriorityTargets supplies fluency
+		// bigrams that the planner should route into the speed slot.
+		const plan = planDailySessions({
+			recentSessions: recentWithDiag,
+			latestDiagnosticReport: report(['th', 'he', 'in']),
+			speedPriorityTargets: [priorityTarget('er', 'fluency'), priorityTarget('an', 'fluency')]
+		});
+		const speedDrill = plan.find(
+			(p) => p.config.type === 'bigram-drill' && p.config.drillMode === 'speed'
+		);
+		expect(speedDrill?.drillMix?.priority).toEqual(['er', 'an']);
+	});
+
+	it('uses accuracyPriorityTargets for the accuracy drill when provided', () => {
+		const plan = planDailySessions({
+			recentSessions: recentWithDiag,
+			latestDiagnosticReport: report(['er']), // fluency-only report would starve accuracy
+			accuracyPriorityTargets: [priorityTarget('th', 'hasty'), priorityTarget('in', 'acquisition')]
+		});
+		const accuracyDrill = plan.find(
+			(p) => p.config.type === 'bigram-drill' && p.config.drillMode === 'accuracy'
+		);
+		expect(accuracyDrill?.drillMix?.priority).toEqual(['th', 'in']);
+	});
+
+	it('falls back to report.priorityTargets when class-scoped lists are absent', () => {
+		// Backward-compat: planner signature is additive — no regressions for
+		// callers that still pass only the report.
+		const plan = planDailySessions({
+			recentSessions: recentWithDiag,
+			latestDiagnosticReport: report(['th'])
+		});
+		const accuracyDrill = plan.find(
+			(p) => p.config.type === 'bigram-drill' && p.config.drillMode === 'accuracy'
+		);
+		expect(accuracyDrill?.drillMix?.priority).toEqual(['th']);
 	});
 });
 
