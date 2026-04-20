@@ -13,7 +13,7 @@
 	import { resolve } from '$app/paths';
 	import { loadSummaryContext, type SummaryViewModel } from '$lib/session';
 	import { startPlannedSession, startBonusRound } from '$lib/practice';
-	import type { BigramAggregate } from '$lib/core';
+	import type { BigramAggregate, SessionSummary } from '$lib/core';
 	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/bigram';
 	import SessionDelta from '$lib/session/components/SessionDelta.svelte';
 	import Graduations from '$lib/session/components/Graduations.svelte';
@@ -95,13 +95,45 @@
 			.toSorted((a, b) => b.meanTime - a.meanTime)
 			.slice(0, 5);
 	}
+
+	/**
+	 * Human label for the session the user just finished. Drills split by mode
+	 * (accuracy / speed) because post-treatment the user cares which regimen
+	 * they ran — the WPM/errors numbers read differently under each. Legacy
+	 * drill sessions (no `drillMode` on the summary) collapse to the generic
+	 * "Bigram drill" so old storage records still render cleanly.
+	 */
+	function sessionTypeLabel(s: SessionSummary): string {
+		if (s.type === 'diagnostic') return 'Diagnostic';
+		if (s.type === 'real-text') return 'Real text';
+		if (s.drillMode === 'accuracy') return 'Accuracy drill';
+		if (s.drillMode === 'speed') return 'Speed drill';
+		return 'Bigram drill';
+	}
 </script>
 
 <svelte:window onkeydown={onWindowKeydown} />
 
 <div class="mx-auto max-w-3xl space-y-10">
 	<header class="flex items-baseline justify-between gap-4">
-		<h1 class="text-4xl font-bold tracking-tight">Session summary</h1>
+		<!--
+			Type subtitle sits directly under the h1 so the reader has context
+			before the hero numbers hit ("Accuracy drill 64 WPM" reads
+			differently than "Speed drill 64 WPM"). Nested in its own div so
+			the flex row's space-between only splits the title group from the
+			keyboard hint on the right.
+		-->
+		<div class="space-y-1">
+			<h1 class="text-4xl font-bold tracking-tight">Session summary</h1>
+			{#if state.status === 'ready'}
+				<p
+					class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase"
+					data-testid="session-type-label"
+				>
+					{sessionTypeLabel(state.session)}
+				</p>
+			{/if}
+		</div>
 		{#if state.status === 'ready'}
 			<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
 				<kbd
