@@ -274,9 +274,7 @@
 					<ol class="ml-4 list-decimal space-y-0.5">
 						{#each data.fullPlan as planned, i (i)}
 							<li
-								class={debugConsumed[i]
-									? 'text-base-content/35 line-through'
-									: 'text-base-content'}
+								class={debugConsumed[i] ? 'text-base-content/35 line-through' : 'text-base-content'}
 							>
 								{planSlotKey(planned.config)}
 							</li>
@@ -286,8 +284,7 @@
 
 				<div>
 					<p class="text-base-content/55">Completed today (by slot-key):</p>
-					<pre
-						class="ml-4 whitespace-pre-wrap">{JSON.stringify(data.completedToday, null, 2)}</pre>
+					<pre class="ml-4 whitespace-pre-wrap">{JSON.stringify(data.completedToday, null, 2)}</pre>
 				</div>
 
 				<div>

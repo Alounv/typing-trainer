@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { computeTargetWPM, deriveBaselineWPM, TARGET_WPM_MULTIPLIER } from './pacing';
 import type { KeystrokeEvent } from '../typing/types';
 
-function ev(position: number, timestamp: number, wordIndex: number, expected = 'a'): KeystrokeEvent {
+function ev(
+	position: number,
+	timestamp: number,
+	wordIndex: number,
+	expected = 'a'
+): KeystrokeEvent {
 	return {
 		position,
 		timestamp,
