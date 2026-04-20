@@ -9,6 +9,7 @@
 	import {
 		loadDashboardData,
 		planSlotKey,
+		startBonusRound,
 		startPlannedSession,
 		type DashboardData,
 		type PlanSlotKey
@@ -92,19 +93,18 @@
 			</p>
 			<h1 class="text-4xl font-semibold tracking-tight text-base-content">Today's plan</h1>
 		</div>
-		<!--
-			Always-visible "restart plan" affordance. Completing a diagnostic
-			is itself the reset — it snapshots today's completions as the new
-			baseline — so this is just a link into the diagnostic route rather
-			than a separate button with its own side effect.
-		-->
-		<a
-			href={resolve('/session/diagnostic')}
-			class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
-			data-testid="restart-plan"
-		>
-			Restart plan — run a new diagnostic →
-		</a>
+		<!-- Snapshot today's completions as a new bonus-round baseline → fresh plan. -->
+		{#if state.status === 'ready'}
+			{@const completed = state.data.completedToday}
+			<button
+				type="button"
+				class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
+				data-testid="restart-plan"
+				onclick={() => startBonusRound(completed)}
+			>
+				Start fresh plan →
+			</button>
+		{/if}
 	</header>
 
 	{#if state.status === 'loading'}
@@ -117,8 +117,8 @@
 		{#if data.allDoneForToday}
 			<!--
 				Day done. Deliberately quiet — celebration is reserved for
-				structural change. The restart-plan link in the header is the
-				escape hatch for anyone who wants to keep practising.
+				structural change. The "Start fresh plan" button in the header
+				is the escape hatch for anyone who wants to keep practising.
 			-->
 			<section class="space-y-3" data-testid="day-complete">
 				<h2 class="text-2xl font-semibold text-base-content">Today's plan is done.</h2>

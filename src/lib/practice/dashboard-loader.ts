@@ -131,20 +131,6 @@ export function startBonusRound(completedToday: Partial<Record<PlanSlotKey, numb
 }
 
 /**
- * Snapshot today's completions as the new baseline, so the dashboard
- * re-emits a fresh plan on next load. Called after a diagnostic saves —
- * running a diagnostic is the user-facing "restart the plan" action.
- *
- * We read the recent-session window ourselves so the single call site
- * (SessionShell's post-save hook) doesn't have to assemble a
- * `completedToday` map it never otherwise needs.
- */
-export async function resetPlanForFreshDiagnostic(): Promise<void> {
-	const recentSessions = await getRecentSessions(RECENT_WINDOW);
-	activateBonusRound(countCompletedToday(recentSessions));
-}
-
-/**
  * Route path for a planned session. Drill sessions split by `drillMode`:
  * accuracy and speed are separate URLs so the treatment is obvious from
  * the address bar and the nav. A drill planned without a mode (legacy

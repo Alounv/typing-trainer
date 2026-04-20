@@ -288,9 +288,7 @@ describe('buildLivePriorityTargets', () => {
 		bigram: string,
 		samples: BigramSample[]
 	): SessionSummary {
-		return session(id, timestamp, 50, [
-			agg(bigram, id, { occurrences: samples.length, samples })
-		]);
+		return session(id, timestamp, 50, [agg(bigram, id, { occurrences: samples.length, samples })]);
 	}
 
 	it('returns [] when no session carries classifiable data', () => {
@@ -324,10 +322,7 @@ describe('buildLivePriorityTargets', () => {
 			correct: i % 3 !== 0,
 			timing: 500
 		}));
-		const sessions = [
-			bigramSession('s1', 100, 'ra', bad),
-			bigramSession('s2', 200, 'co', bad)
-		];
+		const sessions = [bigramSession('s1', 100, 'ra', bad), bigramSession('s2', 200, 'co', bad)];
 		const ranked = buildLivePriorityTargets(sessions, { ra: 1, co: 100 });
 		expect(ranked[0].bigram).toBe('co');
 		expect(buildLivePriorityTargets(sessions, { ra: 1, co: 100 }, undefined, 1)).toHaveLength(1);
