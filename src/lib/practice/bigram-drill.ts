@@ -10,13 +10,6 @@ const DEFAULT_TARGET_RATIO = 0.7;
 /** Default sequence length — enough for a 5-minute session at ~50–80 WPM. */
 const DEFAULT_WORD_COUNT = 80;
 
-/**
- * Default word budget (overridable via `UserSettings.wordBudgets.bigramDrill`).
- * Small so a session is a mini-workout (<1 min at 60 WPM) and every completion
- * is a checkpoint.
- */
-export const DEFAULT_BIGRAM_DRILL_WORD_BUDGET = 50;
-
 export interface BigramDrillInput {
 	/** Bigrams to drill. Caller has already ranked/filtered; empty array throws. */
 	targetBigrams: readonly string[];

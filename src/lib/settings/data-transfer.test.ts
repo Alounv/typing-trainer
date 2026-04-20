@@ -14,9 +14,7 @@ import {
 import { getProfile, saveProfile } from './profile';
 import { clearAll, getBigramHistory, getRecentSessions, getSession } from '../storage/service';
 import { saveSession } from '../session/persistence';
-import type { SessionSummary } from '../session/types';
-import type { BigramAggregate } from '../bigram/types';
-import type { UserSettings } from './profile';
+import type { SessionSummary, UserSettings, BigramAggregate } from '../core/types';
 
 function makeAggregate(overrides: Partial<BigramAggregate> = {}): BigramAggregate {
 	return {

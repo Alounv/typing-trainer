@@ -13,7 +13,8 @@
 	import { resolve } from '$app/paths';
 	import { loadSummaryContext, type SummaryViewModel } from '$lib/session';
 	import { startPlannedSession, startBonusRound } from '$lib/practice';
-	import { type BigramAggregate, DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/bigram';
+	import type { BigramAggregate } from '$lib/core';
+	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/bigram';
 	import SessionDelta from '$lib/session/components/SessionDelta.svelte';
 	import Graduations from '$lib/session/components/Graduations.svelte';
 	import MilestoneBanner from '$lib/session/components/MilestoneBanner.svelte';

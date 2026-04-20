@@ -19,7 +19,7 @@ import {
 	type MilestoneEvent
 } from '../progress';
 import { loadDashboardData, type PlannedSession } from '../practice';
-import type { SessionSummary, SessionType } from './types';
+import type { SessionSummary, SessionType } from '../core';
 
 /** Matches the dashboard's recent-session window; the planner only peeks a few. */
 const RECENT_WINDOW = 20;

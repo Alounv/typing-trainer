@@ -10,12 +10,6 @@ import { generateRealTextSequence } from './real-text';
 /** ~5–8 min of typing at 60 WPM — enough samples per top bigram without dragging. */
 export const DEFAULT_DIAGNOSTIC_CHAR_TARGET = 700;
 
-/**
- * Default word budget (overridable via `UserSettings.wordBudgets.diagnostic`).
- * Sized for ≥15 occurrences of top-200 bigrams; one large sample not fragmented.
- */
-export const DEFAULT_DIAGNOSTIC_WORD_BUDGET = 100;
-
 export interface DiagnosticSamplerOptions {
 	/** Overrides the default char target (mostly for tests). */
 	targetChars?: number;

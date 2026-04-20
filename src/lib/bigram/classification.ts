@@ -1,4 +1,4 @@
-import type { BigramAggregate, BigramClassification } from './types';
+import type { BigramAggregate, BigramClassification } from '../core';
 
 /** Mean transition time at/under which a bigram counts as fast. */
 export const DEFAULT_SPEED_THRESHOLD_MS = 150;

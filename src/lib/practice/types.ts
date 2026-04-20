@@ -3,9 +3,7 @@
  * file is kept type-only so UI components can import `PlannedSession`
  * without pulling in the planning logic.
  */
-import type { SessionConfig, SessionSummary } from '../session';
-import type { DiagnosticReport } from '../diagnostic';
-import type { UserSettings } from '../settings';
+import type { SessionConfig, SessionSummary, UserSettings, DiagnosticReport } from '../core';
 
 /**
  * Why the planner emitted a given entry. Drives the dashboard copy

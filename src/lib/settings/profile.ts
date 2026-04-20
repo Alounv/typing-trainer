@@ -11,32 +11,12 @@
  */
 import { db, SINGLETON_ID } from '$lib/storage';
 import { DEFAULT_SPEED_THRESHOLD_MS, DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/bigram';
+import type { UserSettings } from '$lib/core';
 import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 	DEFAULT_REAL_TEXT_WORD_BUDGET,
 	DEFAULT_DIAGNOSTIC_WORD_BUDGET
-} from '$lib/practice';
-
-export type Language = 'en' | 'fr';
-
-/** Persistent user configuration. */
-export interface UserSettings {
-	/** Ordered by priority — first entry drives default corpus selection. */
-	languages: Language[];
-	/** One `CorpusConfig.id` per entry in `languages`. */
-	corpusIds: string[];
-	/** Per-user override of the defaults below. Advanced users only. */
-	thresholds?: {
-		speedMs: number;
-		errorRate: number;
-	};
-	/** Per-user override of `DEFAULT_*_WORD_BUDGET`. Absent keys fall back to defaults. */
-	wordBudgets?: {
-		bigramDrill: number;
-		realText: number;
-		diagnostic: number;
-	};
-}
+} from './defaults';
 
 /**
  * Factory-fresh profile. Function (not a const) so each caller gets a new

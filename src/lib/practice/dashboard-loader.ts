@@ -3,9 +3,8 @@
 // into a session route" side-effect so route components never touch
 // `sessionStorage` or `window.location` directly.
 import { resolve } from '$app/paths';
-import type { DiagnosticReport } from '../diagnostic';
-import type { SessionSummary, SessionType } from '../session';
-import { getProfile, type UserSettings } from '../settings';
+import type { DiagnosticReport, SessionSummary, SessionType, UserSettings } from '../core';
+import { getProfile } from '../settings';
 import { getBigramHistory, getRecentSessions } from '../storage';
 import { findGraduatedBigrams } from './graduation-filter';
 import { planDailySessions, sliceCompletedFromPlan } from './planner';

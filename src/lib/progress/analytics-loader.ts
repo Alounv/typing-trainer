@@ -8,9 +8,9 @@
  * `summarizeBigrams` falls back to `freq=1` when the corpus is absent.
  */
 import { getRecentSessions } from '../storage';
-import { getProfile, type UserSettings } from '../settings';
+import { getProfile } from '../settings';
 import { isBuiltinCorpusId, loadBuiltinCorpus, type FrequencyTable } from '../corpus';
-import type { SessionSummary } from '../session';
+import type { SessionSummary, UserSettings } from '../core';
 
 /**
  * A user could theoretically rack up thousands of sessions. 500 is a soft

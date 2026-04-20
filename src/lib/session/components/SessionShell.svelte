@@ -16,8 +16,7 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import TypingSurface from '$lib/typing/TypingSurface.svelte';
 	import type { KeystrokeEvent } from '$lib/typing';
-	import type { DiagnosticReport } from '$lib/diagnostic';
-	import type { SessionType, SessionSummary } from '../types';
+	import type { DiagnosticReport, SessionType, SessionSummary } from '$lib/core';
 	import { SessionRunner } from '../runner';
 	import { saveSession } from '../persistence';
 	import Timer from './Timer.svelte';

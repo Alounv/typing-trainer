@@ -1,5 +1,4 @@
-import type { BigramAggregate, BigramClassification } from '../bigram';
-import type { SessionSummary } from '../session';
+import type { BigramAggregate, BigramClassification, SessionSummary } from '../core';
 import { buildWpmSeries } from './metrics';
 
 /**

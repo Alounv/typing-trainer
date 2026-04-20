@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { computeSessionDelta } from './delta';
-import type { SessionSummary, SessionType } from './types';
-import type { BigramAggregate, BigramClassification } from '../bigram/types';
+import type {
+	SessionSummary,
+	SessionType,
+	BigramAggregate,
+	BigramClassification
+} from '../core/types';
 import { WPM_ROLLING_WINDOW } from '../progress/metrics';
 import { DEFAULT_HIGH_ERROR_THRESHOLD } from '../bigram/classification';
 

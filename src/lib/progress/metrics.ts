@@ -1,12 +1,5 @@
-import {
-	type BigramAggregate,
-	type BigramClassification,
-	type BigramSample,
-	classifyBigram,
-	DEFAULT_THRESHOLDS,
-	type ClassificationThresholds
-} from '../bigram';
-import type { SessionSummary } from '../session';
+import type { BigramAggregate, BigramClassification, BigramSample, SessionSummary } from '../core';
+import { classifyBigram, DEFAULT_THRESHOLDS, type ClassificationThresholds } from '../bigram';
 import type { FrequencyTable } from '../corpus';
 
 /**

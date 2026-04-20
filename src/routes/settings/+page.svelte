@@ -19,15 +19,12 @@
 		saveProfile,
 		buildDefaultProfile,
 		withDefaults,
-		type Language,
-		type UserSettings
-	} from '$lib/settings';
-	import { DEFAULT_SPEED_THRESHOLD_MS, DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/bigram';
-	import {
 		DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 		DEFAULT_REAL_TEXT_WORD_BUDGET,
 		DEFAULT_DIAGNOSTIC_WORD_BUDGET
-	} from '$lib/practice';
+	} from '$lib/settings';
+	import type { Language, UserSettings } from '$lib/core';
+	import { DEFAULT_SPEED_THRESHOLD_MS, DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/bigram';
 	import type { BuiltinCorpusId } from '$lib/corpus';
 	import DataTransfer from '$lib/settings/DataTransfer.svelte';
 

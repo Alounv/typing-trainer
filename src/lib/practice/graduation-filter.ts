@@ -3,7 +3,7 @@
  * N sessions leaves the drill roster, freeing slots for bottlenecks. Lives outside
  * the planner because it's async (storage read); dashboard wires the two together.
  */
-import type { BigramAggregate } from '../bigram';
+import type { BigramAggregate } from '../core';
 
 /** Consecutive `healthy` sessions required before a bigram leaves rotation. */
 export const CONSECUTIVE_HEALTHY_SESSIONS = 3;

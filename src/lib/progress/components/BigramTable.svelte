@@ -5,7 +5,7 @@
 -->
 <script lang="ts">
 	import type { BigramSummary } from '../metrics';
-	import type { BigramClassification } from '../../bigram';
+	import type { BigramClassification } from '../../core';
 	import BigramSparkline from './BigramSparkline.svelte';
 
 	interface Props {

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { detectGraduations, detectMilestone, isImprovement } from './celebrations';
-import type { BigramAggregate, BigramClassification } from '../bigram/types';
-import type { SessionSummary } from '../session/types';
+import type { BigramAggregate, BigramClassification, SessionSummary } from '../core/types';
 
 // Minimal aggregate factory — only fields `detectGraduations` reads are populated.
 function agg(bigram: string, classification: BigramClassification): BigramAggregate {

@@ -22,8 +22,7 @@
 	import ErrorRateChart from '$lib/progress/components/ErrorRateChart.svelte';
 	import BigramTable from '$lib/progress/components/BigramTable.svelte';
 	import ClassificationBar from '$lib/progress/components/ClassificationBar.svelte';
-	import type { SessionSummary } from '$lib/session';
-	import type { DiagnosticReport } from '$lib/diagnostic';
+	import type { SessionSummary, DiagnosticReport } from '$lib/core';
 
 	type LoadState =
 		| { status: 'loading' }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateDiagnosticReport } from './engine';
-import type { BigramAggregate } from '../bigram/types';
+import type { BigramAggregate } from '../core/types';
 import type { KeystrokeEvent } from '../typing/types';
 import { TARGET_WPM_MULTIPLIER } from './pacing';
 

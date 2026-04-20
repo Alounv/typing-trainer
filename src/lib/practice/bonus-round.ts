@@ -17,7 +17,7 @@
  * user gets yet another full plan. No cap — if someone wants to drill
  * all day, let them.
  */
-import type { SessionType } from '../session';
+import type { SessionType } from '../core';
 
 const STORAGE_KEY = 'scheduler.bonusRound';
 

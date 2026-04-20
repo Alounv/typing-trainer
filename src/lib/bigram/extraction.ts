@@ -1,5 +1,5 @@
 import type { KeystrokeEvent } from '../typing';
-import type { BigramAggregate, BigramSample } from './types';
+import type { BigramAggregate, BigramSample } from '../core';
 import { classifyBigram, type ClassificationThresholds } from './classification';
 
 /**

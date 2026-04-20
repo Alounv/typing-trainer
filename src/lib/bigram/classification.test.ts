@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { classifyBigram, DEFAULT_THRESHOLDS } from './classification';
-import type { BigramClassification } from './types';
+import type { BigramClassification } from '../core/types';
 
 /**
  * The 4-way classification has tunable thresholds, so bugs here are silent

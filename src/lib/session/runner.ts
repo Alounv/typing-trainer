@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import { annotateFirstInputs, type KeystrokeEvent } from '../typing';
 import { extractBigramAggregates, type ClassificationThresholds } from '../bigram';
-import type { SessionSummary, SessionType } from './types';
+import type { SessionSummary, SessionType } from '../core';
 
 /**
  * Inputs for turning a finished capture into a persistable summary.

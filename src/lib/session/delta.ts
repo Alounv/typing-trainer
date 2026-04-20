@@ -1,9 +1,5 @@
-import type { SessionSummary } from './types';
-import {
-	type BigramAggregate,
-	type BigramClassification,
-	DEFAULT_HIGH_ERROR_THRESHOLD
-} from '../bigram';
+import type { SessionSummary, BigramAggregate, BigramClassification } from '../core';
+import { DEFAULT_HIGH_ERROR_THRESHOLD } from '../bigram';
 import { countGraduations, WPM_ROLLING_WINDOW } from '../progress';
 
 /**

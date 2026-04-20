@@ -18,12 +18,18 @@ import {
 	type BuiltinCorpusId,
 	type FrequencyTable
 } from '../corpus';
-import { getProfile, type UserSettings } from '../settings';
+import type { UserSettings } from '../core';
+import {
+	getProfile,
+	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
+	DEFAULT_REAL_TEXT_WORD_BUDGET,
+	DEFAULT_DIAGNOSTIC_WORD_BUDGET
+} from '../settings';
 import { getBigramHistory, getRecentSessions } from '../storage';
 import { consumePlannedSession } from './planned';
-import { generateBigramDrillSequence, DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from './bigram-drill';
-import { generateRealTextSequence, DEFAULT_REAL_TEXT_WORD_BUDGET } from './real-text';
-import { sampleDiagnosticPassage, DEFAULT_DIAGNOSTIC_WORD_BUDGET } from './diagnostic-sampler';
+import { generateBigramDrillSequence } from './bigram-drill';
+import { generateRealTextSequence } from './real-text';
+import { sampleDiagnosticPassage } from './diagnostic-sampler';
 import { findGraduatedBigrams } from './graduation-filter';
 import { DEFAULT_DRILL_TARGET_COUNT, selectDrillTargets } from './planner';
 

@@ -18,12 +18,6 @@ const QUOTE_SEPARATOR = ' ';
 /** 1400 chars ≈ 5 min at 60 WPM. */
 const DEFAULT_TARGET_LENGTH_CHARS = 1400;
 
-/**
- * Default word budget (overridable via `UserSettings.wordBudgets.realText`).
- * Smaller than the drill default — real-text runs are denser per word.
- */
-export const DEFAULT_REAL_TEXT_WORD_BUDGET = 25;
-
 export interface RealTextInput {
 	/** Preferred source: a quote bank for the session's language. */
 	quoteBank?: QuoteBank;

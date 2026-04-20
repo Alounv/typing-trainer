@@ -14,112 +14,85 @@ loaders).
 
 ```mermaid
 flowchart TB
-    subgraph Routes["routes/ (pages)"]
-        R_Dash["/ (dashboard)"]
-        R_Sess["/session/*<br/>(diagnostic, bigram-drill,<br/>real-text)"]
-        R_Summary["/session/[id]/summary"]
-        R_Ana["/analytics"]
-        R_Set["/settings"]
+    subgraph Routes["routes/"]
+        R["/ · /session/* · /session/[id]/summary<br/>/analytics · /settings"]
     end
 
-    subgraph UI["UI components ($lib)"]
-        Shell["session/components<br/>SessionShell"]
-        Surface["typing/TypingSurface"]
-        SummaryCmp["session/components<br/>SessionDelta,<br/>Graduations,<br/>MilestoneBanner"]
-        Charts["progress/components<br/>WpmChart,<br/>ErrorRateChart,<br/>BigramTable,<br/>ClassificationBar"]
-        DataXfer["settings/<br/>DataTransfer"]
+    subgraph Domain["src/lib (domain)"]
+        session
+        practice
+        progress
+        settings
+        diagnostic
+        corpus
+        bigram
+        typing
+        core
     end
 
-    subgraph Domain["Domain (TS)"]
-        Typing["typing<br/>capture + postprocess"]
-        Runner["session/runner"]
-        Persistence["session/persistence<br/>saveSession"]
-        SummaryLoader["session/summary-loader<br/>(wraps delta +<br/>celebrations + plan)"]
-
-        DashLoader["practice/<br/>dashboard-loader<br/>(+ startPlannedSession,<br/>startBonusRound)"]
-        SessLoader["practice/<br/>session-loader<br/>(prepare* functions)"]
-        PracticeCore["practice<br/>planner, graduation-filter,<br/>bigram-drill, real-text,<br/>diagnostic-sampler,<br/>bonus-round, planned"]
-
-        Celebrations["progress/celebrations"]
-        Metrics["progress/metrics"]
-        AnalyticsLoader["progress/<br/>analytics-loader"]
-
-        Bigram["bigram<br/>extraction + classification"]
-        Diag["diagnostic<br/>engine + pacing"]
-        Corpus["corpus<br/>registry + loader"]
-        Profile["settings/profile"]
-        DataTransferDom["settings/<br/>data-transfer"]
+    subgraph Support["src/lib (support UI)"]
+        stores
+        components
     end
 
     subgraph Infra["Infra"]
-        Storage[("storage<br/>IndexedDB")]
+        storage[("storage<br/>IndexedDB")]
     end
 
-    %% Dashboard — single loader boundary.
-    R_Dash --> DashLoader
+    %% Route → domain. Each page enters the domain through one (or two) libs,
+    %% never directly into storage.
+    R --> session
+    R --> practice
+    R --> progress
+    R --> settings
+    R --> diagnostic
+    R --> bigram
+    R --> corpus
+    R --> core
+    R --> stores
+    R --> components
 
-    %% Session write-path (keystroke -> storage)
-    R_Sess --> Shell
-    R_Sess --> SessLoader
-    Shell --> Surface
-    Shell --> Runner
-    Shell --> Persistence
-    Surface -- "KeystrokeEvent[]" --> Typing
-    Typing --> Runner
-    Runner --> Bigram
+    %% Domain → domain (all forward-only, strict DAG).
+    session --> practice
+    session --> progress
+    session --> diagnostic
+    session --> bigram
+    session --> typing
+    session --> core
+    practice --> settings
+    practice --> diagnostic
+    practice --> corpus
+    practice --> bigram
+    practice --> core
+    progress --> settings
+    progress --> corpus
+    progress --> bigram
+    progress --> core
+    settings --> bigram
+    settings --> core
+    diagnostic --> corpus
+    diagnostic --> bigram
+    diagnostic --> typing
+    diagnostic --> core
+    bigram --> typing
+    bigram --> core
+    components --> stores
 
-    %% Summary — loader returns delta + celebrations + next planned session.
-    %% The DashLoader edge is only for the `startPlannedSession` /
-    %% `startBonusRound` hand-off actions, not data loading.
-    R_Summary --> SummaryCmp
-    R_Summary --> SummaryLoader
-    R_Summary --> DashLoader
-
-    %% Analytics
-    R_Ana --> Charts
-    R_Ana --> AnalyticsLoader
-
-    %% Settings
-    R_Set --> DataXfer
-    R_Set --> Profile
-    DataXfer --> DataTransferDom
-
-    %% Domain internal + domain -> infra
-    SummaryLoader --> Metrics
-    SummaryLoader --> Celebrations
-    SummaryLoader --> DashLoader
-    SummaryLoader --> Storage
-    SessLoader --> PracticeCore
-    SessLoader --> Corpus
-    SessLoader --> Profile
-    SessLoader --> Storage
-    DashLoader --> PracticeCore
-    DashLoader --> Diag
-    DashLoader --> Profile
-    DashLoader --> Storage
-    AnalyticsLoader --> Metrics
-    AnalyticsLoader --> Storage
-    AnalyticsLoader --> Profile
-    AnalyticsLoader --> Corpus
-    PracticeCore --> Corpus
-    PracticeCore --> Bigram
-    Celebrations --> Metrics
-    Celebrations --> Bigram
-    Metrics --> Bigram
-    Diag --> Corpus
-    Diag --> Bigram
-    Profile --> Storage
-    DataTransferDom --> Storage
-    Persistence --> Storage
+    %% Domain → infra. Only these libs touch storage; routes never do.
+    session --> storage
+    practice --> storage
+    progress --> storage
+    settings --> storage
+    storage --> core
 
     classDef route fill:#1e3a5f,stroke:#5aa9e6,color:#e6f2ff
-    classDef ui fill:#5c3d1e,stroke:#e89f4c,color:#fff2e0
     classDef domain fill:#2d4a2b,stroke:#7cb342,color:#eaffea
+    classDef support fill:#5c3d1e,stroke:#e89f4c,color:#fff2e0
     classDef infra fill:#5a2740,stroke:#e06c9f,color:#ffe6f0
-    class R_Dash,R_Sess,R_Summary,R_Ana,R_Set route
-    class Shell,Surface,SummaryCmp,Charts,DataXfer ui
-    class Typing,Runner,Persistence,SummaryLoader,DashLoader,SessLoader,PracticeCore,Metrics,Celebrations,AnalyticsLoader,Bigram,Diag,Corpus,Profile,DataTransferDom domain
-    class Storage infra
+    class R route
+    class session,practice,progress,settings,diagnostic,corpus,bigram,typing,core domain
+    class stores,components support
+    class storage infra
 ```
 
 ## Main flows
@@ -132,16 +105,17 @@ flowchart TB
 
 ## Module purposes
 
-| Module       | Role                                                                                                                                                                                               |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `typing`     | Keystroke capture attachment, `KeystrokeEvent` types, postprocess annotation.                                                                                                                      |
-| `session`    | `SessionRunner`, `SessionSummary` construction, delta computation, `saveSession`, summary loader, UI components.                                                                                   |
-| `bigram`     | Classification (+ thresholds), extraction, accuracy/timing aggregation from events.                                                                                                                |
-| `diagnostic` | Weakness-report engine and pacing computation. Practice-side sampling lives in `practice`.                                                                                                         |
-| `practice`   | What-to-practice-next domain: drill/real-text/diagnostic text generation, planner, graduation filter, bonus round, route hand-off (`planned`), plus the dashboard and session loaders routes call. |
-| `corpus`     | Text corpus registry, loading, normalization, custom texts.                                                                                                                                        |
-| `progress`   | Metrics computation, celebrations logic, analytics chart components, analytics loader.                                                                                                             |
-| `storage`    | IndexedDB Dexie instance + low-level helpers. Only domain modules call into it; UI goes through the domain.                                                                                        |
-| `stores`     | Theme UI state.                                                                                                                                                                                    |
-| `components` | Shared UI (theme selector).                                                                                                                                                                        |
-| `settings`   | User-profile domain (`profile`), export/import domain (`data-transfer`), `DataTransfer` component.                                                                                                 |
+| Module       | Role                                                                                                                                                                                                                                                            |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `typing`     | Keystroke capture attachment, `KeystrokeEvent` types, postprocess annotation.                                                                                                                                                                                   |
+| `session`    | `SessionRunner`, `SessionSummary` construction, delta computation, `saveSession`, summary loader, UI components.                                                                                                                                                |
+| `bigram`     | Classification (+ thresholds), extraction, accuracy/timing aggregation from events.                                                                                                                                                                             |
+| `diagnostic` | Weakness-report engine and pacing computation. Practice-side sampling lives in `practice`.                                                                                                                                                                      |
+| `practice`   | What-to-practice-next domain: drill/real-text/diagnostic text generation, planner, graduation filter, bonus round, route hand-off (`planned`), plus the dashboard and session loaders routes call.                                                              |
+| `corpus`     | Text corpus registry, loading, normalization, custom texts.                                                                                                                                                                                                     |
+| `progress`   | Metrics computation, celebrations logic, analytics chart components, analytics loader.                                                                                                                                                                          |
+| `storage`    | IndexedDB Dexie instance + low-level helpers. Only domain modules call into it; UI goes through the domain.                                                                                                                                                     |
+| `stores`     | Theme UI state.                                                                                                                                                                                                                                                 |
+| `components` | Shared UI (theme selector).                                                                                                                                                                                                                                     |
+| `settings`   | User-profile domain (`profile`), export/import domain (`data-transfer`), `DataTransfer` component.                                                                                                                                                              |
+| `core`       | Shared domain types (`SessionSummary`, `SessionType`, `SessionConfig`, `UserSettings`, `Language`, `BigramAggregate`, `BigramClassification`, `BigramSample`, `DiagnosticReport`, `PriorityBigram`). Type-only; no runtime, no `$lib/*` imports — the DAG leaf. |
