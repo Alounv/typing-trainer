@@ -54,20 +54,22 @@
 	});
 
 	/**
-	 * Space-bar shortcut: trigger the primary CTA (next session if planned,
-	 * otherwise back to dashboard). Mirrors the "spacebar advances" reflex
-	 * built up during typing sessions — the user's hand is already there.
+	 * Enter-key shortcut: trigger the primary CTA (next session if planned,
+	 * otherwise back to dashboard). Enter reads as "confirm / proceed" and
+	 * avoids the typo hazard of Space — after a drill the user's hands are
+	 * still resting on the home row, and a stray spacebar press would
+	 * otherwise advance before they've read the summary.
 	 *
 	 * Ignored when a form field or the theme dropdown has focus so we don't
-	 * hijack native inputs. We also skip modifier combos (`ctrl+space`,
-	 * `shift+space`, `meta+space`) to avoid clashing with OS shortcuts.
+	 * hijack native inputs. We also skip modifier combos to avoid clashing
+	 * with OS shortcuts.
 	 */
 	function onWindowKeydown(event: KeyboardEvent) {
 		if (state.status !== 'ready') return;
-		if (event.key !== ' ' && event.code !== 'Space') return;
+		if (event.key !== 'Enter' && event.code !== 'Enter') return;
 		if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
 
-		// Don't steal space from inputs / buttons the user may be interacting with.
+		// Don't steal Enter from inputs / buttons the user may be interacting with.
 		const el = document.activeElement;
 		if (el instanceof HTMLElement) {
 			const tag = el.tagName;
@@ -138,7 +140,7 @@
 			<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
 				<kbd
 					class="rounded-sm border border-base-300 bg-base-200 px-1.5 py-0.5 font-mono text-[0.65rem] tracking-normal text-base-content/70"
-					>Space</kbd
+					>Enter</kbd
 				>
 				{state.next ? 'next session' : 'dashboard'}
 			</p>

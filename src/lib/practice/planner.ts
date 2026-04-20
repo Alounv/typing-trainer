@@ -23,8 +23,8 @@ function resolveWordBudgets(settings?: UserSettings) {
 
 /**
  * Run a full diagnostic every N non-diagnostic sessions. 28 is chosen so the
- * cadence stays roughly weekly for an active user — a full day is up to 9
- * mini-sessions (3 cycles × accuracy + speed + real-text), so 28 ≈ 3 days of
+ * cadence stays roughly weekly for an active user — a full day is up to 6
+ * mini-sessions (2 cycles × accuracy + speed + real-text), so 28 ≈ ~5 days of
  * full workouts. Kept at 28 through the cycle refactor so existing users
  * don't see a surprise diagnostic the day of the migration.
  */
@@ -40,7 +40,7 @@ export const DEFAULT_DRILL_TARGET_COUNT = 10;
  * silently skipped — a cycle can therefore be as short as a single real-text.
  * Real-text always runs; it's the transfer test and shouldn't ever go away.
  */
-export const CYCLES_PER_DAY = 3;
+export const CYCLES_PER_DAY = 2;
 
 export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	const {
