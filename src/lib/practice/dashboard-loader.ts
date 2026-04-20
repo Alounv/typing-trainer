@@ -96,7 +96,7 @@ export async function loadDashboardData(opts: DashboardLoadOptions = {}): Promis
  */
 export function startPlannedSession(planned: PlannedSession): void {
 	stashPlannedSession(planned);
-	window.location.href = routeForSessionType(planned.config.type);
+	window.location.href = routeForPlannedSession(planned);
 }
 
 /**
@@ -113,16 +113,21 @@ export function startBonusRound(completedToday: Partial<Record<SessionType, numb
 }
 
 /**
- * Route path for a planned session's type. Kept inside the loader so every
- * "start a planned session" caller routes identically — previously every
- * route component had its own copy of this switch.
+ * Route path for a planned session. Drill sessions split by `drillMode`:
+ * accuracy and speed are separate URLs so the treatment is obvious from
+ * the address bar and the nav. A drill planned without a mode (legacy
+ * plans or direct nav stashes) falls back to accuracy — matches the
+ * direct-nav default elsewhere in the app.
  */
-function routeForSessionType(type: SessionType): string {
+function routeForPlannedSession(planned: PlannedSession): string {
+	const { type } = planned.config;
 	switch (type) {
 		case 'diagnostic':
 			return resolve('/session/diagnostic');
 		case 'bigram-drill':
-			return resolve('/session/bigram-drill');
+			return planned.config.drillMode === 'speed'
+				? resolve('/session/speed-drill')
+				: resolve('/session/accuracy-drill');
 		case 'real-text':
 			return resolve('/session/real-text');
 	}

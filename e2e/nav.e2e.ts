@@ -7,7 +7,13 @@ test('dashboard renders and nav links route correctly', async ({ page }) => {
 	// pinning the h1 text anyway.
 	await expect(page.getByTestId('start-diagnostic')).toBeVisible();
 
-	await page.getByTestId('override-drill').click();
-	await expect(page).toHaveURL(/\/session\/bigram-drill$/);
-	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bigram drill');
+	// Two drill overrides now — accuracy and speed live on separate routes.
+	await page.getByTestId('override-accuracy-drill').click();
+	await expect(page).toHaveURL(/\/session\/accuracy-drill$/);
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Accuracy drill');
+
+	await page.goto('/');
+	await page.getByTestId('override-speed-drill').click();
+	await expect(page).toHaveURL(/\/session\/speed-drill$/);
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Speed drill');
 });

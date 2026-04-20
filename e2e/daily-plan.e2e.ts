@@ -48,13 +48,15 @@ test(
 		await typeCurrentPassage(page);
 
 		// Drill: override link is always present on the dashboard and
-		// routes straight to the bigram-drill session. Without a
+		// routes straight to the accuracy-drill session. Without a
 		// dashboard hand-off, the route falls back to a small set of
 		// common English target bigrams — enough to generate a valid
-		// drill passage for the runner to consume.
+		// drill passage for the runner to consume. Accuracy route is
+		// enough coverage here; speed uses the same runner, just a
+		// different pacer multiplier.
 		await page.goto('/');
-		await page.getByTestId('override-drill').click();
-		await expect(page).toHaveURL(/\/session\/bigram-drill$/);
+		await page.getByTestId('override-accuracy-drill').click();
+		await expect(page).toHaveURL(/\/session\/accuracy-drill$/);
 		await typeCurrentPassage(page);
 
 		// Real-text: same shape via the real-text override.

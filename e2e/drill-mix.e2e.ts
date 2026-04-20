@@ -24,10 +24,16 @@ async function stashDrillPlan(page: Page, mix: SeededMix): Promise<void> {
 		config: {
 			type: 'bigram-drill',
 			wordBudget: 20,
-			bigramsTargeted: [...mix.priority, ...mix.exposure]
+			bigramsTargeted: [...mix.priority, ...mix.exposure],
+			// Both fixtures are accuracy-mode: undertrained/exposure backfill is
+			// an accuracy-mode concern, and priority hasty/acquisition targets
+			// likewise. The dedicated speed route would carry its own fixtures
+			// (fluency-only, no exposure) — keeping the coverage focused rather
+			// than duplicating the whole test file per mode.
+			drillMode: 'accuracy'
 		},
 		reason: 'default-drill',
-		label: 'Bigram drill',
+		label: 'Accuracy drill',
 		rationale: 'test',
 		drillMix: mix
 	};
@@ -47,14 +53,13 @@ test('mixed drill: priority chips filled, exposure chips dashed, legend visible'
 		exposure: ['an', 'in']
 	});
 
-	await page.goto('/session/bigram-drill');
-
-	// Header copy flags the mixed nature — "flagged as weak" + "need more data".
-	const what = page.getByText(/flagged as weak/i);
-	await expect(what).toBeVisible();
+	await page.goto('/session/accuracy-drill');
 
 	// Chips surface aria-labels per source — the semantic hook the UI uses to
-	// carry the priority/exposure distinction to assistive tech.
+	// carry the priority/exposure distinction to assistive tech. These are now
+	// the only place the priority-vs-exposure distinction appears in text
+	// (the `what` header that used to spell it out was removed — the title +
+	// chip list are enough to convey mix composition).
 	const drillList = page.getByRole('list', { name: 'Drill targets' });
 	await expect(drillList.getByLabel('th, diagnosed weakness')).toBeVisible();
 	await expect(drillList.getByLabel('he, diagnosed weakness')).toBeVisible();
@@ -74,13 +79,7 @@ test('exposure-only drill: exposure-only copy, no legend (no weakness chips to c
 		exposure: ['th', 'he', 'in']
 	});
 
-	await page.goto('/session/bigram-drill');
-
-	// Exposure-only copy is distinct from the mixed copy: it has to admit
-	// "not enough data yet" rather than claim "flagged as weak".
-	await expect(
-		page.getByText(/not enough data yet to diagnose specific weaknesses/i)
-	).toBeVisible();
+	await page.goto('/session/accuracy-drill');
 
 	const drillList = page.getByRole('list', { name: 'Drill targets' });
 	// All three chips carry the exposure label.

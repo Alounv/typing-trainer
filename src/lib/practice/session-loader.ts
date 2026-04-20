@@ -31,7 +31,7 @@ import { generateBigramDrillSequence } from './bigram-drill';
 import { generateRealTextSequence } from './real-text';
 import { sampleDiagnosticPassage } from './diagnostic-sampler';
 import { findGraduatedBigrams } from './graduation-filter';
-import { DEFAULT_DRILL_TARGET_COUNT, selectDrillTargets } from './planner';
+import { DEFAULT_DRILL_TARGET_COUNT, selectAccuracyDrillMix, selectSpeedDrillMix } from './planner';
 
 /** 5 chars ≈ 1 word — translates word budget into char targets for samplers. */
 const CHARS_PER_WORD = 5;
@@ -78,7 +78,18 @@ export interface DiagnosticSessionInputs {
 	corpusBigramFrequencies: FrequencyTable;
 }
 
-export async function prepareBigramDrillSession(): Promise<BigramDrillSessionInputs> {
+/**
+ * Build inputs for a drill session. `routeMode` is the URL's own mode — the
+ * accuracy and speed routes each call this with their own constant, so the
+ * rendered treatment is never ambiguous from the URL alone.
+ *
+ * When a planned session is stashed with a *different* mode than the route
+ * expects, the route's mode wins: the URL is the source of truth, and a
+ * mismatch means a stale stash survived (e.g. back-button after a plan card).
+ * Safer to honour what the user navigated to than silently run a different
+ * treatment.
+ */
+export async function prepareDrillSession(routeMode: DrillMode): Promise<BigramDrillSessionInputs> {
 	// Profile drives word budget and corpus language. Planned sessions
 	// already had the budget chosen upstream; we always read the profile
 	// for corpus so a French user's drill uses French even from a plan card.
@@ -94,7 +105,9 @@ export async function prepareBigramDrillSession(): Promise<BigramDrillSessionInp
 		planned?.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0
 			? { targets: planned.config.bigramsTargeted, mix: planned.drillMix }
 			: null;
-	const resolved = fromPlan ?? (await resolveDirectNavMix());
+	// Direct-nav mix selection is scoped to the route's mode so hitting
+	// /accuracy-drill doesn't pull fluency targets and vice versa.
+	const resolved = fromPlan ?? (await resolveDirectNavMix(routeMode));
 
 	const exposure = resolved.mix?.exposure ?? [];
 
@@ -104,22 +117,16 @@ export async function prepareBigramDrillSession(): Promise<BigramDrillSessionInp
 		corpus,
 		options: { wordCount: wordBudget }
 	});
-	// Planned sessions carry the mode forward from the planner. Direct nav has
-	// no planner to defer to; we pick accuracy as the conservative default
-	// (see `drillMode` doc on `BigramDrillSessionInputs`).
-	const drillMode: DrillMode = planned?.config.drillMode ?? 'accuracy';
 
-	// Baseline for the pacer. Independent of the target selection — we always
-	// want the most recent baseline, even when the planner already resolved
-	// targets from an earlier report. Zero when no diagnostic exists, which
-	// the shell interprets as "hide the ghost cursor."
+	// Baseline for the pacer. Zero when no diagnostic exists, which the
+	// shell interprets as "hide the ghost cursor."
 	const baselineWPM = await getLatestBaselineWPM();
 
 	return {
 		text: seq.text,
 		targets: resolved.targets,
 		exposure,
-		drillMode,
+		drillMode: routeMode,
 		baselineWPM
 	};
 }
@@ -188,12 +195,13 @@ export async function prepareDiagnosticSession(): Promise<DiagnosticSessionInput
 }
 
 /**
- * Pick targets without a dashboard hand-off. Mirrors the planner's
- * selection (including undertrained backfill) so direct nav and plan
- * nav agree. Falls back to SEED_TARGETS only when there's no diagnostic
- * on file.
+ * Pick targets without a dashboard hand-off. Mirrors the planner's per-mode
+ * selection so direct nav and plan nav agree on what each route drills.
+ * Falls back to SEED_TARGETS when there's no diagnostic on file OR the
+ * selected mix is empty for this mode (e.g. no fluency targets on the
+ * speed route yet — we still want to let the user practice).
  */
-async function resolveDirectNavMix(): Promise<{
+async function resolveDirectNavMix(mode: DrillMode): Promise<{
 	targets: readonly string[];
 	mix?: { priority: string[]; exposure: string[] };
 }> {
@@ -201,14 +209,18 @@ async function resolveDirectNavMix(): Promise<{
 	const report = recent.find((s) => s.type === 'diagnostic')?.diagnosticReport;
 	if (!report) return { targets: SEED_TARGETS };
 
-	const priority = report.priorityTargets.map((p) => p.bigram);
-	const graduated = await findGraduatedBigrams(priority, getBigramHistory);
-	const mix = selectDrillTargets(
-		priority,
-		report.corpusFit.undertrained,
-		graduated,
-		DEFAULT_DRILL_TARGET_COUNT
-	);
+	const priorityBigrams = report.priorityTargets.map((p) => p.bigram);
+	const graduated = await findGraduatedBigrams(priorityBigrams, getBigramHistory);
+
+	const mix =
+		mode === 'speed'
+			? selectSpeedDrillMix(report.priorityTargets, graduated, DEFAULT_DRILL_TARGET_COUNT)
+			: selectAccuracyDrillMix(
+					report.priorityTargets,
+					report.corpusFit.undertrained,
+					graduated,
+					DEFAULT_DRILL_TARGET_COUNT
+				);
 	const targets = [...mix.priority, ...mix.exposure];
 	return targets.length > 0 ? { targets, mix } : { targets: SEED_TARGETS };
 }

@@ -12,7 +12,8 @@
 	const nav = [
 		{ href: '/', label: 'Dashboard' },
 		{ href: '/session/diagnostic', label: 'Diagnostic' },
-		{ href: '/session/bigram-drill', label: 'Drill' },
+		{ href: '/session/accuracy-drill', label: 'Accuracy' },
+		{ href: '/session/speed-drill', label: 'Speed' },
 		{ href: '/session/real-text', label: 'Real text' },
 		{ href: '/analytics', label: 'Analytics' },
 		{ href: '/settings', label: 'Settings' }

@@ -6,7 +6,7 @@ import {
 	selectSpeedDrillMix,
 	DIAGNOSTIC_INTERVAL,
 	DEFAULT_DRILL_TARGET_COUNT,
-	PAIRS_PER_DAY
+	CYCLES_PER_DAY
 } from './planner';
 import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
@@ -36,8 +36,18 @@ function recent(...types: SessionType[]): SessionSummary[] {
 	return types.map((t, i) => session(t, types.length - i));
 }
 
-function priorityTarget(bigram: string): PriorityBigram {
-	return { bigram, score: 1, meanTime: 300, errorRate: 0, classification: 'fluency' };
+/**
+ * Default priority targets land in the *accuracy* bucket (`hasty`) so the
+ * baseline `report([...])` helper produces an accuracy drill — that's where
+ * undertrained backfill, graduation filtering, and exposure edge cases live,
+ * so the default matches the test surface area. Tests that need fluency
+ * targets pass `'fluency'` explicitly via `priorityTargetWithClass`.
+ */
+function priorityTarget(
+	bigram: string,
+	classification: PriorityBigram['classification'] = 'hasty'
+): PriorityBigram {
+	return { bigram, score: 1, meanTime: 300, errorRate: 0, classification };
 }
 
 function report(priorityBigrams: string[], undertrained: string[] = []): DiagnosticReport {
@@ -48,7 +58,10 @@ function report(priorityBigrams: string[], undertrained: string[] = []): Diagnos
 		targetWPM: 70,
 		counts: { healthy: 0, fluency: 0, hasty: 0, acquisition: 0 },
 		topBottlenecks: { fluency: [], hasty: [], acquisition: [] },
-		priorityTargets: priorityBigrams.map(priorityTarget),
+		// Wrap to keep `Array.map`'s `(value, index)` arity from binding to the
+		// helper's optional `classification` arg — that'd silently assign the
+		// loop index as a "classification" and skip every target in the mix.
+		priorityTargets: priorityBigrams.map((b) => priorityTarget(b)),
 		// Default coverage = 1 when no undertrained entries, otherwise <1 to keep
 		// it internally consistent (real reports compute it, we just need a
 		// plausible shape for planner tests).
@@ -108,20 +121,72 @@ describe('planDailySessions — diagnostic triggers', () => {
 });
 
 describe('planDailySessions — default daily structure', () => {
-	it('mid-cycle: interleaves drill + real-text mini-sessions', () => {
+	it('mid-cycle: accuracy-only targets produce [accuracy, real-text] × CYCLES_PER_DAY', () => {
+		// All defaults are hasty → accuracy drill only. Speed slot is silently
+		// skipped, so each cycle is 2 items instead of 3.
 		const plan = planDailySessions({
 			recentSessions: recent('real-text', 'diagnostic'),
 			latestDiagnosticReport: report(['th', 'he', 'in'])
 		});
-		// Full day = PAIRS_PER_DAY × [drill, real-text].
-		expect(plan).toHaveLength(PAIRS_PER_DAY * 2);
-		const types = plan.map((p) => p.config.type);
-		for (let i = 0; i < PAIRS_PER_DAY; i++) {
-			expect(types[i * 2]).toBe('bigram-drill');
-			expect(types[i * 2 + 1]).toBe('real-text');
+		expect(plan).toHaveLength(CYCLES_PER_DAY * 2);
+		for (let i = 0; i < CYCLES_PER_DAY; i++) {
+			expect(plan[i * 2].config.type).toBe('bigram-drill');
+			expect(plan[i * 2].config.drillMode).toBe('accuracy');
+			expect(plan[i * 2 + 1].config.type).toBe('real-text');
 		}
 		expect(plan[0].config.wordBudget).toBe(DEFAULT_BIGRAM_DRILL_WORD_BUDGET);
 		expect(plan[1].config.wordBudget).toBe(DEFAULT_REAL_TEXT_WORD_BUDGET);
+	});
+
+	it('mixed classes: full cycle emits [accuracy, speed, real-text]', () => {
+		// Explicit class mix — accuracy and speed buckets both non-empty.
+		const report = {
+			sessionId: 'diag-1',
+			timestamp: 0,
+			baselineWPM: 60,
+			targetWPM: 70,
+			counts: { healthy: 0, fluency: 1, hasty: 2, acquisition: 0 },
+			topBottlenecks: { fluency: [], hasty: [], acquisition: [] },
+			priorityTargets: [
+				priorityTarget('th', 'hasty'),
+				priorityTarget('in', 'hasty'),
+				priorityTarget('er', 'fluency')
+			],
+			corpusFit: { coverageRatio: 1, undertrained: [] }
+		};
+		const plan = planDailySessions({
+			recentSessions: recent('diagnostic'),
+			latestDiagnosticReport: report
+		});
+		expect(plan).toHaveLength(CYCLES_PER_DAY * 3);
+		// Spot-check the first cycle — all three slots present, in order.
+		expect(plan[0].config.drillMode).toBe('accuracy');
+		expect(plan[0].config.bigramsTargeted).toEqual(['th', 'in']);
+		expect(plan[1].config.drillMode).toBe('speed');
+		expect(plan[1].config.bigramsTargeted).toEqual(['er']);
+		expect(plan[2].config.type).toBe('real-text');
+	});
+
+	it('fluency-only targets: cycle skips accuracy slot', () => {
+		const plan = planDailySessions({
+			recentSessions: recent('diagnostic'),
+			latestDiagnosticReport: {
+				sessionId: 'diag-1',
+				timestamp: 0,
+				baselineWPM: 60,
+				targetWPM: 70,
+				counts: { healthy: 0, fluency: 2, hasty: 0, acquisition: 0 },
+				topBottlenecks: { fluency: [], hasty: [], acquisition: [] },
+				priorityTargets: [priorityTarget('er', 'fluency'), priorityTarget('an', 'fluency')],
+				corpusFit: { coverageRatio: 1, undertrained: [] }
+			}
+		});
+		// CYCLES_PER_DAY × [speed, real-text] = 6.
+		expect(plan).toHaveLength(CYCLES_PER_DAY * 2);
+		for (let i = 0; i < CYCLES_PER_DAY; i++) {
+			expect(plan[i * 2].config.drillMode).toBe('speed');
+			expect(plan[i * 2 + 1].config.type).toBe('real-text');
+		}
 	});
 
 	it('drill uses top priority bigrams up to the default count', () => {
@@ -159,8 +224,9 @@ describe('planDailySessions — default daily structure', () => {
 			latestDiagnosticReport: report(['th', 'he']),
 			graduatedFromRotation: new Set(['th', 'he'])
 		});
-		// Still PAIRS_PER_DAY mini-sessions — just all real-text, no drill.
-		expect(plan).toHaveLength(PAIRS_PER_DAY);
+		// CYCLES_PER_DAY × [real-text only]. Both drill slots skipped because
+		// every target is graduated and no undertrained is available.
+		expect(plan).toHaveLength(CYCLES_PER_DAY);
 		expect(plan.every((p) => p.config.type === 'real-text')).toBe(true);
 	});
 });
@@ -246,7 +312,11 @@ describe('planDailySessions — exposure backfill from undertrained', () => {
 			latestDiagnosticReport: report(['th'], ['he', 'in']),
 			drillTargetCount: 3
 		});
-		expect(plan[0].rationale).toMatch(/1 weakness.*2 new bigrams/);
+		// Accuracy-mode rationale uses "error-prone" vocabulary — fluency mode
+		// uses "accurate-but-slow". Pinning the exact phrasing would make copy
+		// tweaks churn the test; just confirm the shape (count of error-prone +
+		// count of new bigrams) lands in the string.
+		expect(plan[0].rationale).toMatch(/1 error-prone.*2 new bigrams/);
 	});
 
 	it('empty priority AND empty undertrained → no drill, real-text only', () => {
@@ -297,18 +367,17 @@ describe('sliceCompletedFromPlan', () => {
 	});
 
 	/**
-	 * The interleaved order is [drill, real-text, drill, real-text, …].
-	 * "2 drills + 0 real-text done" chews through the first drill, keeps
-	 * the first real-text, chews through the second drill. Net: we drop
-	 * the two earliest drill slots while the real-text slots in between
-	 * survive, so 6 items remain.
+	 * Accuracy-only default plan = CYCLES_PER_DAY × [accuracy-drill, real-text]
+	 * → 6 items total. Completing a drill consumes the earliest `bigram-drill`
+	 * slot; real-text credits do the same for their slots. Unused credit (more
+	 * "done" than actual slots) is dropped, not carried over.
 	 */
 	it.each`
-		drillsDone | realTextDone | expectedRemaining
-		${1}       | ${0}         | ${PAIRS_PER_DAY * 2 - 1}
-		${2}       | ${0}         | ${PAIRS_PER_DAY * 2 - 2}
-		${2}       | ${2}         | ${PAIRS_PER_DAY * 2 - 4}
-		${4}       | ${4}         | ${0}
+		drillsDone        | realTextDone      | expectedRemaining
+		${1}              | ${0}              | ${CYCLES_PER_DAY * 2 - 1}
+		${2}              | ${0}              | ${CYCLES_PER_DAY * 2 - 2}
+		${2}              | ${2}              | ${CYCLES_PER_DAY * 2 - 4}
+		${CYCLES_PER_DAY} | ${CYCLES_PER_DAY} | ${0}
 	`(
 		'$drillsDone drills + $realTextDone real-text done → $expectedRemaining remaining',
 		({ drillsDone, realTextDone, expectedRemaining }) => {
@@ -322,8 +391,9 @@ describe('sliceCompletedFromPlan', () => {
 	);
 
 	it('preserves interleaving order of surviving items', () => {
-		// 1 drill + 0 real-text done → first survivor is the initial real-text,
-		// then drill, real-text, drill, real-text, drill, real-text.
+		// 1 drill done → first survivor is the initial real-text (the drill
+		// slot that would have been first is consumed), then the remaining
+		// [drill, real-text, drill, real-text] alternation.
 		const full = dailyPlan();
 		const remaining = sliceCompletedFromPlan(full, { 'bigram-drill': 1 });
 		expect(remaining[0].config.type).toBe('real-text');
@@ -415,11 +485,7 @@ describe('selectSpeedDrillMix', () => {
 
 	it('respects graduated filter', () => {
 		const graduated = new Set(['er']);
-		const mix = selectSpeedDrillMix(
-			[pt('er', 'fluency'), pt('an', 'fluency')],
-			graduated,
-			10
-		);
+		const mix = selectSpeedDrillMix([pt('er', 'fluency'), pt('an', 'fluency')], graduated, 10);
 		expect(mix.priority).toEqual(['an']);
 	});
 

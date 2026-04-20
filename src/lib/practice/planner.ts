@@ -3,7 +3,7 @@
  * graduated bigrams, decides the next single session — diagnostic or N interleaved
  * drill/real-text mini-sessions. The dashboard re-plans on each completion.
  */
-import type { PriorityBigram, SessionConfig, SessionType, UserSettings } from '../core';
+import type { DrillMode, PriorityBigram, SessionConfig, SessionType, UserSettings } from '../core';
 import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 	DEFAULT_REAL_TEXT_WORD_BUDGET,
@@ -22,16 +22,25 @@ function resolveWordBudgets(settings?: UserSettings) {
 }
 
 /**
- * Run a full diagnostic every N non-diagnostic sessions. 28 (not 7) because a
- * daily plan now emits 8 mini-sessions; keeping ~weekly cadence means 4× the count.
+ * Run a full diagnostic every N non-diagnostic sessions. 28 is chosen so the
+ * cadence stays roughly weekly for an active user — a full day is up to 9
+ * mini-sessions (3 cycles × accuracy + speed + real-text), so 28 ≈ 3 days of
+ * full workouts. Kept at 28 through the cycle refactor so existing users
+ * don't see a surprise diagnostic the day of the migration.
  */
 export const DIAGNOSTIC_INTERVAL = 28;
 
 /** Default "top N" priority bigrams to drill per session. */
 export const DEFAULT_DRILL_TARGET_COUNT = 10;
 
-/** 4 drill + 4 real-text sessions interleaved — a full workout with save points between. */
-export const PAIRS_PER_DAY = 4;
+/**
+ * A daily plan emits this many treatment cycles. Each cycle is up to three
+ * mini-sessions: accuracy drill → speed drill → real-text. Drill slots whose
+ * target pool is empty (no fluency targets, or everything graduated) are
+ * silently skipped — a cycle can therefore be as short as a single real-text.
+ * Real-text always runs; it's the transfer test and shouldn't ever go away.
+ */
+export const CYCLES_PER_DAY = 3;
 
 export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	const {
@@ -63,26 +72,42 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 		return [diagnosticPlan('cadence-diagnostic', since, budgets.diagnostic)];
 	}
 
-	// 4. Default daily = drill + real text.
-	const drillMix = selectDrillTargets(
-		latestDiagnosticReport.priorityTargets.map((p) => p.bigram),
+	// 4. Default daily = treatment cycle. Split the priority list by class so
+	//    hasty/acquisition bigrams feed the accuracy-drill (no speed pressure,
+	//    pacer at 0.60× baseline) and fluency bigrams feed the speed-drill
+	//    (pacer at 1.17× baseline). Undertrained backfill goes to accuracy —
+	//    unknown bigrams are an error risk, not a speed-ceiling problem.
+	const accuracyMix = selectAccuracyDrillMix(
+		latestDiagnosticReport.priorityTargets,
 		latestDiagnosticReport.corpusFit.undertrained,
 		graduatedFromRotation,
 		drillTargetCount
 	);
+	const speedMix = selectSpeedDrillMix(
+		latestDiagnosticReport.priorityTargets,
+		graduatedFromRotation,
+		drillTargetCount
+	);
 
-	// Nothing to drill (no weaknesses, no corpus backfill) → real-text only.
-	if (drillMix.priority.length === 0 && drillMix.exposure.length === 0) {
-		return Array.from({ length: PAIRS_PER_DAY }, () =>
+	const accuracyHasTargets = accuracyMix.priority.length > 0 || accuracyMix.exposure.length > 0;
+	const speedHasTargets = speedMix.priority.length > 0;
+
+	// Nothing to drill at all (everything graduated, no undertrained) →
+	// real-text only, one per cycle. Matches the pre-cycle fallback: the
+	// dashboard still has something to offer the user.
+	if (!accuracyHasTargets && !speedHasTargets) {
+		return Array.from({ length: CYCLES_PER_DAY }, () =>
 			realtextPlan(budgets.realText, 'no-targets-left')
 		);
 	}
 
-	// Interleave drill + real-text; each pair is independent so the user can
-	// stop after any pair and the next run re-plans.
+	// Cycle emitter: [accuracy, speed, real-text] per round, skipping drill
+	// slots whose pool is empty. Real-text always runs — it's the transfer
+	// test that closes each cycle and the one slot that shouldn't be skipped.
 	const plan: PlannedSession[] = [];
-	for (let i = 0; i < PAIRS_PER_DAY; i++) {
-		plan.push(drillPlan(drillMix, budgets.bigramDrill));
+	for (let i = 0; i < CYCLES_PER_DAY; i++) {
+		if (accuracyHasTargets) plan.push(drillPlan(accuracyMix, 'accuracy', budgets.bigramDrill));
+		if (speedHasTargets) plan.push(drillPlan(speedMix, 'speed', budgets.bigramDrill));
 		plan.push(realtextPlan(budgets.realText));
 	}
 	return plan;
@@ -98,53 +123,14 @@ function sessionsSinceLastDiagnostic(recent: readonly { type: string }[]): numbe
 }
 
 /**
- * Priority (diagnosed weaknesses) first; when short of `count`, backfill with
- * undertrained bigrams so early sessions — when most bigrams haven't hit the
- * ≥10-occurrence classification floor — still have meaningful targets.
- * Graduated filter applies to both; exposure is deduped against priority.
- *
- * Exported so the drill route's direct-nav fallback can use the same selection
- * as the planner — otherwise the two entry points would disagree on targets.
- */
-export function selectDrillTargets(
-	priorityBigrams: readonly string[],
-	undertrainedBigrams: readonly string[],
-	graduated: ReadonlySet<string> | undefined,
-	count: number
-): { priority: string[]; exposure: string[] } {
-	const filter = graduated ?? new Set<string>();
-
-	const priority: string[] = [];
-	for (const b of priorityBigrams) {
-		if (filter.has(b)) continue;
-		priority.push(b);
-		if (priority.length >= count) break;
-	}
-
-	const remaining = count - priority.length;
-	const exposure: string[] = [];
-	if (remaining > 0) {
-		const seen = new Set(priority);
-		for (const b of undertrainedBigrams) {
-			if (filter.has(b)) continue;
-			if (seen.has(b)) continue;
-			exposure.push(b);
-			if (exposure.length >= remaining) break;
-		}
-	}
-
-	return { priority, exposure };
-}
-
-/**
  * Accuracy-mode selection: priority = `hasty` + `acquisition` targets (both fail
  * on accuracy — hasty from rushing, acquisition from not yet knowing the
  * motor pattern); exposure = undertrained corpus backfill, since unmeasured
  * bigrams are also an error risk. Graduated filter applies; exposure is
  * deduped against priority.
  *
- * Mirror shape of {@link selectDrillTargets} for drop-in replacement once
- * the planner's rotation lands.
+ * Exported so the drill route's direct-nav fallback can reuse the same
+ * selection as the planner — otherwise the two entry points would disagree.
  */
 export function selectAccuracyDrillMix(
 	priorityTargets: readonly PriorityBigram[],
@@ -238,6 +224,7 @@ function diagnosticPlan(
 
 function drillPlan(
 	mix: { priority: string[]; exposure: string[] },
+	mode: DrillMode,
 	wordBudget: number
 ): PlannedSession {
 	// Priority first so `bigramsTargeted` stays correctly ordered for source-blind consumers.
@@ -245,26 +232,38 @@ function drillPlan(
 	const config: SessionConfig = {
 		type: 'bigram-drill',
 		wordBudget,
-		bigramsTargeted: targets
+		bigramsTargeted: targets,
+		drillMode: mode
 	};
 	return {
 		config,
 		reason: 'default-drill',
-		label: 'Bigram drill',
-		rationale: buildDrillRationale(mix),
+		label: mode === 'speed' ? 'Speed drill' : 'Accuracy drill',
+		rationale: buildDrillRationale(mix, mode),
 		drillMix: mix
 	};
 }
 
-/** "Why this mix" line — shape varies by which buckets are populated. */
-function buildDrillRationale(mix: { priority: string[]; exposure: string[] }): string {
+/**
+ * "Why this mix" line. Accuracy mix can carry priority + exposure (undertrained
+ * backfill goes here); speed mix is priority-only. Copy reflects the treatment
+ * intent, not just counts — "slow them down" vs "push past the ceiling."
+ */
+function buildDrillRationale(
+	mix: { priority: string[]; exposure: string[] },
+	mode: DrillMode
+): string {
 	const p = mix.priority.length;
 	const e = mix.exposure.length;
-	if (p > 0 && e === 0) return `Targeted practice on your ${p} weakest bigrams.`;
+	if (mode === 'speed') {
+		return `Push speed on your ${p} accurate-but-slow ${p === 1 ? 'bigram' : 'bigrams'}.`;
+	}
+	// Accuracy mode: exposure-backfill branch + mixed branch are both possible.
+	if (p > 0 && e === 0) return `Slow-down practice on your ${p} error-prone bigrams.`;
 	if (p === 0 && e > 0) {
 		return `Building exposure on ${e} common bigrams — not enough data yet to pinpoint weaknesses.`;
 	}
-	return `${p} ${p === 1 ? 'weakness' : 'weaknesses'} + ${e} new ${e === 1 ? 'bigram' : 'bigrams'} to build exposure.`;
+	return `${p} error-prone + ${e} new ${e === 1 ? 'bigram' : 'bigrams'} to build exposure.`;
 }
 
 /**

@@ -161,11 +161,18 @@
 				Diagnostic
 			</a>
 			<a
-				href={resolve('/session/bigram-drill')}
+				href={resolve('/session/accuracy-drill')}
 				class="btn btn-ghost btn-sm"
-				data-testid="override-drill"
+				data-testid="override-accuracy-drill"
 			>
-				Drill
+				Accuracy drill
+			</a>
+			<a
+				href={resolve('/session/speed-drill')}
+				class="btn btn-ghost btn-sm"
+				data-testid="override-speed-drill"
+			>
+				Speed drill
 			</a>
 			<a
 				href={resolve('/session/real-text')}
