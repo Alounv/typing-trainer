@@ -90,6 +90,13 @@ export interface PriorityBigram {
 	score: number;
 	meanTime: number;
 	errorRate: number;
+	/**
+	 * Non-healthy class this bigram falls into. `unclassified` and `healthy`
+	 * never appear in the priority list, so the type excludes them — this lets
+	 * the drill planner route hasty/acquisition → accuracy-drill and
+	 * fluency → speed-drill without re-deriving the class at plan time.
+	 */
+	classification: Exclude<BigramClassification, 'healthy' | 'unclassified'>;
 }
 
 // ──────────────────────────────────────────────────────────────

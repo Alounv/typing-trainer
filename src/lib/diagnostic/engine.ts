@@ -121,7 +121,10 @@ function buildPriorityTargets(
 			bigram: a.bigram,
 			score: badness * freq,
 			meanTime: a.meanTime,
-			errorRate: a.errorRate
+			errorRate: a.errorRate,
+			// Guard above filtered out `healthy` / `unclassified`, so the narrow
+			// `PriorityBigram.classification` type is satisfied.
+			classification: a.classification
 		});
 	}
 	scored.sort((a, b) => b.score - a.score);

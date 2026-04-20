@@ -35,7 +35,7 @@ function recent(...types: SessionType[]): SessionSummary[] {
 }
 
 function priorityTarget(bigram: string): PriorityBigram {
-	return { bigram, score: 1, meanTime: 300, errorRate: 0 };
+	return { bigram, score: 1, meanTime: 300, errorRate: 0, classification: 'fluency' };
 }
 
 function report(priorityBigrams: string[], undertrained: string[] = []): DiagnosticReport {

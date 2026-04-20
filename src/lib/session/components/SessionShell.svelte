@@ -273,7 +273,7 @@
 
 	<div class="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">
 		<Timer {elapsedMs} />
-		<StatsBar {position} {elapsedMs} {errorCount} />
+		<StatsBar {errorCount} />
 		{#if saving}
 			<span class="text-base-content/55">Saving…</span>
 		{/if}
