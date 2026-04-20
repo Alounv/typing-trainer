@@ -5,7 +5,7 @@
 	 * Export: serializes every Dexie table to a JSON file and triggers a
 	 * browser download. Import: reads a user-chosen JSON file, shows a
 	 * confirmation modal summarizing what's inside, then **replaces** the
-	 * current DB on confirm (no merge — see `storage/export.ts` for why).
+	 * current DB on confirm (no merge — see `settings/data-transfer.ts` for why).
 	 *
 	 * After a successful import we force a full page reload. The other
 	 * stores on this page (and elsewhere) already memoized the old
@@ -18,7 +18,7 @@
 		importAll,
 		ImportValidationError,
 		type ExportFile
-	} from '$lib/storage/export';
+	} from '$lib/settings/data-transfer';
 
 	type Status =
 		| { kind: 'idle' }

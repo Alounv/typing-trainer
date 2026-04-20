@@ -6,7 +6,8 @@ import {
 	DEFAULT_DRILL_TARGET_COUNT,
 	PAIRS_PER_DAY
 } from './planner';
-import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET, DEFAULT_REAL_TEXT_WORD_BUDGET } from '../models';
+import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from './bigram-drill';
+import { DEFAULT_REAL_TEXT_WORD_BUDGET } from './real-text';
 import type { SessionSummary, SessionType } from '../session/types';
 import type { DiagnosticReport, PriorityBigram } from '../diagnostic/types';
 

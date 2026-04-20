@@ -1,26 +1,7 @@
-import { db, bigramRecordKey, SINGLETON_ID } from './db';
+import { db, SINGLETON_ID } from './db';
 import type { SessionSummary } from '../session/types';
 import type { BigramAggregate } from '../bigram/types';
-import type { UserSettings } from '../models';
-
-/**
- * Persist summary + mirrored bigram rows atomically — a partial write would
- * desync `sessions` and `bigramRecords`. Diagnostic reports (when present)
- * ride along on the summary itself; there's no separate table.
- */
-export async function saveSession(summary: SessionSummary): Promise<void> {
-	await db.transaction('rw', db.sessions, db.bigramRecords, async () => {
-		await db.sessions.put(summary);
-
-		const rows = summary.bigramAggregates.map((agg) => ({
-			...agg,
-			key: bigramRecordKey(agg.bigram, agg.sessionId)
-		}));
-		if (rows.length > 0) {
-			await db.bigramRecords.bulkPut(rows);
-		}
-	});
-}
+import type { UserSettings } from '../settings/profile';
 
 export async function getSession(id: string): Promise<SessionSummary | undefined> {
 	return db.sessions.get(id);

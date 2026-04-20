@@ -11,13 +11,13 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { getSession, getRecentSessions } from '$lib/storage/service';
+	import { loadSummaryContext } from '$lib/session/summary-loader';
 	import type { SessionSummary, SessionType } from '$lib/session/types';
 	import type { BigramAggregate } from '$lib/bigram/types';
-	import { loadDashboardData } from '$lib/scheduler/dashboard-data';
-	import { stashPlannedSession } from '$lib/scheduler/handoff';
-	import { activateBonusRound } from '$lib/scheduler/bonus-round';
-	import type { PlannedSession } from '$lib/scheduler/types';
+	import { loadDashboardData } from '$lib/practice/dashboard-loader';
+	import { stashPlannedSession } from '$lib/session/planned';
+	import { activateBonusRound } from '$lib/practice/bonus-round';
+	import type { PlannedSession } from '$lib/practice/types';
 	import { computeSessionDelta, type SessionDelta as SessionDeltaModel } from '$lib/session/delta';
 	import SessionDelta from '$lib/session/components/SessionDelta.svelte';
 	import {
@@ -28,7 +28,7 @@
 	} from '$lib/progress/celebrations';
 	import Graduations from '$lib/session/components/Graduations.svelte';
 	import MilestoneBanner from '$lib/session/components/MilestoneBanner.svelte';
-	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/models';
+	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/bigram/classification';
 
 	/**
 	 * Traffic-light threshold for the error-rate hero. The high-error cutoff
@@ -66,18 +66,13 @@
 
 	let state = $state<LoadState>({ status: 'loading' });
 
-	/** Matches the dashboard's recent-session window; the planner only peeks a few. */
-	const RECENT_WINDOW = 20;
-
 	onMount(async () => {
 		try {
-			// Load the session + re-run the planner in parallel. The planner
-			// sees the just-completed session (it's in recentSessions) so the
-			// first remaining plan item *is* the real "what's next".
-			const [summary, recentSessions] = await Promise.all([
-				getSession(page.params.id!),
-				getRecentSessions(RECENT_WINDOW)
-			]);
+			// Load the session + recent history. The history feeds the planner
+			// (so the first remaining plan item *is* the real "what's next"),
+			// the delta, graduation detection, and milestone detection — one
+			// fetch shared across four consumers.
+			const { session: summary, recentSessions } = await loadSummaryContext(page.params.id!);
 			if (!summary) {
 				state = { status: 'missing' };
 				return;

@@ -2,12 +2,20 @@
 // component only handles render. Outside the component so tests don't mount.
 import type { DiagnosticReport } from '../diagnostic/types';
 import type { SessionSummary, SessionType } from '../session/types';
-import type { UserSettings } from '../models';
-import { getBigramHistory, getProfile } from '../storage/service';
+import type { UserSettings } from '../settings/profile';
+import { getProfile } from '../settings/profile';
+import { getBigramHistory, getRecentSessions } from '../storage/service';
 import { findGraduatedBigrams } from './graduation-filter';
 import { planDailySessions, sliceCompletedFromPlan } from './planner';
 import { applyBonusBaseline, readActiveBaseline } from './bonus-round';
 import type { PlannedSession } from './types';
+
+/**
+ * How many sessions to pull for cadence + diagnostic-lookup decisions. The
+ * planner only peeks at ~10; 20 gives comfortable headroom without pulling a
+ * full analytics load.
+ */
+const RECENT_WINDOW = 20;
 
 export interface DashboardData {
 	/** Plan with completed-today items stripped. Empty = done for today. */
@@ -20,10 +28,21 @@ export interface DashboardData {
 	latestDiagnosticReport?: DiagnosticReport;
 	graduatedFromRotation: ReadonlySet<string>;
 	userSettings?: UserSettings;
+	/**
+	 * Recent-session window used for planning — exposed so the summary page
+	 * (which also needs it for delta / graduation / milestone detection) can
+	 * reuse the same fetch instead of doing a second one.
+	 */
+	recentSessions: readonly SessionSummary[];
 }
 
-export interface DashboardLoadInputs {
-	recentSessions: readonly SessionSummary[];
+export interface DashboardLoadOptions {
+	/**
+	 * Optional pre-fetched recent sessions. Passed in by the summary page so
+	 * the delta + graduation + milestone computations share the fetch with
+	 * the planner. Absent → the loader does its own read.
+	 */
+	recentSessions?: readonly SessionSummary[];
 }
 
 /**
@@ -32,8 +51,8 @@ export interface DashboardLoadInputs {
  * off the most recent diagnostic's summary — computed once at save time, not
  * replayed here.
  */
-export async function loadDashboardData(inputs: DashboardLoadInputs): Promise<DashboardData> {
-	const { recentSessions } = inputs;
+export async function loadDashboardData(opts: DashboardLoadOptions = {}): Promise<DashboardData> {
+	const recentSessions = opts.recentSessions ?? (await getRecentSessions(RECENT_WINDOW));
 
 	const latestDiagnosticReport = findLatestDiagnosticReport(recentSessions);
 	const userSettings = await getProfile();
@@ -62,7 +81,8 @@ export async function loadDashboardData(inputs: DashboardLoadInputs): Promise<Da
 		lastSession: recentSessions[0],
 		latestDiagnosticReport,
 		graduatedFromRotation,
-		userSettings
+		userSettings,
+		recentSessions
 	};
 }
 

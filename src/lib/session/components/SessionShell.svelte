@@ -19,7 +19,7 @@
 	import type { SessionType, SessionSummary } from '$lib/session/types';
 	import type { DiagnosticReport } from '$lib/diagnostic/types';
 	import { SessionRunner } from '$lib/session/runner';
-	import { saveSession } from '$lib/storage/service';
+	import { saveSession } from '$lib/session/persistence';
 	import Timer from './Timer.svelte';
 	import StatsBar from './StatsBar.svelte';
 

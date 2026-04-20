@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generateDiagnosticReport } from './engine';
 import type { BigramAggregate } from '../bigram/types';
 import type { KeystrokeEvent } from '../typing/types';
-import { TARGET_WPM_MULTIPLIER } from '../models';
+import { TARGET_WPM_MULTIPLIER } from './pacing';
 
 /**
  * Minimal aggregate factory. Defaults represent a borderline-but-fine

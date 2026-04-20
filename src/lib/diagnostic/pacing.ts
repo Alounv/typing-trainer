@@ -1,5 +1,7 @@
 import type { KeystrokeEvent } from '../typing/types';
-import { TARGET_WPM_MULTIPLIER } from '../models';
+
+/** `targetWPM = baselineWPM × this`. 1.17 is modest — reachable, not punitive. */
+export const TARGET_WPM_MULTIPLIER = 1.17;
 
 /**
  * Discard slowest/fastest deciles. Keeping 80% trims outliers (typo-riddled

@@ -1,5 +1,10 @@
 import type { BigramAggregate, BigramClassification } from './types';
-import { DEFAULT_HIGH_ERROR_THRESHOLD, DEFAULT_SPEED_THRESHOLD_MS } from '../models';
+
+/** Mean transition time at/under which a bigram counts as fast. */
+export const DEFAULT_SPEED_THRESHOLD_MS = 150;
+
+/** Error rate at/above which a bigram counts as error-prone. */
+export const DEFAULT_HIGH_ERROR_THRESHOLD = 0.05;
 
 /** Thresholds driving the 4-way classification. `UserSettings.thresholds` overrides. */
 export interface ClassificationThresholds {

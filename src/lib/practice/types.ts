@@ -5,7 +5,7 @@
  */
 import type { SessionConfig, SessionSummary } from '../session/types';
 import type { DiagnosticReport } from '../diagnostic/types';
-import type { UserSettings } from '../models';
+import type { UserSettings } from '../settings/profile';
 
 /**
  * Why the planner emitted a given entry. Drives the dashboard copy

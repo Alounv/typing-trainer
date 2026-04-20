@@ -6,7 +6,7 @@
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getProfile, getRecentSessions } from '$lib/storage/service';
+	import { loadAnalyticsInputs } from '$lib/progress/analytics-loader';
 	import {
 		buildErrorRateSeries,
 		buildWpmSeries,
@@ -22,19 +22,8 @@
 	import ErrorRateChart from '$lib/progress/components/ErrorRateChart.svelte';
 	import BigramTable from '$lib/progress/components/BigramTable.svelte';
 	import ClassificationBar from '$lib/progress/components/ClassificationBar.svelte';
-	import { isBuiltinCorpusId, loadBuiltinCorpus } from '$lib/corpus/registry';
-	import type { FrequencyTable } from '$lib/corpus/types';
 	import type { SessionSummary } from '$lib/session/types';
 	import type { DiagnosticReport } from '$lib/diagnostic/types';
-
-	// A user could theoretically rack up thousands of sessions. 500 is a soft
-	// cap that keeps the chart fast without truncating a realistic history —
-	// revisit if the axis becomes illegible.
-	const SESSION_CAP = 500;
-
-	/** Mirrors the session routes: English is the fall-back when the profile
-	 * is missing or points at a no-longer-supported corpus. */
-	const FALLBACK_CORPUS_ID = 'en';
 
 	type LoadState =
 		| { status: 'loading' }
@@ -79,20 +68,7 @@
 
 	onMount(async () => {
 		try {
-			const [sessions, profile] = await Promise.all([getRecentSessions(SESSION_CAP), getProfile()]);
-
-			// Corpus load is best-effort: if it fails (e.g. network hiccup on
-			// a code-split chunk), we still want the WPM chart to render —
-			// `summarizeBigrams` falls back to freq=1 when corpus is absent.
-			let corpusFrequencies: FrequencyTable | undefined;
-			try {
-				const pickedId = profile?.corpusIds?.[0];
-				const corpusId = pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
-				const corpus = await loadBuiltinCorpus(corpusId);
-				corpusFrequencies = corpus.bigramFrequencies;
-			} catch {
-				corpusFrequencies = undefined;
-			}
+			const { sessions, corpusFrequencies } = await loadAnalyticsInputs();
 
 			const diagnosticSessions = pickDiagnosticSessions(sessions);
 			const [latestDiagnosticSession, previousDiagnosticSession] = diagnosticSessions;

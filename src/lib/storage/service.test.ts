@@ -10,13 +10,13 @@ import {
 	getProfile,
 	getRecentSessions,
 	getSession,
-	saveProfile,
-	saveSession
+	saveProfile
 } from './service';
+import { saveSession } from '../session/persistence';
 import type { SessionSummary } from '../session/types';
 import type { BigramAggregate } from '../bigram/types';
 import type { DiagnosticReport } from '../diagnostic/types';
-import type { UserSettings } from '../models';
+import type { UserSettings } from '../settings/profile';
 
 function makeAggregate(overrides: Partial<BigramAggregate> = {}): BigramAggregate {
 	return {

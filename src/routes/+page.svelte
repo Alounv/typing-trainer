@@ -6,15 +6,11 @@
 	 */
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { getRecentSessions } from '$lib/storage/service';
-	import { loadDashboardData, type DashboardData } from '$lib/scheduler/dashboard-data';
-	import { stashPlannedSession } from '$lib/scheduler/handoff';
-	import { activateBonusRound } from '$lib/scheduler/bonus-round';
-	import type { PlannedSession } from '$lib/scheduler/types';
+	import { loadDashboardData, type DashboardData } from '$lib/practice/dashboard-loader';
+	import { stashPlannedSession } from '$lib/session/planned';
+	import { activateBonusRound } from '$lib/practice/bonus-round';
+	import type { PlannedSession } from '$lib/practice/types';
 	import type { SessionType } from '$lib/session/types';
-
-	/** How many sessions to pull for cadence + diagnostic-lookup decisions. */
-	const RECENT_WINDOW = 20;
 
 	type LoadState =
 		| { status: 'loading' }
@@ -25,8 +21,7 @@
 
 	onMount(async () => {
 		try {
-			const recentSessions = await getRecentSessions(RECENT_WINDOW);
-			const data = await loadDashboardData({ recentSessions });
+			const data = await loadDashboardData();
 			state = { status: 'ready', data };
 		} catch (err) {
 			state = {

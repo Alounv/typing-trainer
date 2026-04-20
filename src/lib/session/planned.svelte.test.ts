@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { stashPlannedSession, consumePlannedSession } from './handoff';
-import type { PlannedSession } from './types';
+import { stashPlannedSession, consumePlannedSession } from './planned';
+import type { PlannedSession } from '../practice/types';
 
 /**
  * Minimal fixture. The hand-off just round-trips JSON; it doesn't

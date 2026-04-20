@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sampleDiagnosticPassage, DEFAULT_DIAGNOSTIC_CHAR_TARGET } from './sampler';
+import { sampleDiagnosticPassage, DEFAULT_DIAGNOSTIC_CHAR_TARGET } from './diagnostic-sampler';
 import type { CorpusData, QuoteBank } from '../corpus/types';
 
 /**

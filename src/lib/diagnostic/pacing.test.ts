@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeTargetWPM, deriveBaselineWPM, perWordWPM } from './pacing';
 import type { KeystrokeEvent } from '../typing/types';
-import { TARGET_WPM_MULTIPLIER } from '../models';
+import { TARGET_WPM_MULTIPLIER } from './pacing';
 
 /**
  * Build a keystroke event. `wordIndex` is derived from `positionInWord`

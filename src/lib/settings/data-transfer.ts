@@ -1,6 +1,21 @@
-import { db, SINGLETON_ID, type ProfileRecord } from './db';
-import type { SessionSummary } from '../session/types';
-import type { BigramAggregate } from '../bigram/types';
+/**
+ * Data-transfer domain — owns full-database export / import.
+ *
+ * Why this lives in `settings/` (not `storage/`):
+ * - The UI calls into this module, and we want a single rule for the
+ *   UI: talk to a domain module, never to `storage/*` directly.
+ * - Schema versioning + payload validation are domain concerns — the
+ *   storage layer only cares about getting bytes in and out of IndexedDB.
+ *
+ * Replace-only semantics (no merge) are intentional: merging two
+ * independent histories produces conflicts (overlapping session IDs,
+ * diverging bigram aggregates) we have no principled answer for, and the
+ * source file on disk is the user's undo. See `importAll` for the
+ * transaction shape.
+ */
+import { db, SINGLETON_ID, type ProfileRecord } from '$lib/storage/db';
+import type { SessionSummary } from '$lib/session/types';
+import type { BigramAggregate } from '$lib/bigram/types';
 
 /**
  * Bump when the export shape changes. Old files with a lower version should be

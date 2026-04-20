@@ -3,7 +3,7 @@ import { computeSessionDelta } from './delta';
 import type { SessionSummary, SessionType } from './types';
 import type { BigramAggregate, BigramClassification } from '../bigram/types';
 import { WPM_ROLLING_WINDOW } from '../progress/metrics';
-import { DEFAULT_HIGH_ERROR_THRESHOLD } from '../models';
+import { DEFAULT_HIGH_ERROR_THRESHOLD } from '../bigram/classification';
 
 function makeAggregate(overrides: Partial<BigramAggregate> = {}): BigramAggregate {
 	return {

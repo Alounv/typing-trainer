@@ -6,8 +6,10 @@
  * (nav wipes in-memory state). The hand-off is a hint — routes must still work on
  * direct navigation. Atomic read-and-clear so a mid-session refresh doesn't re-apply.
  */
-import type { PlannedSession } from './types';
+import type { PlannedSession } from '../practice/types';
 
+// Storage key preserved verbatim so in-flight hand-offs from earlier builds
+// (rare, but possible if the user navigated mid-deploy) still round-trip.
 const STORAGE_KEY = 'scheduler.pendingPlannedSession';
 
 /** Save a planned session for the next route. No-ops in SSR. */

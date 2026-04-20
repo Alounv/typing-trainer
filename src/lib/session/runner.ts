@@ -75,7 +75,7 @@ export interface SessionRunnerConfig {
 	text: string;
 	/**
 	 * Target bigrams for a drill session. Recorded on the summary for later
-	 * analysis (cross-session graduation lives in `scheduler/graduation-filter`).
+	 * analysis (cross-session graduation lives in `practice/graduation-filter`).
 	 */
 	targetBigrams?: readonly string[];
 	/** Injectable so tests get deterministic ids. */

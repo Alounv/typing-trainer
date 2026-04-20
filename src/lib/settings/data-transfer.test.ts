@@ -1,5 +1,5 @@
 // Dexie opens its connection at module-load time; the fake-indexeddb shim
-// must be installed before any import that pulls in `./db`.
+// must be installed before any import that pulls in the storage layer.
 import 'fake-indexeddb/auto';
 
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -10,19 +10,13 @@ import {
 	importAll,
 	ImportValidationError,
 	type ExportFile
-} from './export';
-import {
-	clearAll,
-	getBigramHistory,
-	getProfile,
-	getRecentSessions,
-	getSession,
-	saveProfile,
-	saveSession
-} from './service';
+} from './data-transfer';
+import { getProfile, saveProfile } from './profile';
+import { clearAll, getBigramHistory, getRecentSessions, getSession } from '../storage/service';
+import { saveSession } from '../session/persistence';
 import type { SessionSummary } from '../session/types';
 import type { BigramAggregate } from '../bigram/types';
-import type { UserSettings } from '../models';
+import type { UserSettings } from './profile';
 
 function makeAggregate(overrides: Partial<BigramAggregate> = {}): BigramAggregate {
 	return {

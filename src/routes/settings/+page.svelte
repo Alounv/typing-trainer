@@ -14,40 +14,23 @@
 	 * in the footer is the single source of feedback.
 	 */
 	import { onMount } from 'svelte';
-	import { getProfile, saveProfile } from '$lib/storage/service';
 	import {
-		DEFAULT_SPEED_THRESHOLD_MS,
-		DEFAULT_HIGH_ERROR_THRESHOLD,
-		DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
-		DEFAULT_REAL_TEXT_WORD_BUDGET,
-		DEFAULT_DIAGNOSTIC_WORD_BUDGET,
+		getProfile,
+		saveProfile,
+		buildDefaultProfile,
+		withDefaults,
 		type Language,
 		type UserSettings
-	} from '$lib/models';
+	} from '$lib/settings/profile';
+	import {
+		DEFAULT_SPEED_THRESHOLD_MS,
+		DEFAULT_HIGH_ERROR_THRESHOLD
+	} from '$lib/bigram/classification';
+	import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from '$lib/practice/bigram-drill';
+	import { DEFAULT_REAL_TEXT_WORD_BUDGET } from '$lib/practice/real-text';
+	import { DEFAULT_DIAGNOSTIC_WORD_BUDGET } from '$lib/practice/diagnostic-sampler';
 	import type { BuiltinCorpusId } from '$lib/corpus/registry';
-	import DataTransfer from '$lib/settings/components/DataTransfer.svelte';
-
-	/**
-	 * Source of truth for what the factory-fresh profile looks like.
-	 * Used on first mount (before any save) and by the reset button.
-	 * Kept as a function so each reset produces a fresh object rather
-	 * than mutating a shared reference.
-	 */
-	function buildDefaults(): UserSettings {
-		return {
-			languages: ['en'],
-			corpusIds: ['en'],
-			thresholds: {
-				speedMs: DEFAULT_SPEED_THRESHOLD_MS,
-				errorRate: DEFAULT_HIGH_ERROR_THRESHOLD
-			},
-			wordBudgets: {
-				bigramDrill: DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
-				realText: DEFAULT_REAL_TEXT_WORD_BUDGET,
-				diagnostic: DEFAULT_DIAGNOSTIC_WORD_BUDGET
-			}
-		};
-	}
+	import DataTransfer from '$lib/settings/DataTransfer.svelte';
 
 	// One corpus per language now — the `corpusIds` array on the profile
 	// is kept parallel to `languages` using the language code itself as
@@ -61,7 +44,7 @@
 	let loadState = $state<LoadState>('loading');
 	let loadError = $state<string | null>(null);
 	/** Form state — bound to inputs. Initialized from profile on mount. */
-	let form = $state<UserSettings>(buildDefaults());
+	let form = $state<UserSettings>(buildDefaultProfile());
 	let saving = $state(false);
 	let saveError = $state<string | null>(null);
 	let savedAt = $state<Date | null>(null);
@@ -77,18 +60,10 @@
 	onMount(async () => {
 		try {
 			const stored = await getProfile();
-			if (stored) {
-				// Merge over defaults so a legacy profile missing
-				// `wordBudgets` or `thresholds` still renders sane
-				// values instead of `undefined` in the inputs.
-				const defaults = buildDefaults();
-				form = {
-					...defaults,
-					...stored,
-					thresholds: { ...defaults.thresholds!, ...(stored.thresholds ?? {}) },
-					wordBudgets: { ...defaults.wordBudgets!, ...(stored.wordBudgets ?? {}) }
-				};
-			}
+			// Merge over defaults so a legacy profile missing `wordBudgets`
+			// or `thresholds` still renders sane values instead of
+			// `undefined` in the inputs.
+			if (stored) form = withDefaults(stored);
 			loadState = 'ready';
 		} catch (err) {
 			loadError = err instanceof Error ? err.message : 'Failed to load settings.';
@@ -168,7 +143,7 @@
 		// The reactive assignment triggers the auto-save effect — no need
 		// to call `save()` directly. Keeps the reset path identical to any
 		// other edit, so there's one save code path, not two.
-		form = buildDefaults();
+		form = buildDefaultProfile();
 	}
 </script>
 
