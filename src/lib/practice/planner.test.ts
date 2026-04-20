@@ -21,10 +21,7 @@ type TestInput = Omit<
 	'accuracyPriorityTargets' | 'speedPriorityTargets' | 'undertrainedBigrams'
 > &
 	Partial<
-		Pick<
-			SchedulerInput,
-			'accuracyPriorityTargets' | 'speedPriorityTargets' | 'undertrainedBigrams'
-		>
+		Pick<SchedulerInput, 'accuracyPriorityTargets' | 'speedPriorityTargets' | 'undertrainedBigrams'>
 	> & { latestDiagnosticReport?: DiagnosticReport };
 
 function planDailySessions(input: TestInput) {

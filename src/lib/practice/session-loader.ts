@@ -216,8 +216,7 @@ async function resolveDirectNavMix(
 		classes
 	);
 	// Speed mode ignores undertrained — no exposure pool there.
-	const undertrained =
-		mode === 'accuracy' ? buildLiveUndertrained(recent, corpusFrequencies) : [];
+	const undertrained = mode === 'accuracy' ? buildLiveUndertrained(recent, corpusFrequencies) : [];
 
 	const priorityBigrams = priorityTargets.map((p) => p.bigram);
 	const graduated = await findGraduatedBigrams(priorityBigrams, getBigramHistory);

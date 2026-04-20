@@ -198,4 +198,3 @@ async function loadCorpusFrequencies(
 		return undefined;
 	}
 }
-
