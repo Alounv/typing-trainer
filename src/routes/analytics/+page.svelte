@@ -22,7 +22,7 @@
 	import ErrorRateChart from '$lib/progress/components/ErrorRateChart.svelte';
 	import BigramTable from '$lib/progress/components/BigramTable.svelte';
 	import ClassificationBar from '$lib/progress/components/ClassificationBar.svelte';
-	import type { SessionSummary, DiagnosticReport } from '$lib/core';
+	import type { SessionSummary, BigramAggregate, BigramClassification } from '$lib/core';
 
 	type LoadState =
 		| { status: 'loading' }
@@ -41,12 +41,11 @@
 				 * the same sliding-window logic as the bigram table.
 				 */
 				liveClassification: ClassificationMix;
-				/**
-				 * Most recent diagnostic report. Retained as the comparison row
-				 * ("have I improved since my last diagnostic?"). `null` until the
-				 * user runs their first diagnostic.
-				 */
-				lastDiagnostic: DiagnosticReport | null;
+				/** Most recent diagnostic snapshot, for the "Last diagnostic" comparison row. */
+				lastDiagnostic: {
+					counts: Record<Exclude<BigramClassification, 'unclassified'>, number>;
+					timestamp: number;
+				} | null;
 				/**
 				 * Bigrams that transitioned into `healthy` between the two most
 				 * recent diagnostics. `null` until two diagnostics exist — avoids
@@ -56,14 +55,23 @@
 		  }
 		| { status: 'error'; message: string };
 
-	/** Pull the two most recent diagnostic sessions (with attached report),
-	 * newest first. We keep the full session (not just the report) because
-	 * graduation counts need the underlying bigram aggregates. */
+	/** Two most recent diagnostic sessions with an attached report, newest first. */
 	function pickDiagnosticSessions(sessions: readonly SessionSummary[]): SessionSummary[] {
 		return sessions
 			.filter((s) => s.type === 'diagnostic' && s.diagnosticReport)
 			.sort((a, b) => b.timestamp - a.timestamp)
 			.slice(0, 2);
+	}
+
+	/** Tally classification counts from a session's stored aggregates. */
+	function tallyCounts(
+		aggregates: readonly BigramAggregate[]
+	): Record<Exclude<BigramClassification, 'unclassified'>, number> {
+		const out = { healthy: 0, fluency: 0, hasty: 0, acquisition: 0 };
+		for (const a of aggregates) {
+			if (a.classification !== 'unclassified') out[a.classification]++;
+		}
+		return out;
 	}
 
 	let state = $state<LoadState>({ status: 'loading' });
@@ -94,7 +102,12 @@
 				errorRate: buildErrorRateSeries(diagnosticSessions),
 				bigrams,
 				liveClassification: tallyClassificationMix(bigrams),
-				lastDiagnostic: latestDiagnosticSession?.diagnosticReport ?? null,
+				lastDiagnostic: latestDiagnosticSession
+					? {
+							counts: tallyCounts(latestDiagnosticSession.bigramAggregates),
+							timestamp: latestDiagnosticSession.timestamp
+						}
+					: null,
 				graduatedCount
 			};
 		} catch (err) {

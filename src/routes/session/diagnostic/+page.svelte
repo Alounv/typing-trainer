@@ -10,19 +10,18 @@
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
 	import { prepareDiagnosticSession } from '$lib/practice';
 	import { generateDiagnosticReport } from '$lib/diagnostic';
-	import type { FrequencyTable } from '$lib/corpus';
 
 	type LoadState =
 		| { status: 'loading' }
-		| { status: 'ready'; text: string; corpusBigramFrequencies: FrequencyTable }
+		| { status: 'ready'; text: string }
 		| { status: 'error'; message: string };
 
 	let state = $state<LoadState>({ status: 'loading' });
 
 	onMount(async () => {
 		try {
-			const inputs = await prepareDiagnosticSession();
-			state = { status: 'ready', ...inputs };
+			const { text } = await prepareDiagnosticSession();
+			state = { status: 'ready', text };
 		} catch (err) {
 			state = {
 				status: 'error',
@@ -37,20 +36,12 @@
 {:else if state.status === 'error'}
 	<p class="mx-auto max-w-3xl text-error" role="alert">{state.message}</p>
 {:else}
-	{@const corpusBigramFrequencies = state.corpusBigramFrequencies}
 	<SessionShell
 		type="diagnostic"
 		text={state.text}
 		title="Diagnostic"
 		what="A calibration run. We measure your baseline typing speed and flag the bigrams that slow you down."
 		approach="Type at a natural pace. There's no score — the point is representative data, not performance."
-		buildDiagnosticReport={(summary, events) =>
-			generateDiagnosticReport({
-				sessionId: summary.id,
-				timestamp: summary.timestamp,
-				events,
-				aggregates: summary.bigramAggregates,
-				corpusBigramFrequencies
-			})}
+		buildDiagnosticReport={(_summary, events) => generateDiagnosticReport({ events })}
 	/>
 {/if}

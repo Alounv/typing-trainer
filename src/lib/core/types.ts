@@ -36,31 +36,15 @@ export interface BigramAggregate {
 }
 
 /** Structured output of a diagnostic session. */
+/**
+ * Frozen-at-diagnostic-time snapshot. Pared down to the one value that can't
+ * be re-derived from session history: the middle-quartiles baseline WPM that
+ * drives the pacer. Counts, bottlenecks, priority targets, corpus fit — all
+ * computable live from the diagnostic session's `bigramAggregates`.
+ */
 export interface DiagnosticReport {
-	sessionId: string;
-	timestamp: number;
-	/** Middle quartiles of session WPM. */
+	/** Middle quartiles of session WPM — drives the pacer. */
 	baselineWPM: number;
-	/** `baselineWPM × TARGET_WPM_MULTIPLIER`. */
-	targetWPM: number;
-	counts: {
-		healthy: number;
-		fluency: number;
-		hasty: number;
-		acquisition: number;
-	};
-	/** Top-5 per non-healthy class, ranked by badness. */
-	topBottlenecks: {
-		fluency: string[];
-		hasty: string[];
-		acquisition: string[];
-	};
-	priorityTargets: PriorityBigram[];
-	corpusFit: {
-		/** Fraction of corpus bigrams with ≥10 observations. */
-		coverageRatio: number;
-		undertrained: string[];
-	};
 }
 
 /** One entry in the diagnostic priority list. */

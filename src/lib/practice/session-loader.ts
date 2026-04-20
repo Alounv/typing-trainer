@@ -71,7 +71,6 @@ interface RealTextSessionInputs {
 
 interface DiagnosticSessionInputs {
 	text: string;
-	corpusBigramFrequencies: FrequencyTable;
 }
 
 /**
@@ -184,10 +183,7 @@ export async function prepareDiagnosticSession(): Promise<DiagnosticSessionInput
 		targetChars: wordBudget * CHARS_PER_WORD,
 		quoteBank
 	});
-	return {
-		text: passage.text,
-		corpusBigramFrequencies: corpus.bigramFrequencies
-	};
+	return { text: passage.text };
 }
 
 /**

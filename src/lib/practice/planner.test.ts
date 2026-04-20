@@ -12,22 +12,32 @@ import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 	DEFAULT_REAL_TEXT_WORD_BUDGET
 } from '../settings/defaults';
-import type { SessionSummary, SessionType, DiagnosticReport, PriorityBigram } from '../core/types';
+import type { SessionSummary, SessionType, PriorityBigram } from '../core/types';
 import type { SchedulerInput } from './types';
 
-/** Test wrapper: projects `report([...])` into the planner's class-scoped fields. */
+/**
+ * Fixture shape for test wrapper input. `DiagnosticReport` is now just
+ * `{ baselineWPM }`, so it's no longer a useful carrier for planner-relevant
+ * fields. Tests keep expressing intent via these two lists and the wrapper
+ * splits `priorityTargets` by classification.
+ */
+interface PlannerFixture {
+	priorityTargets: PriorityBigram[];
+	undertrained: string[];
+}
+
 type TestInput = Omit<
 	SchedulerInput,
 	'accuracyPriorityTargets' | 'speedPriorityTargets' | 'undertrainedBigrams'
 > &
 	Partial<
 		Pick<SchedulerInput, 'accuracyPriorityTargets' | 'speedPriorityTargets' | 'undertrainedBigrams'>
-	> & { latestDiagnosticReport?: DiagnosticReport };
+	> & { fixture?: PlannerFixture };
 
 function planDailySessions(input: TestInput) {
-	const targets = input.latestDiagnosticReport?.priorityTargets ?? [];
-	const undertrainedFromReport = input.latestDiagnosticReport?.corpusFit.undertrained ?? [];
-	const { latestDiagnosticReport: _ignored, ...rest } = input;
+	const targets = input.fixture?.priorityTargets ?? [];
+	const undertrainedFromFixture = input.fixture?.undertrained ?? [];
+	const { fixture: _ignored, ...rest } = input;
 	return planDailySessionsRaw({
 		...rest,
 		accuracyPriorityTargets:
@@ -35,7 +45,7 @@ function planDailySessions(input: TestInput) {
 			targets.filter((t) => t.classification === 'hasty' || t.classification === 'acquisition'),
 		speedPriorityTargets:
 			input.speedPriorityTargets ?? targets.filter((t) => t.classification === 'fluency'),
-		undertrainedBigrams: input.undertrainedBigrams ?? undertrainedFromReport
+		undertrainedBigrams: input.undertrainedBigrams ?? undertrainedFromFixture
 	});
 }
 
@@ -63,7 +73,7 @@ function recent(...types: SessionType[]): SessionSummary[] {
 
 /**
  * Default priority targets land in the *accuracy* bucket (`hasty`) so the
- * baseline `report([...])` helper produces an accuracy drill — that's where
+ * baseline `fixture([...])` helper produces an accuracy drill — that's where
  * undertrained backfill, graduation filtering, and exposure edge cases live,
  * so the default matches the test surface area. Tests that need fluency
  * targets pass `'fluency'` explicitly via `priorityTargetWithClass`.
@@ -75,25 +85,13 @@ function priorityTarget(
 	return { bigram, score: 1, meanTime: 300, errorRate: 0, classification };
 }
 
-function report(priorityBigrams: string[], undertrained: string[] = []): DiagnosticReport {
+function fixture(priorityBigrams: string[], undertrained: string[] = []): PlannerFixture {
 	return {
-		sessionId: 'diag-1',
-		timestamp: 0,
-		baselineWPM: 60,
-		targetWPM: 70,
-		counts: { healthy: 0, fluency: 0, hasty: 0, acquisition: 0 },
-		topBottlenecks: { fluency: [], hasty: [], acquisition: [] },
 		// Wrap to keep `Array.map`'s `(value, index)` arity from binding to the
 		// helper's optional `classification` arg — that'd silently assign the
 		// loop index as a "classification" and skip every target in the mix.
 		priorityTargets: priorityBigrams.map((b) => priorityTarget(b)),
-		// Default coverage = 1 when no undertrained entries, otherwise <1 to keep
-		// it internally consistent (real reports compute it, we just need a
-		// plausible shape for planner tests).
-		corpusFit: {
-			coverageRatio: undertrained.length === 0 ? 1 : 0.5,
-			undertrained
-		}
+		undertrained
 	};
 }
 
@@ -134,7 +132,7 @@ describe('planDailySessions — diagnostic triggers', () => {
 			];
 			const plan = planDailySessions({
 				recentSessions: recent(...types),
-				latestDiagnosticReport: report(['th', 'he'])
+				fixture: fixture(['th', 'he'])
 			});
 			if (shouldDiagnose) {
 				expect(plan[0].config.type).toBe('diagnostic');
@@ -155,8 +153,8 @@ describe('planDailySessions — diagnostic triggers', () => {
 		it('prepends a diagnostic when last one predates planStartedAt', () => {
 			const plan = planDailySessions({
 				recentSessions: recent('diagnostic'),
-				// report() builds with timestamp: 0; planStartedAt = 1000 ⇒ stale.
-				latestDiagnosticReport: report(['th']),
+				// recent('diagnostic') builds a session at timestamp 1; planStartedAt 1000 ⇒ stale.
+				fixture: fixture(['th']),
 				planStartedAt: 1000
 			});
 			expect(plan[0].config.type).toBe('diagnostic');
@@ -169,7 +167,7 @@ describe('planDailySessions — diagnostic triggers', () => {
 		it('does not prepend when last diagnostic is newer than planStartedAt', () => {
 			const plan = planDailySessions({
 				recentSessions: [session('diagnostic', 5000)],
-				latestDiagnosticReport: report(['th']),
+				fixture: fixture(['th']),
 				planStartedAt: 1000
 			});
 			expect(plan[0].config.type).not.toBe('diagnostic');
@@ -178,7 +176,7 @@ describe('planDailySessions — diagnostic triggers', () => {
 		it('does nothing when planStartedAt is unset', () => {
 			const plan = planDailySessions({
 				recentSessions: recent('diagnostic'),
-				latestDiagnosticReport: report(['th'])
+				fixture: fixture(['th'])
 			});
 			expect(plan[0].config.type).not.toBe('diagnostic');
 		});
@@ -191,7 +189,7 @@ describe('planDailySessions — default daily structure', () => {
 		// skipped, so each cycle is 2 items instead of 3.
 		const plan = planDailySessions({
 			recentSessions: recent('real-text', 'diagnostic'),
-			latestDiagnosticReport: report(['th', 'he', 'in'])
+			fixture: fixture(['th', 'he', 'in'])
 		});
 		expect(plan).toHaveLength(CYCLES_PER_DAY * 2);
 		for (let i = 0; i < CYCLES_PER_DAY; i++) {
@@ -205,23 +203,16 @@ describe('planDailySessions — default daily structure', () => {
 
 	it('mixed classes: full cycle emits [accuracy, speed, real-text]', () => {
 		// Explicit class mix — accuracy and speed buckets both non-empty.
-		const report = {
-			sessionId: 'diag-1',
-			timestamp: 0,
-			baselineWPM: 60,
-			targetWPM: 70,
-			counts: { healthy: 0, fluency: 1, hasty: 2, acquisition: 0 },
-			topBottlenecks: { fluency: [], hasty: [], acquisition: [] },
-			priorityTargets: [
-				priorityTarget('th', 'hasty'),
-				priorityTarget('in', 'hasty'),
-				priorityTarget('er', 'fluency')
-			],
-			corpusFit: { coverageRatio: 1, undertrained: [] }
-		};
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report
+			fixture: {
+				priorityTargets: [
+					priorityTarget('th', 'hasty'),
+					priorityTarget('in', 'hasty'),
+					priorityTarget('er', 'fluency')
+				],
+				undertrained: []
+			}
 		});
 		expect(plan).toHaveLength(CYCLES_PER_DAY * 3);
 		// Spot-check the first cycle — all three slots present, in order.
@@ -235,15 +226,9 @@ describe('planDailySessions — default daily structure', () => {
 	it('fluency-only targets: cycle skips accuracy slot', () => {
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: {
-				sessionId: 'diag-1',
-				timestamp: 0,
-				baselineWPM: 60,
-				targetWPM: 70,
-				counts: { healthy: 0, fluency: 2, hasty: 0, acquisition: 0 },
-				topBottlenecks: { fluency: [], hasty: [], acquisition: [] },
+			fixture: {
 				priorityTargets: [priorityTarget('er', 'fluency'), priorityTarget('an', 'fluency')],
-				corpusFit: { coverageRatio: 1, undertrained: [] }
+				undertrained: []
 			}
 		});
 		// CYCLES_PER_DAY × [speed, real-text] = 6.
@@ -259,7 +244,7 @@ describe('planDailySessions — default daily structure', () => {
 		const targets = Array.from({ length: 15 }, (_, i) => `b${i}`);
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report(targets)
+			fixture: fixture(targets)
 		});
 		expect(plan[0].config.bigramsTargeted).toHaveLength(DEFAULT_DRILL_TARGET_COUNT);
 		expect(plan[0].config.bigramsTargeted?.[0]).toBe('b0');
@@ -268,7 +253,7 @@ describe('planDailySessions — default daily structure', () => {
 	it('drill target count override is honored', () => {
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report(['a', 'b', 'c', 'd']),
+			fixture: fixture(['a', 'b', 'c', 'd']),
 			drillTargetCount: 2
 		});
 		expect(plan[0].config.bigramsTargeted).toEqual(['a', 'b']);
@@ -277,7 +262,7 @@ describe('planDailySessions — default daily structure', () => {
 	it('graduated bigrams are stripped from drill targets, order preserved', () => {
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report(['th', 'he', 'in', 'er']),
+			fixture: fixture(['th', 'he', 'in', 'er']),
 			graduatedFromRotation: new Set(['he', 'er'])
 		});
 		expect(plan[0].config.bigramsTargeted).toEqual(['th', 'in']);
@@ -286,7 +271,7 @@ describe('planDailySessions — default daily structure', () => {
 	it('all priority targets graduated and no undertrained → skip drill, emit real-text only', () => {
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report(['th', 'he']),
+			fixture: fixture(['th', 'he']),
 			graduatedFromRotation: new Set(['th', 'he'])
 		});
 		// CYCLES_PER_DAY × [real-text only]. Both drill slots skipped because
@@ -308,7 +293,7 @@ describe('planDailySessions — exposure backfill from undertrained', () => {
 	it('short priority list → backfilled from undertrained up to drillTargetCount', () => {
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report(
+			fixture: fixture(
 				['th', 'he'],
 				// Undertrained is already frequency-sorted by the diagnostic engine;
 				// planner should preserve that order.
@@ -327,7 +312,7 @@ describe('planDailySessions — exposure backfill from undertrained', () => {
 	it('priority already fills the cap → no exposure needed', () => {
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report(['a', 'b', 'c'], ['x', 'y']),
+			fixture: fixture(['a', 'b', 'c'], ['x', 'y']),
 			drillTargetCount: 3
 		});
 		expect(plan[0].drillMix).toEqual({ priority: ['a', 'b', 'c'], exposure: [] });
@@ -338,7 +323,7 @@ describe('planDailySessions — exposure backfill from undertrained', () => {
 		// but the corpus gives us a ranked list of common bigrams to expose.
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report([], ['th', 'he', 'in']),
+			fixture: fixture([], ['th', 'he', 'in']),
 			drillTargetCount: 3
 		});
 		expect(plan[0].config.type).toBe('bigram-drill');
@@ -351,7 +336,7 @@ describe('planDailySessions — exposure backfill from undertrained', () => {
 	it('graduated bigrams are stripped from exposure too', () => {
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report([], ['th', 'he', 'in']),
+			fixture: fixture([], ['th', 'he', 'in']),
 			graduatedFromRotation: new Set(['he']),
 			drillTargetCount: 5
 		});
@@ -365,7 +350,7 @@ describe('planDailySessions — exposure backfill from undertrained', () => {
 		// defend against it here.
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report(['th'], ['th', 'he']),
+			fixture: fixture(['th'], ['th', 'he']),
 			drillTargetCount: 3
 		});
 		expect(plan[0].drillMix).toEqual({ priority: ['th'], exposure: ['he'] });
@@ -374,7 +359,7 @@ describe('planDailySessions — exposure backfill from undertrained', () => {
 	it('rationale reflects the mix (priority + exposure)', () => {
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report(['th'], ['he', 'in']),
+			fixture: fixture(['th'], ['he', 'in']),
 			drillTargetCount: 3
 		});
 		// Accuracy-mode rationale uses "error-prone" vocabulary — fluency mode
@@ -388,7 +373,7 @@ describe('planDailySessions — exposure backfill from undertrained', () => {
 		// The "nothing to do" fallback survives — both buckets must be empty.
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report([], [])
+			fixture: fixture([], [])
 		});
 		expect(plan.every((p) => p.config.type === 'real-text')).toBe(true);
 	});
@@ -398,7 +383,7 @@ describe('planDailySessions — exposure backfill from undertrained', () => {
 		// array must remain empty (not undefined, not accidentally populated).
 		const plan = planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report(['th', 'he'])
+			fixture: fixture(['th', 'he'])
 		});
 		expect(plan[0].drillMix).toEqual({ priority: ['th', 'he'], exposure: [] });
 	});
@@ -420,7 +405,7 @@ describe('sliceCompletedFromPlan', () => {
 	function dailyPlan() {
 		return planDailySessions({
 			recentSessions: recent('diagnostic'),
-			latestDiagnosticReport: report(['th'])
+			fixture: fixture(['th'])
 		});
 	}
 
@@ -489,9 +474,9 @@ describe('sliceCompletedFromPlan', () => {
 		function mixedPlan() {
 			return planDailySessions({
 				recentSessions: recent('diagnostic'),
-				latestDiagnosticReport: {
-					...report([]),
-					priorityTargets: [pt('th', 'hasty'), pt('er', 'fluency')]
+				fixture: {
+					priorityTargets: [pt('th', 'hasty'), pt('er', 'fluency')],
+					undertrained: []
 				}
 			});
 		}
@@ -600,7 +585,7 @@ describe('planDailySessions — class-scoped priority targets', () => {
 		// bigrams that the planner should route into the speed slot.
 		const plan = planDailySessions({
 			recentSessions: recentWithDiag,
-			latestDiagnosticReport: report(['th', 'he', 'in']),
+			fixture: fixture(['th', 'he', 'in']),
 			speedPriorityTargets: [priorityTarget('er', 'fluency'), priorityTarget('an', 'fluency')]
 		});
 		const speedDrill = plan.find(
@@ -612,7 +597,7 @@ describe('planDailySessions — class-scoped priority targets', () => {
 	it('uses accuracyPriorityTargets for the accuracy drill when provided', () => {
 		const plan = planDailySessions({
 			recentSessions: recentWithDiag,
-			latestDiagnosticReport: report(['er']), // fluency-only report would starve accuracy
+			fixture: fixture(['er']), // fluency-only report would starve accuracy
 			accuracyPriorityTargets: [priorityTarget('th', 'hasty'), priorityTarget('in', 'acquisition')]
 		});
 		const accuracyDrill = plan.find(
@@ -626,7 +611,7 @@ describe('planDailySessions — class-scoped priority targets', () => {
 		// callers that still pass only the report.
 		const plan = planDailySessions({
 			recentSessions: recentWithDiag,
-			latestDiagnosticReport: report(['th'])
+			fixture: fixture(['th'])
 		});
 		const accuracyDrill = plan.find(
 			(p) => p.config.type === 'bigram-drill' && p.config.drillMode === 'accuracy'

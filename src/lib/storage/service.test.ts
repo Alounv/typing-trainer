@@ -89,26 +89,7 @@ describe('storage service — round-trip', () => {
 	});
 
 	it('attaches a diagnostic report to the summary round-trip', async () => {
-		// Reports are built at save time by the diagnostic route and ride on the
-		// summary — no separate reads needed when the dashboard loads recent sessions.
-		const report: DiagnosticReport = {
-			sessionId: 'diag-1',
-			timestamp: 1_000,
-			baselineWPM: 60,
-			targetWPM: 70,
-			counts: { healthy: 1, fluency: 0, hasty: 0, acquisition: 0 },
-			topBottlenecks: { fluency: [], hasty: [], acquisition: [] },
-			priorityTargets: [
-				{
-					bigram: 'th',
-					score: 1.2,
-					meanTime: 180,
-					errorRate: 0.05,
-					classification: 'hasty'
-				}
-			],
-			corpusFit: { coverageRatio: 0.8, undertrained: [] }
-		};
+		const report: DiagnosticReport = { baselineWPM: 60 };
 		await saveSession(makeSession({ id: 'diag-1', type: 'diagnostic', diagnosticReport: report }));
 
 		const roundTripped = await getSession('diag-1');
