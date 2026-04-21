@@ -4,21 +4,22 @@
  * WPM milestone check, and the "what's next" planning call into one
  * view-model so the route stays UI-only.
  *
- * Historically the route reached past this loader into `session/delta`,
- * `progress/celebrations`, and `practice/dashboard-loader` directly; each
+ * Historically the route reached past this loader into `progress/delta`,
+ * `progress/celebrations`, and `practice/computePlan` directly; each
  * relied on the same `recentSessions` window. Composing them here keeps
  * IndexedDB reads to one pass and stops the route from knowing about
  * downstream domain modules at all.
  */
 import { getSession, getRecentSessions } from '../storage';
-import { computeSessionDelta, type SessionDelta } from './delta';
 import {
+	computeSessionDelta,
 	detectGraduations,
 	detectMilestone,
+	type SessionDelta,
 	type GraduationEvent,
 	type MilestoneEvent
 } from '../progress';
-import { loadDashboardData, type PlannedSession } from '../practice';
+import { computePlan, type PlannedSession } from '../practice';
 import type { SessionSummary } from '../core';
 
 /** Matches the dashboard's recent-session window; the planner only peeks a few. */
@@ -69,7 +70,7 @@ export async function loadSummaryContext(id: string): Promise<SummaryViewModel> 
 	// Reuse the same `recentSessions` fetch for the planner so the summary
 	// page and the dashboard agree on the "what's next" answer without a
 	// second IndexedDB round-trip.
-	const dashboard = await loadDashboardData({ recentSessions });
+	const { plan } = await computePlan({ recentSessions });
 
 	return {
 		status: 'ready',
@@ -77,6 +78,6 @@ export async function loadSummaryContext(id: string): Promise<SummaryViewModel> 
 		delta,
 		graduations,
 		milestone,
-		next: dashboard.plan[0]
+		next: plan[0]
 	};
 }

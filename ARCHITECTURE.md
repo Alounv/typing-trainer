@@ -23,8 +23,9 @@ flowchart TB
     end
 
     subgraph Practice["practice/"]
-        P_DashL["dashboard-loader"]
+        P_DashL["dashboard-loader<br/>(hand-off actions)"]
         P_SessL["session-loader"]
+        P_Plan["plan (computePlan)"]
         P_Planner["planner"]
         P_PlanWin["plan-window"]
         P_Planned["planned"]
@@ -38,7 +39,6 @@ flowchart TB
         S_SummL["summary-loader"]
         S_Runner["runner"]
         S_Persist["persistence"]
-        S_Delta["delta"]
         S_Pacer["pacer"]
         S_Comp["components<br/>(SessionShell, …)"]
     end
@@ -46,6 +46,7 @@ flowchart TB
     subgraph Progress["progress/"]
         Pr_AnaL["analytics-loader"]
         Pr_Metrics["metrics"]
+        Pr_Delta["delta"]
         Pr_Celeb["celebrations"]
         Pr_Comp["components<br/>(charts)"]
     end
@@ -90,15 +91,19 @@ flowchart TB
     R_Dash --> Components
     R_Dash --> Stores
 
-    %% practice/dashboard-loader composes the dashboard view-model.
-    P_DashL --> St_Profile
-    P_DashL --> Storage
-    P_DashL --> Pr_Metrics
-    P_DashL --> Corpus
-    P_DashL --> P_Grad
-    P_DashL --> P_Planner
-    P_DashL --> P_PlanWin
+    %% practice/dashboard-loader delegates to computePlan; adds hand-off actions.
+    P_DashL --> P_Plan
     P_DashL --> P_Planned
+    P_DashL --> P_PlanWin
+
+    %% practice/plan — shared plan-computation pipeline.
+    P_Plan --> St_Profile
+    P_Plan --> Storage
+    P_Plan --> Pr_Metrics
+    P_Plan --> Corpus
+    P_Plan --> P_Grad
+    P_Plan --> P_Planner
+    P_Plan --> P_PlanWin
 
     %% practice/session-loader composes the session-start view-model.
     P_SessL --> Storage
@@ -110,10 +115,10 @@ flowchart TB
     P_SessL --> P_Grad
     P_SessL --> P_Planner
 
-    %% session/summary-loader reuses dashboard-loader for plan hand-off.
+    %% session/summary-loader reuses computePlan for the "Next session" CTA.
     S_SummL --> Storage
-    S_SummL --> S_Delta
-    S_SummL --> P_DashL
+    S_SummL --> Pr_Delta
+    S_SummL --> P_Plan
     S_SummL --> Pr_Celeb
 
     %% progress/analytics-loader.
@@ -137,8 +142,8 @@ flowchart TB
     S_Runner --> T_Post
     S_Runner --> B_Extr
     S_Persist --> Storage
-    S_Delta --> B_Class
-    S_Delta --> Pr_Metrics
+    Pr_Delta --> B_Class
+    Pr_Delta --> Pr_Metrics
 
     %% practice internals.
     P_Drill --> Corpus
@@ -166,16 +171,16 @@ flowchart TB
 
     class R_Dash,R_Sess,R_Summ,R_Ana,R_Set route
     class P_DashL,P_SessL,S_SummL,Pr_AnaL loader
-    class P_Planner,P_PlanWin,P_Planned,P_Grad,P_Drill,P_Real,P_DiagS,S_Runner,S_Persist,S_Delta,S_Pacer,S_Comp,Pr_Metrics,Pr_Celeb,Pr_Comp,St_Profile,St_DT,St_DTUI,D_Engine,D_Pacing,B_Class,B_Extr,T_Capture,T_Post,T_UI,Corpus,Core domain
+    class P_Plan,P_Planner,P_PlanWin,P_Planned,P_Grad,P_Drill,P_Real,P_DiagS,S_Runner,S_Persist,S_Pacer,S_Comp,Pr_Metrics,Pr_Delta,Pr_Celeb,Pr_Comp,St_Profile,St_DT,St_DTUI,D_Engine,D_Pacing,B_Class,B_Extr,T_Capture,T_Post,T_UI,Corpus,Core domain
     class Stores,Components support
     class Storage infra
 ```
 
 ## Main flows
 
-- **Dashboard (`/`)** — calls `practice/dashboard-loader` which fetches recent sessions, runs the planner, and returns the next planned session(s). The loader also exposes `startPlannedSession` / `startFreshPlan` so the route doesn't touch `sessionStorage` or `window.location` directly.
+- **Dashboard (`/`)** — calls `practice/dashboard-loader` (thin wrapper over `practice/plan.computePlan`) which fetches recent sessions, runs the planner, and returns the next planned session(s). The loader also exposes `startPlannedSession` / `startFreshPlan` so the route doesn't touch `sessionStorage` or `window.location` directly.
 - **Session write-path (`/session/*`)** — route calls a `practice/session-loader` (`prepareBigramDrillSession` / `prepareRealTextSession` / `prepareDiagnosticSession`) to get ready-to-render text + metadata. The loader consumes any `practice/planned` hand-off stashed by the dashboard. `SessionShell` → `TypingSurface` captures raw keystrokes → `typing/postprocess` annotates → `session/runner` aggregates (delegating bigram math to `bigram/extraction`) → `SessionSummary` persisted via `session/persistence`.
-- **Summary (`/session/[id]/summary`)** — `session/summary-loader` fetches the session + recent history, runs `session/delta`, `progress/celebrations`, and a shared `practice/dashboard-loader` call (reusing the same `recentSessions`), and returns one view-model. The route is render-only plus the `startPlannedSession` / `startFreshPlan` hand-off actions.
+- **Summary (`/session/[id]/summary`)** — `session/summary-loader` fetches the session + recent history, runs `progress/delta`, `progress/celebrations`, and a shared `practice/plan.computePlan` call (reusing the same `recentSessions`) for the "Next session" CTA, and returns one view-model. The route is render-only plus the `startPlannedSession` / `startFreshPlan` hand-off actions.
 - **Analytics (`/analytics`)** — `progress/analytics-loader` returns sessions + profile + corpus frequencies + pre-computed trend series (via `progress/metrics`), and the charts render them.
 - **Settings (`/settings`)** — reads/writes `settings/profile`; delegates export/import UI to `DataTransfer`, which talks to `settings/data-transfer`.
 
@@ -184,12 +189,12 @@ flowchart TB
 | Module       | Role                                                                                                                                                                                                                                                            |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `typing`     | Keystroke capture attachment, `KeystrokeEvent` types, postprocess annotation.                                                                                                                                                                                   |
-| `session`    | `SessionRunner`, `SessionSummary` construction, delta computation, `saveSession`, summary loader, UI components.                                                                                                                                                |
+| `session`    | `SessionRunner`, `SessionSummary` construction, `saveSession`, summary loader, UI components.                                                                                                                                                                   |
 | `bigram`     | Classification (+ thresholds), extraction, accuracy/timing aggregation from events.                                                                                                                                                                             |
 | `diagnostic` | Weakness-report engine and pacing computation. Practice-side sampling lives in `practice`.                                                                                                                                                                      |
-| `practice`   | What-to-practice-next domain: drill/real-text/diagnostic text generation, planner, graduation filter, bonus round, route hand-off (`planned`), plus the dashboard and session loaders routes call.                                                              |
+| `practice`   | What-to-practice-next domain: drill/real-text/diagnostic text generation, planner, graduation filter, bonus round, route hand-off (`planned`), the shared plan-compute pipeline (`plan.computePlan`), plus the dashboard and session loaders routes call.       |
 | `corpus`     | Text corpus registry, loading, normalization.                                                                                                                                                                                                                   |
-| `progress`   | Metrics computation, celebrations logic, analytics chart components, analytics loader.                                                                                                                                                                          |
+| `progress`   | Metrics computation, session-delta (prior-vs-current comparison), celebrations logic, analytics chart components, analytics loader.                                                                                                                             |
 | `storage`    | IndexedDB Dexie instance + low-level helpers. Only domain modules call into it; UI goes through the domain.                                                                                                                                                     |
 | `stores`     | Theme UI state.                                                                                                                                                                                                                                                 |
 | `components` | Shared UI (theme selector).                                                                                                                                                                                                                                     |

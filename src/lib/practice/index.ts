@@ -6,5 +6,6 @@
  * types.
  */
 export * from './types';
+export * from './plan';
 export * from './dashboard-loader';
 export * from './session-loader';

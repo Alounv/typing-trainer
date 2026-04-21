@@ -9,3 +9,4 @@
 export * from './analytics-loader';
 export * from './metrics';
 export * from './celebrations';
+export * from './delta';
