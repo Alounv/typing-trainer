@@ -30,8 +30,6 @@
 		ghostPosition?: number;
 		/** Forwarded to TextDisplay so the ghost overlay's CSS slide matches the pace. */
 		ghostTransitionMs?: number;
-		/** Forwarded: `ahead` for speed drills, `behind` for accuracy drills. */
-		ghostVisibility?: 'ahead' | 'behind';
 		/** Auto-focus the surface on mount. Default: true. */
 		autoFocus?: boolean;
 		/**
@@ -51,7 +49,6 @@
 		correctedPositions,
 		ghostPosition,
 		ghostTransitionMs,
-		ghostVisibility,
 		autoFocus = true,
 		announceErrors = false,
 		onEvent,
@@ -91,7 +88,6 @@
 			{correctedPositions}
 			{ghostPosition}
 			{ghostTransitionMs}
-			{ghostVisibility}
 		/>
 	</div>
 

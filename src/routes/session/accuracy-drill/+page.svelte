@@ -4,7 +4,8 @@
 	 * mode is obvious from the nav alone. Behaviour vs. speed-drill:
 	 *   - Targets are priority hasty/acquisition bigrams + undertrained backfill
 	 *     (picked upstream by the planner; loader just unpacks).
-	 *   - Pacer runs at `baselineWPM × 0.60` — slow-down pressure, no speed chase.
+	 *   - No pacer: nothing to chase, nothing to slow down against. Removes
+	 *     speed pressure entirely so the user can focus on correctness.
 	 *   - Copy encourages correctness over throughput.
 	 * All data-plane logic is shared via `prepareDrillSession` — this file
 	 * stays thin on purpose.
@@ -54,7 +55,7 @@
 		type="bigram-drill"
 		text={state.text}
 		title="Accuracy drill"
-		approach="Slow down. The pacer ghost runs below your baseline on purpose — let it get ahead if you need to. Hitting every key correctly is the whole point."
+		approach="Slow down. Hitting every key correctly is the whole point — take the time you need."
 		targetBigrams={state.targets}
 		exposureBigrams={state.exposure}
 		drillMode="accuracy"

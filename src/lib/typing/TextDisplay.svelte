@@ -28,8 +28,9 @@
 		 * Optional pacer ghost position. When set, an overlay bar is drawn
 		 * at that char marking "where the pacer expects you to be". The bar
 		 * slides between positions via a CSS transition — see
-		 * `ghostTransitionMs`. Whether it renders when ahead or behind the
-		 * user is controlled by `ghostVisibility`.
+		 * `ghostTransitionMs`. Rendered whether the ghost is ahead of or
+		 * behind the user; hidden only when it overlaps the cursor so the
+		 * two bars never stack.
 		 */
 		ghostPosition?: number;
 		/**
@@ -40,17 +41,6 @@
 		 * glide when the caller doesn't know the pace.
 		 */
 		ghostTransitionMs?: number;
-		/**
-		 * Which side of the cursor the ghost is allowed to appear on.
-		 * - `ahead` (speed drills): visible only when strictly *ahead* — its
-		 *   job is to pull the user forward; hiding it once the user catches
-		 *   up removes the pressure and signals "you made it."
-		 * - `behind` (accuracy drills): visible only when strictly *behind*
-		 *   — its job is to apply slow-down pressure; it only shows how far
-		 *   the user has over-sped past the target pace.
-		 * Defaults to `ahead` to match the historical behavior.
-		 */
-		ghostVisibility?: 'ahead' | 'behind';
 	}
 
 	let {
@@ -59,8 +49,7 @@
 		errorPositions = new Set<number>(),
 		correctedPositions = new Set<number>(),
 		ghostPosition,
-		ghostTransitionMs = 150,
-		ghostVisibility = 'ahead'
+		ghostTransitionMs = 150
 	}: Props = $props();
 
 	// Per-keystroke hot path: we deliberately do NOT build a $derived array
@@ -180,13 +169,9 @@
 	 */
 	$effect(() => {
 		if (!viewportEl) return;
-		// Visibility is side-dependent: `ahead` hides once the user catches
-		// up to or passes the ghost; `behind` hides while the user is still
-		// at or behind it. Equality hides in both cases so the overlay never
-		// sits directly beneath the cursor bar.
-		const hidden =
-			ghostPosition === undefined ||
-			(ghostVisibility === 'ahead' ? ghostPosition <= position : ghostPosition >= position);
+		// Hide only when the ghost overlaps the cursor — otherwise render
+		// it whether the ghost is ahead or behind the user.
+		const hidden = ghostPosition === undefined || ghostPosition === position;
 		if (hidden) {
 			ghostRect = { x: 0, y: 0, w: 0, h: 0, ready: false };
 			return;

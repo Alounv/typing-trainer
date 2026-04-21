@@ -1,15 +1,16 @@
 import type { DrillMode } from '../core';
 
-/** Accuracy drills push *below* baseline — hasty/acquisition bigrams need slow-down pressure, not speed-up. */
-export const ACCURACY_PACE_MULTIPLIER = 0.6;
-
 export const SPEED_PACE_MULTIPLIER = 1;
 
-/** Returns 0 when baseline is unusable (first-run, no diagnostic); caller skips ghost rendering. */
+/**
+ * Pace for the ghost cursor, in WPM. Only speed drills get a pacer —
+ * accuracy drills removed it so the user focuses on mistake count, not
+ * a visible pace target. Returns 0 when the ghost should not render
+ * (no diagnostic baseline, or non-speed mode).
+ */
 export function paceForMode(mode: DrillMode, baselineWPM: number): number {
-	if (baselineWPM <= 0) return 0;
-	const multiplier = mode === 'accuracy' ? ACCURACY_PACE_MULTIPLIER : SPEED_PACE_MULTIPLIER;
-	return baselineWPM * multiplier;
+	if (baselineWPM <= 0 || mode !== 'speed') return 0;
+	return baselineWPM * SPEED_PACE_MULTIPLIER;
 }
 
 /** Floors to int (single-char highlight). Returns 0 for non-positive inputs so ghost never falls behind the user. */

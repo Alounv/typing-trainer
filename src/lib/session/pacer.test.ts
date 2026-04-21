@@ -1,29 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import {
-	ACCURACY_PACE_MULTIPLIER,
-	SPEED_PACE_MULTIPLIER,
-	computeGhostPosition,
-	paceForMode
-} from './pacer';
+import { SPEED_PACE_MULTIPLIER, computeGhostPosition, paceForMode } from './pacer';
 
 describe('paceForMode', () => {
-	it('applies the accuracy multiplier for accuracy mode', () => {
-		expect(paceForMode('accuracy', 60)).toBeCloseTo(60 * ACCURACY_PACE_MULTIPLIER, 5);
-	});
-
 	it('applies the speed multiplier for speed mode', () => {
 		expect(paceForMode('speed', 60)).toBeCloseTo(60 * SPEED_PACE_MULTIPLIER, 5);
+	});
+
+	it('returns 0 for accuracy mode — pacer is hidden in accuracy drills', () => {
+		expect(paceForMode('accuracy', 60)).toBe(0);
 	});
 
 	it('returns 0 when baselineWPM is 0 (no diagnostic yet)', () => {
 		// Drill route skips ghost rendering entirely in this case — matches the
 		// "no diagnostic on file" UX where the pacer doesn't know a target.
-		expect(paceForMode('accuracy', 0)).toBe(0);
 		expect(paceForMode('speed', 0)).toBe(0);
 	});
 
 	it('returns 0 for negative baselineWPM (defensive — should never happen)', () => {
-		expect(paceForMode('accuracy', -5)).toBe(0);
+		expect(paceForMode('speed', -5)).toBe(0);
 	});
 });
 

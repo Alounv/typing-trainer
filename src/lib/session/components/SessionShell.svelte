@@ -118,9 +118,20 @@
 
 	const progressPct = $derived(Math.round((position / text.length) * 100));
 
-	// Pacer wiring. `paceWPM` resolves to 0 when either the session isn't a
-	// drill or the user has no diagnostic baseline — `ghostPosition` stays
+	// Accuracy-drill error budget: the per-drill tolerance is 5% of the
+	// full text length. The overlay bar fills to 100% once the user has
+	// burned that budget; under it, fill is proportional. Denominator is
+	// total chars (not chars-typed) so a single early mistake doesn't
+	// slam the bar to full — it grows as the budget shrinks.
+	const errorBudgetPct = $derived(
+		text.length > 0 ? Math.min(100, (errorCount / text.length) * 100 * (100 / 5)) : 0
+	);
+
+	// Pacer wiring. `paceForMode` resolves to 0 for non-speed drills or
+	// when the user has no diagnostic baseline — `ghostPosition` stays
 	// undefined in that case, which TextDisplay interprets as "no pacer."
+	// Accuracy drills deliberately hide the pacer (errors are the signal);
+	// only speed drills get a ghost to chase.
 	// Only read `elapsedMs` once `running` is true so the ghost doesn't crawl
 	// forward before the first keystroke (reading/focus time shouldn't count).
 	const paceWPM = $derived(drillMode && baselineWPM ? paceForMode(drillMode, baselineWPM) : 0);
@@ -132,12 +143,6 @@
 	// consecutive chars — the next boundary arrives precisely when the
 	// slide ends, producing continuous motion. 5 chars = 1 word.
 	const ghostTransitionMs = $derived(paceWPM > 0 ? 60_000 / (paceWPM * 5) : 0);
-	// Speed drills want forward pressure (ghost ahead); accuracy drills
-	// want slow-down pressure (ghost behind, visible only when the user
-	// has outrun the target pace).
-	const ghostVisibility = $derived<'ahead' | 'behind'>(
-		drillMode === 'accuracy' ? 'behind' : 'ahead'
-	);
 
 	function onEvent(event: KeystrokeEvent) {
 		if (sessionStart === null) {
@@ -296,6 +301,28 @@
 		first keystroke (flat).
 	-->
 	<div class="space-y-3">
+		{#if drillMode === 'accuracy'}
+			<!--
+				Accuracy-only "error budget" bar. Fills as errorCount /
+				charsTyped approaches the 5% tolerance; clamps at 100% once
+				over budget. Placed above the session progress bar so a
+				glance answers "am I burning my error budget?" without
+				looking at the numeric readout.
+			-->
+			<div
+				class="h-0.5 w-full overflow-hidden rounded-full bg-base-300"
+				role="progressbar"
+				aria-label="Error budget used (5% tolerance)"
+				aria-valuemin="0"
+				aria-valuemax="100"
+				aria-valuenow={Math.round(errorBudgetPct)}
+			>
+				<div
+					class="h-full bg-error transition-[width] duration-75 ease-out motion-reduce:transition-none"
+					style="width: {errorBudgetPct}%"
+				></div>
+			</div>
+		{/if}
 		<div
 			class="h-0.5 w-full overflow-hidden rounded-full bg-base-300"
 			role="progressbar"
@@ -317,14 +344,13 @@
 			{correctedPositions}
 			{ghostPosition}
 			{ghostTransitionMs}
-			{ghostVisibility}
 			{onEvent}
 		/>
 	</div>
 
 	<div class="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">
 		<Timer {elapsedMs} />
-		<StatsBar {errorCount} />
+		<StatsBar {errorCount} {drillMode} />
 		{#if saving}
 			<span class="text-base-content/55">Saving…</span>
 		{/if}
