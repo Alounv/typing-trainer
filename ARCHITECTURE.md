@@ -15,84 +15,160 @@ loaders).
 ```mermaid
 flowchart TB
     subgraph Routes["routes/"]
-        R["/ · /session/* · /session/[id]/summary<br/>/analytics · /settings"]
+        R_Dash["/"]
+        R_Sess["/session/*"]
+        R_Summ["/session/[id]/summary"]
+        R_Ana["/analytics"]
+        R_Set["/settings"]
     end
 
-    subgraph Domain["src/lib (domain)"]
-        session
-        practice
-        progress
-        settings
-        diagnostic
-        corpus
-        bigram
-        typing
-        core
+    subgraph Practice["practice/"]
+        P_DashL["dashboard-loader"]
+        P_SessL["session-loader"]
+        P_Planner["planner"]
+        P_PlanWin["plan-window"]
+        P_Planned["planned"]
+        P_Grad["graduation-filter"]
+        P_Drill["bigram-drill"]
+        P_Real["real-text"]
+        P_DiagS["diagnostic-sampler"]
     end
 
-    subgraph Support["src/lib (support UI)"]
-        stores
-        components
+    subgraph Session["session/"]
+        S_SummL["summary-loader"]
+        S_Runner["runner"]
+        S_Persist["persistence"]
+        S_Delta["delta"]
+        S_Pacer["pacer"]
+        S_Comp["components<br/>(SessionShell, …)"]
     end
 
-    subgraph Infra["Infra"]
-        storage[("storage<br/>IndexedDB")]
+    subgraph Progress["progress/"]
+        Pr_AnaL["analytics-loader"]
+        Pr_Metrics["metrics"]
+        Pr_Celeb["celebrations"]
+        Pr_Comp["components<br/>(charts)"]
     end
 
-    %% Route → domain. Each page enters the domain through one (or two) libs,
-    %% never directly into storage.
-    R --> session
-    R --> practice
-    R --> progress
-    R --> settings
-    R --> diagnostic
-    R --> bigram
-    R --> corpus
-    R --> core
-    R --> stores
-    R --> components
+    subgraph Settings["settings/"]
+        St_Profile["profile"]
+        St_DT["data-transfer"]
+        St_DTUI["DataTransfer.svelte"]
+    end
 
-    %% Domain → domain (all forward-only, strict DAG).
-    session --> practice
-    session --> progress
-    session --> diagnostic
-    session --> bigram
-    session --> typing
-    session --> core
-    practice --> settings
-    practice --> diagnostic
-    practice --> corpus
-    practice --> bigram
-    practice --> core
-    progress --> settings
-    progress --> corpus
-    progress --> bigram
-    progress --> core
-    settings --> bigram
-    settings --> core
-    diagnostic --> corpus
-    diagnostic --> bigram
-    diagnostic --> typing
-    diagnostic --> core
-    bigram --> typing
-    bigram --> core
-    components --> stores
+    subgraph Diagnostic["diagnostic/"]
+        D_Engine["engine"]
+        D_Pacing["pacing"]
+    end
 
-    %% Domain → infra. Only these libs touch storage; routes never do.
-    session --> storage
-    practice --> storage
-    progress --> storage
-    settings --> storage
-    storage --> core
+    subgraph Bigram["bigram/"]
+        B_Class["classification"]
+        B_Extr["extraction"]
+    end
+
+    subgraph Typing["typing/"]
+        T_Capture["capture"]
+        T_Post["postprocess"]
+        T_UI["TypingSurface<br/>TextDisplay"]
+    end
+
+    Corpus["corpus"]
+    Core["core (types)"]
+    Stores["stores"]
+    Components["components"]
+    Storage[("storage<br/>IndexedDB")]
+
+    %% Route → loader (one entry per page). Routes never touch storage.
+    R_Dash --> P_DashL
+    R_Sess --> P_SessL
+    R_Sess --> S_Comp
+    R_Summ --> S_SummL
+    R_Ana --> Pr_AnaL
+    R_Ana --> Pr_Comp
+    R_Set --> St_Profile
+    R_Set --> St_DTUI
+    R_Dash --> Components
+    R_Dash --> Stores
+
+    %% practice/dashboard-loader composes the dashboard view-model.
+    P_DashL --> St_Profile
+    P_DashL --> Storage
+    P_DashL --> Pr_Metrics
+    P_DashL --> Corpus
+    P_DashL --> P_Grad
+    P_DashL --> P_Planner
+    P_DashL --> P_PlanWin
+    P_DashL --> P_Planned
+
+    %% practice/session-loader composes the session-start view-model.
+    P_SessL --> Storage
+    P_SessL --> Pr_Metrics
+    P_SessL --> P_Planned
+    P_SessL --> P_Drill
+    P_SessL --> P_Real
+    P_SessL --> P_DiagS
+    P_SessL --> P_Grad
+    P_SessL --> P_Planner
+
+    %% session/summary-loader reuses dashboard-loader for plan hand-off.
+    S_SummL --> Storage
+    S_SummL --> S_Delta
+    S_SummL --> P_DashL
+    S_SummL --> Pr_Celeb
+
+    %% progress/analytics-loader.
+    Pr_AnaL --> Storage
+    Pr_AnaL --> St_Profile
+    Pr_AnaL --> Corpus
+    Pr_AnaL --> Pr_Metrics
+
+    %% settings internals.
+    St_Profile --> Storage
+    St_Profile --> B_Class
+    St_DT --> Storage
+    St_DTUI --> St_DT
+
+    %% Session runtime (session/*). SessionShell wires capture → runner → persistence.
+    S_Comp --> T_UI
+    S_Comp --> S_Runner
+    S_Comp --> S_Pacer
+    S_Comp --> S_Persist
+    T_UI --> T_Capture
+    S_Runner --> T_Post
+    S_Runner --> B_Extr
+    S_Persist --> Storage
+    S_Delta --> B_Class
+    S_Delta --> Pr_Metrics
+
+    %% practice internals.
+    P_Drill --> Corpus
+    P_DiagS --> Corpus
+    P_DiagS --> P_Real
+
+    %% progress internals.
+    Pr_Celeb --> Pr_Metrics
+    Pr_Metrics --> Corpus
+
+    %% bigram / diagnostic / typing internals.
+    B_Extr --> B_Class
+    B_Extr --> T_Post
+    D_Engine --> T_Post
+    D_Engine --> D_Pacing
+
+    Components --> Stores
+    Storage --> Core
 
     classDef route fill:#1e3a5f,stroke:#5aa9e6,color:#e6f2ff
+    classDef loader fill:#3d2b5a,stroke:#a78bfa,color:#f0e6ff
     classDef domain fill:#2d4a2b,stroke:#7cb342,color:#eaffea
     classDef support fill:#5c3d1e,stroke:#e89f4c,color:#fff2e0
     classDef infra fill:#5a2740,stroke:#e06c9f,color:#ffe6f0
-    class R route
-    class session,practice,progress,settings,diagnostic,corpus,bigram,typing,core domain
-    class stores,components support
-    class storage infra
+
+    class R_Dash,R_Sess,R_Summ,R_Ana,R_Set route
+    class P_DashL,P_SessL,S_SummL,Pr_AnaL loader
+    class P_Planner,P_PlanWin,P_Planned,P_Grad,P_Drill,P_Real,P_DiagS,S_Runner,S_Persist,S_Delta,S_Pacer,S_Comp,Pr_Metrics,Pr_Celeb,Pr_Comp,St_Profile,St_DT,St_DTUI,D_Engine,D_Pacing,B_Class,B_Extr,T_Capture,T_Post,T_UI,Corpus,Core domain
+    class Stores,Components support
+    class Storage infra
 ```
 
 ## Main flows
