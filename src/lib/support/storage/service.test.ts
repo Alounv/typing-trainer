@@ -6,7 +6,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearAll, getBigramHistory, getRecentSessions, getSession } from './service';
 import { saveProfile } from '../../settings/profile';
-import { saveSession } from '../../session';
+import { saveSessionFixture as saveSession } from '../../test-utils/fixtures';
 import type { SessionSummary, BigramAggregate, DiagnosticReport } from '../core/types';
 
 function makeAggregate(overrides: Partial<BigramAggregate> = {}): BigramAggregate {

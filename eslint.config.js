@@ -72,12 +72,7 @@ export default defineConfig(
 	// Lib-boundary rule. Tests and barrel files (`index.ts`) are exempt.
 	{
 		files: ['src/**/*.ts', 'src/**/*.svelte'],
-		ignores: [
-			'src/**/*.test.ts',
-			'src/**/*.svelte.test.ts',
-			'src/lib/*/index.ts',
-			'src/lib/support/*/index.ts'
-		],
+		ignores: ['src/lib/*/index.ts', 'src/lib/support/*/index.ts'],
 		rules: {
 			'no-restricted-imports': [
 				'error',

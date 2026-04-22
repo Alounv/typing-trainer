@@ -15,7 +15,7 @@ export function generateDiagnosticReport(input: DiagnosticReportInput): Diagnost
 }
 
 /** Wall-clock WPM across the event span. Mirrors session WPM so the pacer tracks sustained pace, not a pauses-stripped peak. */
-export function deriveBaselineWPM(events: readonly KeystrokeEvent[]): number {
+function deriveBaselineWPM(events: readonly KeystrokeEvent[]): number {
 	if (events.length < 2) return 0;
 	const sorted = [...events].sort((a, b) => a.timestamp - b.timestamp);
 	const durationMs = sorted[sorted.length - 1].timestamp - sorted[0].timestamp;

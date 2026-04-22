@@ -97,7 +97,7 @@ export async function loadBuiltinCorpus(id: BuiltinCorpusId): Promise<CorpusData
  * `BUILTIN_CORPUS_IDS` because a user might pick a wordlist-only language
  * (or a custom corpus) — we shouldn't pretend quotes are always available.
  */
-export const QUOTE_BANK_LANGUAGES = ['en', 'fr'] as const;
+const QUOTE_BANK_LANGUAGES = ['en', 'fr'] as const;
 type QuoteBankLanguage = (typeof QUOTE_BANK_LANGUAGES)[number];
 
 const QUOTE_LOADERS: Record<QuoteBankLanguage, () => Promise<QuoteBank>> = {

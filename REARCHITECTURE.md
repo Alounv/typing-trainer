@@ -160,7 +160,7 @@ Landed:
 
 `plan/index.ts` still re-exports its internals (`planner`, `planned`, `graduation-filter`) so route loaders can reach them. Narrowing to a single `computePlan` entry point is the later "surface consolidation" pass (same deferred scope as `analyzeSkill` for skill).
 
-### ⬜ R5 — Tests at the domain frontier
+### ✅ R5 — Tests at the domain frontier
 
 Final stage, after R1–R4 have stabilized the public surfaces. Move tests so each domain has **one test file per public entry point**, exercising it end-to-end. Drop unit tests tied to internals.
 
@@ -193,7 +193,5 @@ Do this **only after** R1–R4 — otherwise we'd be migrating tests twice.
 ## Deferred cleanups
 
 Known leaks/smells we're intentionally not fixing in this pass.
-
-- **Test fixture leak** — [storage/service.test.ts](src/lib/storage/service.test.ts) and [settings/data-transfer.test.ts](src/lib/settings/data-transfer.test.ts) reach into `../session/persistence` to call `saveSession` as a fixture. Production boundaries are clean; only test code leaks. A `test-utils/fixtures.ts` wrapper would close the hole.
 
 - **Scattered drill/threshold constants** — `LIVE_PRIORITY_TARGETS_TOP_N`, `DEFAULT_DRILL_TARGET_COUNT`, `DEFAULT_HIGH_ERROR_THRESHOLD`, etc. Revisit after R1–R4 so they land in their final domain.

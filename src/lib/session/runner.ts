@@ -36,7 +36,7 @@ interface BuildSessionSummaryInput {
  * timestamp are the only non-determinism, both injectable for tests.
  * Bigram timings use first-input-only events; raw events are archived separately.
  */
-export function buildSessionSummary(input: BuildSessionSummaryInput): SessionSummary {
+function buildSessionSummary(input: BuildSessionSummaryInput): SessionSummary {
 	const id = (input.idGenerator ?? uuid)();
 	const timestamp = (input.timestampProvider ?? Date.now)();
 	const annotated = annotateFirstInputs(input.events);

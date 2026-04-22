@@ -13,18 +13,23 @@
  * source file on disk is the user's undo. See `importAll` for the
  * transaction shape.
  */
-import { db, SINGLETON_ID, type ProfileRecord } from '$lib/support/storage';
-import type { SessionSummary, BigramAggregate } from '$lib/support/core';
+import { db, SINGLETON_ID } from '$lib/support/storage';
+import type { SessionSummary, BigramAggregate, UserSettings } from '$lib/support/core';
+
+interface ProfileRecord {
+	id: typeof SINGLETON_ID;
+	settings: UserSettings;
+}
 
 /**
  * Bump when the export shape changes. Old files with a lower version should be
  * migrated forward (not yet implemented — v1 is the only version); files with
  * a higher version are rejected because this build doesn't know how to read them.
  */
-export const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 1;
 
 /** Identifier stamped into every export so we can detect "wrong app" files early. */
-export const APP_TAG = 'typing-trainer' as const;
+const APP_TAG = 'typing-trainer' as const;
 
 type BigramRow = BigramAggregate & { key: string };
 

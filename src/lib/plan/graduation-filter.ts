@@ -6,7 +6,7 @@
 import type { BigramAggregate } from '../support/core';
 
 /** Consecutive `healthy` sessions required before a bigram leaves rotation. */
-export const CONSECUTIVE_HEALTHY_SESSIONS = 3;
+const CONSECUTIVE_HEALTHY_SESSIONS = 3;
 
 /** Injectable so tests can pass a pure fixture; prod passes `getBigramHistory`. */
 type BigramHistoryLookup = (bigram: string) => Promise<BigramAggregate[]>;
@@ -31,7 +31,7 @@ export async function findGraduatedBigrams(
 }
 
 /** Pure predicate; `history` must be newest-first (matches `getBigramHistory`). */
-export function isBigramGraduated(history: readonly BigramAggregate[]): boolean {
+function isBigramGraduated(history: readonly BigramAggregate[]): boolean {
 	if (history.length < CONSECUTIVE_HEALTHY_SESSIONS) return false;
 	for (let i = 0; i < CONSECUTIVE_HEALTHY_SESSIONS; i++) {
 		if (history[i].classification !== 'healthy') return false;

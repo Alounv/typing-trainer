@@ -37,7 +37,7 @@ interface RollingBigramAggregate {
  * Pool the last `window` per-occurrence samples for `bigram`, newest session first.
  * Legacy sessions without samples are skipped. Returns `undefined` when no session carries samples.
  */
-export function aggregateLastNOccurrences(
+function aggregateLastNOccurrences(
 	sessions: readonly SessionSummary[],
 	bigram: string,
 	window: number = BIGRAM_CLASSIFICATION_WINDOW

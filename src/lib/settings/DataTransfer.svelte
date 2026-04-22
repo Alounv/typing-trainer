@@ -1,19 +1,10 @@
 <script lang="ts">
-	/**
-	 * Data export/import widget for the settings page.
-	 *
-	 * Export: serializes every Dexie table to a JSON file and triggers a
-	 * browser download. Import: reads a user-chosen JSON file, shows a
-	 * confirmation modal summarizing what's inside, then **replaces** the
-	 * current DB on confirm (no merge — see `settings/data-transfer.ts` for why).
-	 *
-	 * After a successful import we force a full page reload. The other
-	 * stores on this page (and elsewhere) already memoized the old
-	 * profile / sessions at mount time; hot-swapping them reactively
-	 * would need invalidation plumbing we don't have yet, and import is
-	 * rare enough that a reload is the honest, bug-free path.
-	 */
 	import { exportAll, importAll, ImportValidationError, type ExportFile } from './data-transfer';
+
+	// After a successful load we force a full page reload. Other stores on this
+	// page memoized the old data at mount time; hot-swapping them reactively
+	// would need invalidation plumbing we don't have, and the restore action is
+	// rare enough that a reload is the honest, bug-free path.
 
 	type Status =
 		| { kind: 'idle' }

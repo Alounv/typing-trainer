@@ -22,20 +22,6 @@ import { buildWpmSeries } from './metrics';
  * from.
  */
 
-/**
- * Ordered best → worst for comparisons. `unclassified` sits between acquisition
- * and hasty only in the sense of "we don't know yet"; we treat transitions
- * involving it conservatively (no celebration) to avoid false positives from
- * sparse data.
- */
-const CLASS_RANK: Record<BigramClassification, number> = {
-	healthy: 0,
-	fluency: 1,
-	hasty: 2,
-	acquisition: 3,
-	unclassified: 4
-};
-
 export type GraduationTier =
 	| 'healthy' // anything (non-healthy) → healthy
 	| 'escaped-acquisition' // acquisition → hasty | fluency
@@ -102,14 +88,6 @@ export function detectGraduations(
 	const TIER_ORDER: GraduationTier[] = ['healthy', 'escaped-acquisition', 'cleaned-up'];
 	events.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
 	return events;
-}
-
-/** True when a classification transition is strictly an improvement (lower rank).
- * Exported for potential future use by regression detection (§10.5); not used
- * by the graduation tiers above because they're opinionated beyond pure rank. */
-export function isImprovement(from: BigramClassification, to: BigramClassification): boolean {
-	if (from === 'unclassified' || to === 'unclassified') return false;
-	return CLASS_RANK[to] < CLASS_RANK[from];
 }
 
 /**

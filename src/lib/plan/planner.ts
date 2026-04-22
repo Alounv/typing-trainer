@@ -28,7 +28,7 @@ function resolveWordBudgets(settings?: UserSettings) {
  * full workouts. Kept at 28 through the cycle refactor so existing users
  * don't see a surprise diagnostic the day of the migration.
  */
-export const DIAGNOSTIC_INTERVAL = 28;
+const DIAGNOSTIC_INTERVAL = 28;
 
 /** Default "top N" priority bigrams to drill per session. */
 export const DEFAULT_DRILL_TARGET_COUNT = 10;
@@ -40,7 +40,7 @@ export const DEFAULT_DRILL_TARGET_COUNT = 10;
  * silently skipped — a cycle can therefore be as short as a single real-text.
  * Real-text always runs; it's the transfer test and shouldn't ever go away.
  */
-export const CYCLES_PER_DAY = 2;
+const CYCLES_PER_DAY = 2;
 
 export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	const {

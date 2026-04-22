@@ -1,6 +1,6 @@
 import type { DrillMode } from '../support/core';
 
-export const SPEED_PACE_MULTIPLIER = 1;
+const SPEED_PACE_MULTIPLIER = 1;
 
 /**
  * Pace for the ghost cursor, in WPM. Only speed drills get a pacer —

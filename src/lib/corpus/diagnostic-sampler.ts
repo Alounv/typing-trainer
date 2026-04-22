@@ -8,7 +8,7 @@ import type { CorpusData, QuoteBank } from './types';
 import { generateRealTextSequence } from './real-text';
 
 /** ~5–8 min of typing at 60 WPM — enough samples per top bigram without dragging. */
-export const DEFAULT_DIAGNOSTIC_CHAR_TARGET = 700;
+const DEFAULT_DIAGNOSTIC_CHAR_TARGET = 700;
 
 interface DiagnosticSamplerOptions {
 	/** Overrides the default char target (mostly for tests). */

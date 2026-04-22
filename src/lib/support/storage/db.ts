@@ -4,7 +4,7 @@ import type { SessionSummary, UserSettings, BigramAggregate } from '../core';
 /** Fixed primary key for the singleton profile table. */
 export const SINGLETON_ID = 'default';
 
-export interface ProfileRecord {
+interface ProfileRecord {
 	id: typeof SINGLETON_ID;
 	settings: UserSettings;
 }

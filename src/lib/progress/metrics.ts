@@ -4,7 +4,7 @@ import type { BigramAggregate, BigramClassification, SessionSummary } from '../s
  * Rolling average with a trailing window. For positions before the window is full, returns
  * `null` — charts render these as gaps rather than misleading partial averages.
  */
-export function rollingAverage(values: readonly number[], window: number): (number | null)[] {
+function rollingAverage(values: readonly number[], window: number): (number | null)[] {
 	if (window < 1) throw new RangeError('window must be ≥ 1');
 	const out: (number | null)[] = [];
 	let sum = 0;
@@ -20,7 +20,7 @@ export function rollingAverage(values: readonly number[], window: number): (numb
  * Trailing-window sample standard deviation (n-1 denominator). Returns `null` before the
  * window is full. Used for the ±1σ envelope on the WPM chart.
  */
-export function rollingStdDev(values: readonly number[], window: number): (number | null)[] {
+function rollingStdDev(values: readonly number[], window: number): (number | null)[] {
 	if (window < 1) throw new RangeError('window must be ≥ 1');
 	const out: (number | null)[] = [];
 	for (let i = 0; i < values.length; i++) {

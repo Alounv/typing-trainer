@@ -3,7 +3,7 @@
  * plain keyboard. Preserves guillemets, accents, and anything not in the map.
  */
 
-export const TYPOGRAPHIC_MAP: Readonly<Record<string, string>> = {
+const TYPOGRAPHIC_MAP: Readonly<Record<string, string>> = {
 	'\u2018': "'", // ‘ left single quote
 	'\u2019': "'", // ’ right single quote / typographic apostrophe
 	'\u201C': '"', // “ left double quote
