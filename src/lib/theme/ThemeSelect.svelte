@@ -12,7 +12,7 @@
 	 * and let the store's reactivity drive `selected`.
 	 */
 	import { onMount } from 'svelte';
-	import { THEMES, setTheme, themeStore, type ThemeChoice } from '$lib/stores';
+	import { THEMES, setTheme, themeStore, type ThemeChoice } from './store.svelte';
 
 	let mounted = $state(false);
 	onMount(() => {

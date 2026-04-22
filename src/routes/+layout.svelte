@@ -4,8 +4,8 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { ThemeSelect } from '$lib/components';
-	import { initThemeStore } from '$lib/stores';
+	import ThemeSelect from '$lib/theme/ThemeSelect.svelte';
+	import { initThemeStore } from '$lib/theme';
 
 	let { children } = $props();
 
