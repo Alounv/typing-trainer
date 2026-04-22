@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildSessionSummary, SessionRunner } from './runner';
-import type { KeystrokeEvent } from '../typing/types';
+import type { KeystrokeEvent } from '../core';
 
 /**
  * Fixed id + timestamp so snapshots of the output are stable without pinning

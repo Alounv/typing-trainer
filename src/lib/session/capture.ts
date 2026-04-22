@@ -1,5 +1,5 @@
 import type { Attachment } from 'svelte/attachments';
-import type { CaptureConfig, KeystrokeEvent } from './types';
+import type { CaptureConfig, KeystrokeEvent } from '../core';
 
 /**
  * Callbacks surfaced by the capture attachment. All optional — consumers pick

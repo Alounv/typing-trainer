@@ -128,11 +128,11 @@ Landed:
 
 Public surface narrowing to a single `analyzeSkill(history)` function is deferred — R2 is a structural merge; surface consolidation is a later pass.
 
-### ⬜ R3 — Typing → Session
+### ✅ R3 — Typing → Session
 
-Fold `src/lib/typing/` into `src/lib/session/`. Keystroke capture is the input layer of a session.
+`src/lib/typing/` folded into `src/lib/session/`. Components flat in `session/components/` (chose flat over a `session/typing/` sub-folder for coherence).
 
-Provisional shape:
+Landed shape:
 
 ```
 session/
@@ -141,11 +141,12 @@ session/
 ├── postprocess.ts     # from typing/
 ├── runner.ts
 ├── persistence.ts
-├── pacer.ts
-└── types.ts           # merges typing/types.ts (KeystrokeEvent etc.)
+└── pacer.ts
 ```
 
-Confirm at execution: whether `TextDisplay`/`TypingSurface` go flat in `session/components/` or under `session/typing/`.
+Unexpected win: `KeystrokeEvent` and `CaptureConfig` moved to `core/types.ts` instead of staying in Session. Both Session and Skill depend on these types; putting them in core (the DAG leaf) keeps the Skill → Session edge from forming. Matches the target dep graph (Session → Skill, never the reverse).
+
+No `session/types.ts` after all — core holds the shared vocabulary, everything else is domain-internal.
 
 ### ⬜ R4 — Practice split (corpus generators → corpus, scheduler → plan)
 
@@ -195,5 +196,3 @@ Known leaks/smells we're intentionally not fixing in this pass.
 - **Test fixture leak** — [storage/service.test.ts](src/lib/storage/service.test.ts) and [settings/data-transfer.test.ts](src/lib/settings/data-transfer.test.ts) reach into `../session/persistence` to call `saveSession` as a fixture. Production boundaries are clean; only test code leaks. A `test-utils/fixtures.ts` wrapper would close the hole.
 
 - **Scattered drill/threshold constants** — `LIVE_PRIORITY_TARGETS_TOP_N`, `DEFAULT_DRILL_TARGET_COUNT`, `DEFAULT_HIGH_ERROR_THRESHOLD`, etc. Revisit after R1–R4 so they land in their final domain.
-
-- **`SessionShell.svelte` size (361 LOC)** — not splitting. User preference is "know where things are" over "separate concerns." The file orchestrates the session lifecycle + briefing header + progress bars honestly. Revisit only if genuine duplication appears.

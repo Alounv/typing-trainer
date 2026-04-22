@@ -14,8 +14,8 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { SvelteSet } from 'svelte/reactivity';
-	import TypingSurface from '$lib/typing/TypingSurface.svelte';
-	import type { KeystrokeEvent } from '$lib/typing';
+	import TypingSurface from './TypingSurface.svelte';
+	import type { KeystrokeEvent } from '$lib/core';
 	import type { DiagnosticReport, DrillMode, SessionType, SessionSummary } from '$lib/core';
 	import { SessionRunner } from '../runner';
 	import { computeGhostPosition, paceForMode } from '../pacer';

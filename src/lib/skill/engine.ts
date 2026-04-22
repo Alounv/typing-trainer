@@ -1,5 +1,4 @@
-import type { DiagnosticReport } from '../core';
-import type { KeystrokeEvent } from '../typing';
+import type { DiagnosticReport, KeystrokeEvent } from '../core';
 
 interface DiagnosticReportInput {
 	events: readonly KeystrokeEvent[];

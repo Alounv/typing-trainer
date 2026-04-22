@@ -1,4 +1,4 @@
-import type { KeystrokeEvent } from './types';
+import type { KeystrokeEvent } from '../core';
 
 /**
  * Keystroke event after correction lookahead. One per position (the first input);
