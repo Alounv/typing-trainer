@@ -8,7 +8,7 @@ import { RECENT_WINDOW } from '../support/core';
 import type { SessionSummary, UserSettings } from '../support/core';
 import { getProfile } from '../settings';
 import { getBigramHistory, getRecentSessions } from '../support/storage';
-import { buildLivePriorityTargets, buildLiveUndertrained } from '../progress';
+import { buildLivePriorityTargets, buildLiveUndertrained } from '../skill';
 import { isBuiltinCorpusId, loadBuiltinCorpus } from '../corpus';
 import type { FrequencyTable } from '../corpus';
 import { findGraduatedBigrams } from './graduation-filter';

@@ -1,11 +1,13 @@
 <!-- Sortable bigram table. Default sort matches diagnostic priority-list criterion (priorityScore desc). -->
 <script lang="ts">
-	import type { BigramSummary } from '../metrics';
+	import type { BigramSummary } from '$lib/skill';
 	import type { BigramClassification } from '../../support/core';
+	import type { BigramTrendPoint } from '../metrics';
 	import BigramSparkline from './BigramSparkline.svelte';
 
 	interface Props {
-		rows: BigramSummary[];
+		/** Skill's per-bigram assessment plus the sparkline trend from Progress. */
+		rows: (BigramSummary & { trend: BigramTrendPoint[] })[];
 		/**
 		 * Cap on how many rows to render after sorting. The bigram set can be
 		 * large (an English diagnostic surfaces 250+ bigrams); beyond the

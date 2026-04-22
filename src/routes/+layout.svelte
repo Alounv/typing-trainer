@@ -1,6 +1,5 @@
 <script lang="ts">
 	import './layout.css';
-	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
@@ -24,8 +23,6 @@
 	// listening for OS changes when the user is on "System".
 	onMount(() => initThemeStore());
 </script>
-
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
 <div class="flex min-h-screen flex-col">
 	<header class="navbar border-b border-base-300 bg-base-100">

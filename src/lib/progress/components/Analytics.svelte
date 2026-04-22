@@ -1,11 +1,12 @@
 <script lang="ts">
 	import type { BigramAggregate, BigramClassification, SessionSummary } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
+	import { summarizeBigrams } from '$lib/skill';
 	import {
 		buildErrorRateSeries,
 		buildWpmSeries,
+		buildBigramTrend,
 		countGraduations,
-		summarizeBigrams,
 		tallyClassificationMix
 	} from '../metrics';
 	import WpmChart from './WpmChart.svelte';
@@ -42,6 +43,9 @@
 	const wpm = $derived(buildWpmSeries(diagnosticSessions));
 	const errorRate = $derived(buildErrorRateSeries(diagnosticSessions));
 	const bigrams = $derived(summarizeBigrams(sessions, corpusFrequencies));
+	const bigramRows = $derived(
+		bigrams.map((row) => ({ ...row, trend: buildBigramTrend(sessions, row.bigram) }))
+	);
 	const liveClassification = $derived(tallyClassificationMix(bigrams));
 
 	const latestAndPrevDiagnostic = $derived(pickDiagnosticSessions(sessions));
@@ -166,7 +170,7 @@
 			{bigrams.length === 1 ? 'bigram observed' : 'bigrams observed'}
 		</p>
 	</div>
-	<BigramTable rows={bigrams} />
+	<BigramTable rows={bigramRows} />
 	<p class="text-xs text-base-content/55">
 		Default sort: priority (badness × corpus frequency). Tap any column to re-sort; tap again to
 		flip direction.

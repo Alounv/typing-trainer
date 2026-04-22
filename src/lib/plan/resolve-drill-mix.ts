@@ -1,6 +1,6 @@
 import type { BigramClassification, DrillMode } from '../support/core';
 import type { FrequencyTable } from '../corpus';
-import { buildLivePriorityTargets, buildLiveUndertrained } from '../progress';
+import { buildLivePriorityTargets, buildLiveUndertrained } from '../skill';
 import { getBigramHistory, getRecentSessions } from '../support/storage';
 import { RECENT_WINDOW } from '../support/core';
 import { findGraduatedBigrams } from './graduation-filter';
