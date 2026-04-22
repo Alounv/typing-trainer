@@ -1,11 +1,12 @@
 import { getSession, getRecentSessions } from '$lib/storage';
-import { computeSessionDelta, type SessionDelta } from '$lib/progress/delta';
 import {
+	computeSessionDelta,
 	detectGraduations,
 	detectMilestone,
+	type SessionDelta,
 	type GraduationEvent,
 	type MilestoneEvent
-} from '$lib/progress/celebrations';
+} from '$lib/progress';
 import { computePlan, type PlannedSession } from '$lib/practice';
 import type { SessionSummary } from '$lib/core';
 
