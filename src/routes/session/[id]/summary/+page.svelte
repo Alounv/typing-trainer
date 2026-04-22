@@ -11,13 +11,13 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { loadSummaryContext, type SummaryViewModel } from '$lib/session';
+	import { loadSummaryContext, type SummaryViewModel } from '$lib/progress';
 	import { startPlannedSession, startFreshPlan } from '$lib/practice';
 	import type { BigramAggregate, SessionSummary } from '$lib/core';
 	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/bigram';
-	import SessionDelta from '$lib/session/components/SessionDelta.svelte';
-	import Graduations from '$lib/session/components/Graduations.svelte';
-	import MilestoneBanner from '$lib/session/components/MilestoneBanner.svelte';
+	import SessionDelta from '$lib/progress/components/SessionDelta.svelte';
+	import Graduations from '$lib/progress/components/Graduations.svelte';
+	import MilestoneBanner from '$lib/progress/components/MilestoneBanner.svelte';
 
 	/**
 	 * Traffic-light threshold for the error-rate hero. The high-error cutoff

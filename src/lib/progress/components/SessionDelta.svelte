@@ -8,7 +8,7 @@
 	 * "did any bigrams graduate or regress?" isn't shown anywhere else on the
 	 * summary page.
 	 */
-	import type { SessionDelta } from '$lib/progress';
+	import type { SessionDelta } from '../delta';
 
 	interface Props {
 		delta: SessionDelta;

@@ -11,14 +11,13 @@
  * downstream domain modules at all.
  */
 import { getSession, getRecentSessions } from '../storage';
+import { computeSessionDelta, type SessionDelta } from './delta';
 import {
-	computeSessionDelta,
 	detectGraduations,
 	detectMilestone,
-	type SessionDelta,
 	type GraduationEvent,
 	type MilestoneEvent
-} from '../progress';
+} from './celebrations';
 import { computePlan, type PlannedSession } from '../practice';
 import type { SessionSummary } from '../core';
 
