@@ -12,7 +12,7 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { loadSummaryContext, type SummaryViewModel } from './loader';
-	import { startPlannedSession, startFreshPlan } from '$lib/practice';
+	import { startPlannedSession, startFreshPlan } from '$lib/plan';
 	import type { BigramAggregate, SessionSummary } from '$lib/core';
 	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/skill';
 	import SessionDelta from '$lib/progress/components/SessionDelta.svelte';

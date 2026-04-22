@@ -1,6 +1,7 @@
 import {
 	loadBuiltinCorpus,
 	isBuiltinCorpusId,
+	generateBigramDrillSequence,
 	type BuiltinCorpusId,
 	type FrequencyTable
 } from '$lib/corpus';
@@ -10,12 +11,11 @@ import { getBigramHistory, getRecentSessions } from '$lib/storage';
 import { buildLivePriorityTargets, buildLiveUndertrained } from '$lib/progress';
 import {
 	consumePlannedSession,
-	generateBigramDrillSequence,
 	findGraduatedBigrams,
 	DEFAULT_DRILL_TARGET_COUNT,
 	selectAccuracyDrillMix,
 	selectSpeedDrillMix
-} from '$lib/practice';
+} from '$lib/plan';
 
 const FALLBACK_CORPUS_ID: BuiltinCorpusId = 'en';
 const RECENT_WINDOW = 20;

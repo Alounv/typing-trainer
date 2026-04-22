@@ -7,7 +7,7 @@ import {
 	type GraduationEvent,
 	type MilestoneEvent
 } from '$lib/progress';
-import { computePlan, type PlannedSession } from '$lib/practice';
+import { computePlan, type PlannedSession } from '$lib/plan';
 import type { SessionSummary } from '$lib/core';
 
 const RECENT_WINDOW = 20;

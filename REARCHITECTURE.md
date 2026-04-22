@@ -148,16 +148,17 @@ Unexpected win: `KeystrokeEvent` and `CaptureConfig` moved to `core/types.ts` in
 
 No `session/types.ts` after all — core holds the shared vocabulary, everything else is domain-internal.
 
-### ⬜ R4 — Practice split (corpus generators → corpus, scheduler → plan)
+### ✅ R4 — Practice split (corpus generators → corpus, scheduler → plan)
 
-The name `practice/` conflates "what text to show" (Corpus) and "when to show it" (Plan).
+`practice/` split by concern: text generators moved to `corpus/`, scheduler became `plan/`.
 
-Moves:
+Landed:
 
 - To `corpus/`: `bigram-drill.ts`, `real-text.ts`, `diagnostic-sampler.ts` (+ tests)
-- Rename `practice/` to `plan/`: `planner.ts`, `plan.ts`, `plan-window.ts`, `planned.ts`, `graduation-filter.ts`, `types.ts`
+- `practice/` renamed to `plan/`: `planner.ts`, `plan.ts`, `plan-window.ts`, `planned.ts`, `graduation-filter.ts`, `plan-actions.ts`, `types.ts`
+- Route loaders now pull generators from `$lib/corpus` directly and scheduler helpers from `$lib/plan`.
 
-After R1, `session-loader.ts` and `dashboard-loader.ts` are already gone. `plan/` exports only `computePlan`.
+`plan/index.ts` still re-exports its internals (`planner`, `planned`, `graduation-filter`) so route loaders can reach them. Narrowing to a single `computePlan` entry point is the later "surface consolidation" pass (same deferred scope as `analyzeSkill` for skill).
 
 ### ⬜ R5 — Tests at the domain frontier
 

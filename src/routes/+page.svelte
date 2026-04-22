@@ -6,12 +6,7 @@
 	 */
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import {
-		computePlan,
-		startFreshPlan,
-		startPlannedSession,
-		type PlanContext
-	} from '$lib/practice';
+	import { computePlan, startFreshPlan, startPlannedSession, type PlanContext } from '$lib/plan';
 
 	type LoadState =
 		| { status: 'loading' }

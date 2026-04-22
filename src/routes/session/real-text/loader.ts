@@ -3,11 +3,12 @@ import {
 	isBuiltinCorpusId,
 	loadQuoteBank,
 	hasQuoteBank,
+	generateRealTextSequence,
 	type BuiltinCorpusId
 } from '$lib/corpus';
 import type { UserSettings } from '$lib/core';
 import { getProfile, DEFAULT_REAL_TEXT_WORD_BUDGET } from '$lib/settings';
-import { consumePlannedSession, generateRealTextSequence } from '$lib/practice';
+import { consumePlannedSession } from '$lib/plan';
 
 const CHARS_PER_WORD = 5;
 const FALLBACK_CORPUS_ID: BuiltinCorpusId = 'en';

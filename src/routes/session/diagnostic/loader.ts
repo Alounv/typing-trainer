@@ -3,11 +3,11 @@ import {
 	isBuiltinCorpusId,
 	loadQuoteBank,
 	hasQuoteBank,
+	sampleDiagnosticPassage,
 	type BuiltinCorpusId
 } from '$lib/corpus';
 import type { UserSettings } from '$lib/core';
 import { getProfile, DEFAULT_DIAGNOSTIC_WORD_BUDGET } from '$lib/settings';
-import { sampleDiagnosticPassage } from '$lib/practice';
 
 const CHARS_PER_WORD = 5;
 const FALLBACK_CORPUS_ID: BuiltinCorpusId = 'en';
