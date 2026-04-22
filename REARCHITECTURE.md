@@ -114,19 +114,19 @@ ESLint boundary rule updated: `+page.svelte` files still can't touch `$lib/stora
 
 Known temporary debt: `practice/index.ts` is widened to re-export its internals (`planned`, `bigram-drill`, `real-text`, `diagnostic-sampler`, `graduation-filter`, `planner`) so the split route loaders can reach them. R4 collapses this back to a single `computePlan` export.
 
-### ⬜ R2 — Skill merge (bigram + diagnostic → skill)
+### ✅ R2 — Skill merge (bigram + diagnostic → skill)
 
-Merge two folders. Single export: `analyzeSkill(history)`.
+Two folders merged into `skill/`. The misnamed `diagnostic/pacing.ts` (10 LOC, one caller) was inlined into `skill/engine.ts`; its test cases merged into `engine.test.ts`.
 
-Moves:
+Landed:
 
 - `bigram/{classification,extraction}.ts` (+ tests) → `skill/`
-- `diagnostic/engine.ts` (+ test) → `skill/`
-- `diagnostic/pacing.ts` (10 LOC, one caller, misnamed) inlined into `skill/engine.ts`
-- New `skill/index.ts` exports only `analyzeSkill`
-- Delete `bigram/` and `diagnostic/`
+- `diagnostic/engine.ts` + `diagnostic/pacing.ts` merged → `skill/engine.ts` (+ merged test)
+- New `skill/index.ts` re-exports classification, extraction, engine
+- 8 import sites updated (3 routes + 5 lib files, including a deep `bigram/classification` import I missed on the first sweep)
+- `bigram/` and `diagnostic/` deleted
 
-Import updates across routes and lib files — sweep at execution time.
+Public surface narrowing to a single `analyzeSkill(history)` function is deferred — R2 is a structural merge; surface consolidation is a later pass.
 
 ### ⬜ R3 — Typing → Session
 

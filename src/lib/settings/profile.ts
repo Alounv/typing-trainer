@@ -10,7 +10,7 @@
  *   UI-facing boundary for anything profile-shaped.
  */
 import { db, SINGLETON_ID } from '$lib/storage';
-import { DEFAULT_SPEED_THRESHOLD_MS, DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/bigram';
+import { DEFAULT_SPEED_THRESHOLD_MS, DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/skill';
 import type { UserSettings } from '$lib/core';
 import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,

@@ -9,7 +9,7 @@
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
 	import { prepareDiagnosticSession } from './loader';
-	import { generateDiagnosticReport } from '$lib/diagnostic';
+	import { generateDiagnosticReport } from '$lib/skill';
 
 	type LoadState =
 		| { status: 'loading' }

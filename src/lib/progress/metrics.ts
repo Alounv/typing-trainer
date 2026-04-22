@@ -10,7 +10,7 @@ import {
 	DEFAULT_THRESHOLDS,
 	MIN_OCCURRENCES_FOR_CLASSIFICATION,
 	type ClassificationThresholds
-} from '../bigram';
+} from '../skill';
 import type { FrequencyTable } from '../corpus';
 
 /** Mirrors `PRIORITY_TARGETS_TOP_N` in the diagnostic engine. */
@@ -344,7 +344,7 @@ export function buildLiveUndertrained(
 }
 
 /**
- * Single-bigram badness scalar. Duplicated (narrowly) from `diagnostic/engine`
+ * Single-bigram badness scalar. Duplicated (narrowly) from `skill/engine`
  * because that copy is private and per-diagnostic — the analytics view wants
  * the same formula applied to any BigramAggregate. If these ever drift, the
  * table and the diagnostic priority list will stop agreeing.

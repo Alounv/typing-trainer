@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { annotateFirstInputs, type KeystrokeEvent } from '../typing';
-import { extractBigramAggregates, type ClassificationThresholds } from '../bigram';
+import { extractBigramAggregates, type ClassificationThresholds } from '../skill';
 import type { DrillMode, SessionSummary, SessionType } from '../core';
 
 /**

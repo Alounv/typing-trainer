@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveBaselineWPM } from './pacing';
+import { deriveBaselineWPM, generateDiagnosticReport } from './engine';
 import type { KeystrokeEvent } from '../typing/types';
 
 function ev(
@@ -67,5 +67,14 @@ describe('deriveBaselineWPM', () => {
 		const ordered = deriveBaselineWPM([...a, ...b]);
 		const shuffled = deriveBaselineWPM([...b, ...a]);
 		expect(shuffled).toBeCloseTo(ordered, 10);
+	});
+});
+
+describe('generateDiagnosticReport', () => {
+	it('derives baselineWPM from the keystroke events', () => {
+		const events = [...word(0, 200, 5, 0, 0), ...word(2000, 200, 5, 1, 5)];
+		const expectedBaseline = 10 / 5 / (2800 / 60_000);
+		const r = generateDiagnosticReport({ events });
+		expect(r.baselineWPM).toBeCloseTo(expectedBaseline, 5);
 	});
 });
