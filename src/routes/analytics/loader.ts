@@ -1,7 +1,7 @@
-import { getRecentSessions } from '$lib/storage';
+import { getRecentSessions } from '$lib/support/storage';
 import { getProfile } from '$lib/settings';
 import { isBuiltinCorpusId, loadBuiltinCorpus, type FrequencyTable } from '$lib/corpus';
-import type { SessionSummary, UserSettings } from '$lib/core';
+import type { SessionSummary, UserSettings } from '$lib/support/core';
 
 const SESSION_CAP = 500;
 const FALLBACK_CORPUS_ID = 'en';

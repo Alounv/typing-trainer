@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { loadAnalyticsInputs } from './loader';
 	import Analytics from '$lib/progress/components/Analytics.svelte';
-	import type { SessionSummary } from '$lib/core';
+	import type { SessionSummary } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
 
 	type LoadState =

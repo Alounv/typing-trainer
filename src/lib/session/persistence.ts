@@ -6,8 +6,8 @@
  * only thing that still reaches directly into `storage/db` is this
  * file — everything above it calls `saveSession` and never sees Dexie.
  */
-import { db, bigramRecordKey } from '../storage';
-import type { SessionSummary } from '../core';
+import { db, bigramRecordKey } from '../support/storage';
+import type { SessionSummary } from '../support/core';
 
 /**
  * Persist summary + mirrored bigram rows atomically — a partial write would

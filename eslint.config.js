@@ -10,10 +10,30 @@ import svelteConfig from './svelte.config.js';
 
 const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 
+// Import-path boundary: imports must go through a lib barrel. Allow:
+// - `$lib/<lib>` (barrel, e.g. `$lib/corpus`)
+// - `$lib/support/<lib>` (support barrel, e.g. `$lib/support/core`)
+// - `.svelte` files anywhere under `$lib/<lib>/...` (components don't re-export through .ts barrels)
+// - `$lib/<lib>/components` (component sub-folder)
+// - `$lib/assets/**` (static assets)
+// Ban deep paths into library internals: `$lib/<lib>/<file>`, `$lib/support/<lib>/<file>`.
+const LIB_BOUNDARY_GROUP = [
+	'$lib/*/*',
+	'$lib/support/*/*',
+	'!$lib/support/*',
+	'!$lib/*/*.svelte',
+	'!$lib/*/components',
+	'!$lib/support/*/*.svelte',
+	'!$lib/support/*/components',
+	'!$lib/assets/**'
+];
+
+const LIB_BOUNDARY_MESSAGE =
+	"Import from the lib barrel (e.g. '$lib/corpus', '$lib/support/core'), not a deep file path. Svelte components under `components/` and assets under `$lib/assets` are the only exceptions.";
+
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
-	// Skill / agent assets live in-tree for distribution but aren't our source
-	// code — don't lint them.
+	// Skill / agent assets live in-tree for distribution but aren't our source code — don't lint them.
 	{ ignores: ['.agents/**', 'skills-lock.json'] },
 	js.configs.recommended,
 	ts.configs.recommended,
@@ -49,30 +69,27 @@ export default defineConfig(
 			}
 		}
 	},
-	// Lib-boundary rules. Imports between libs must go through each lib's
-	// `index.ts` barrel; deep paths leak internal layout. Exceptions:
-	// `.svelte` components, the `components/` sub-folder, and `assets/`.
+	// Lib-boundary rule. Tests and barrel files (`index.ts`) are exempt.
 	{
 		files: ['src/**/*.ts', 'src/**/*.svelte'],
-		ignores: ['src/**/*.test.ts', 'src/**/*.svelte.test.ts', 'src/lib/*/index.ts'],
+		ignores: [
+			'src/**/*.test.ts',
+			'src/**/*.svelte.test.ts',
+			'src/lib/*/index.ts',
+			'src/lib/support/*/index.ts'
+		],
 		rules: {
 			'no-restricted-imports': [
 				'error',
 				{
-					patterns: [
-						{
-							group: ['$lib/*/*', '!$lib/*/*.svelte', '!$lib/*/components', '!$lib/assets/**'],
-							message:
-								"Import from the lib barrel (e.g. '$lib/session'), not a deep file path. Svelte component subpaths (`$lib/<lib>/components/Foo.svelte` or `$lib/<lib>/Foo.svelte`) and static assets under `$lib/assets` are the only exceptions."
-						}
-					]
+					patterns: [{ group: LIB_BOUNDARY_GROUP, message: LIB_BOUNDARY_MESSAGE }]
 				}
 			]
 		}
 	},
 	// Route `+page.svelte` files stay UI-only: no direct storage, no deep
 	// lib paths. Route-local loader `.ts` files are the orchestration
-	// layer — they may touch `$lib/storage` and compose domain calls,
+	// layer — they may touch `$lib/support/storage` and compose domain calls,
 	// but still go through lib barrels.
 	{
 		files: ['src/routes/**/*.svelte'],
@@ -82,23 +99,17 @@ export default defineConfig(
 				{
 					patterns: [
 						{
-							group: ['$lib/storage', '$lib/storage/**'],
+							group: ['$lib/support/storage', '$lib/support/storage/**'],
 							message:
-								'UI files must not touch $lib/storage directly. Use a route-local loader.ts or a domain public surface.'
+								'UI files must not touch $lib/support/storage directly. Use a route-local loader.ts or a domain public surface.'
 						},
-						{
-							group: ['$lib/*/*', '!$lib/*/*.svelte', '!$lib/*/components', '!$lib/assets/**'],
-							message:
-								"Import from the lib barrel (e.g. '$lib/session'), not a deep file path. Svelte component subpaths and static assets under `$lib/assets` are the only exceptions."
-						}
+						{ group: LIB_BOUNDARY_GROUP, message: LIB_BOUNDARY_MESSAGE }
 					]
 				}
 			]
 		}
 	},
 	{
-		// Override or add rule settings here, such as:
-		// 'svelte/button-has-type': 'error'
 		rules: {}
 	}
 );

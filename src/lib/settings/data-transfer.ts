@@ -13,8 +13,8 @@
  * source file on disk is the user's undo. See `importAll` for the
  * transaction shape.
  */
-import { db, SINGLETON_ID, type ProfileRecord } from '$lib/storage';
-import type { SessionSummary, BigramAggregate } from '$lib/core';
+import { db, SINGLETON_ID, type ProfileRecord } from '$lib/support/storage';
+import type { SessionSummary, BigramAggregate } from '$lib/support/core';
 
 /**
  * Bump when the export shape changes. Old files with a lower version should be

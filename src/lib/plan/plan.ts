@@ -4,10 +4,10 @@
  * (reuses it to pick the "Next session" CTA), so neither route-level loader
  * needs to know about the other.
  */
-import { RECENT_WINDOW } from '../core';
-import type { SessionSummary, UserSettings } from '../core';
+import { RECENT_WINDOW } from '../support/core';
+import type { SessionSummary, UserSettings } from '../support/core';
 import { getProfile } from '../settings';
-import { getBigramHistory, getRecentSessions } from '../storage';
+import { getBigramHistory, getRecentSessions } from '../support/storage';
 import { buildLivePriorityTargets, buildLiveUndertrained } from '../progress';
 import { isBuiltinCorpusId, loadBuiltinCorpus } from '../corpus';
 import type { FrequencyTable } from '../corpus';

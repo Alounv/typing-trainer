@@ -8,8 +8,8 @@ import {
 	DEFAULT_DRILL_TARGET_COUNT,
 	CYCLES_PER_DAY
 } from './planner';
-import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET, DEFAULT_REAL_TEXT_WORD_BUDGET } from '../core';
-import type { SessionSummary, SessionType, PriorityBigram } from '../core';
+import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET, DEFAULT_REAL_TEXT_WORD_BUDGET } from '../support/core';
+import type { SessionSummary, SessionType, PriorityBigram } from '../support/core';
 import type { SchedulerInput } from './types';
 
 /**

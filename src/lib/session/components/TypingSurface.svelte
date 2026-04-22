@@ -19,7 +19,7 @@
 	 */
 	import TextDisplay from './TextDisplay.svelte';
 	import { keystrokeCapture, type CaptureCallbacks } from '../capture';
-	import type { KeystrokeEvent } from '../../core';
+	import type { KeystrokeEvent } from '../../support/core';
 
 	interface Props {
 		text: string;

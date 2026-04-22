@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { SessionSummary, UserSettings, BigramAggregate } from '../core';
+import type { SessionSummary, UserSettings, BigramAggregate } from '../support/core';
 
 /** Fixed primary key for the singleton profile table. */
 export const SINGLETON_ID = 'default';

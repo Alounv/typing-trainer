@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { BigramAggregate, SessionSummary } from '$lib/core';
-	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/core';
+	import type { BigramAggregate, SessionSummary } from '$lib/support/core';
+	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/support/core';
 	import { computeSessionDelta } from '../delta';
 	import { detectGraduations, detectMilestone } from '../celebrations';
 	import SessionDelta from './SessionDelta.svelte';

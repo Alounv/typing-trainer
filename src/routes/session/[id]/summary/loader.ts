@@ -1,8 +1,8 @@
-import { getSession, getRecentSessions } from '$lib/storage';
+import { getSession, getRecentSessions } from '$lib/support/storage';
 import { computePlan } from '$lib/plan';
 import type { PlannedSession } from '$lib/plan';
-import { RECENT_WINDOW } from '$lib/core';
-import type { SessionSummary } from '$lib/core';
+import { RECENT_WINDOW } from '$lib/support/core';
+import type { SessionSummary } from '$lib/support/core';
 
 export type SummaryViewModel =
 	| { status: 'missing' }

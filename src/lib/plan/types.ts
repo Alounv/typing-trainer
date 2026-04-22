@@ -3,7 +3,7 @@
  * file is kept type-only so UI components can import `PlannedSession`
  * without pulling in the planning logic.
  */
-import type { PriorityBigram, SessionConfig, SessionSummary, UserSettings } from '../core';
+import type { PriorityBigram, SessionConfig, SessionSummary, UserSettings } from '../support/core';
 
 /**
  * Slot-level key for completed-today accounting. Splits `bigram-drill` by

@@ -17,7 +17,7 @@ import type {
 	BigramAggregate,
 	BigramClassification,
 	BigramSample
-} from '../core/types';
+} from '../support/core/types';
 
 // Small session factory so tests stay readable. Only the fields the metrics
 // layer actually reads need values; the rest are defaulted.

@@ -11,7 +11,7 @@
 	 * encouraged racing at the expense of accuracy; it's now shown only on
 	 * the post-session summary.
 	 */
-	import type { DrillMode } from '$lib/core';
+	import type { DrillMode } from '$lib/support/core';
 
 	interface Props {
 		errorCount: number;

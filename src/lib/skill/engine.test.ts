@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveBaselineWPM, generateDiagnosticReport } from './engine';
-import type { KeystrokeEvent } from '../core';
+import type { KeystrokeEvent } from '../support/core';
 
 function ev(
 	position: number,

@@ -4,7 +4,7 @@ import {
 	type BigramAggregate,
 	type BigramClassification,
 	type ClassificationThresholds
-} from '../core';
+} from '../support/core';
 
 /** Classifies a bigram against thresholds. `fast` is `≤`, `clean` is strict `<` — boundaries are asymmetric by design. */
 export function classifyBigram(

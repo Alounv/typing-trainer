@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { loadSummaryContext, type SummaryViewModel } from './loader';
 	import { startPlannedSession, startFreshPlan } from '$lib/plan';
-	import type { SessionSummary } from '$lib/core';
+	import type { SessionSummary } from '$lib/support/core';
 	import Summary from '$lib/progress/components/Summary.svelte';
 
 	type LoadState = { status: 'loading' } | { status: 'error'; message: string } | SummaryViewModel;

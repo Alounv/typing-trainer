@@ -1,8 +1,8 @@
-import type { BigramClassification, DrillMode } from '../core';
+import type { BigramClassification, DrillMode } from '../support/core';
 import type { FrequencyTable } from '../corpus';
 import { buildLivePriorityTargets, buildLiveUndertrained } from '../progress';
-import { getBigramHistory, getRecentSessions } from '../storage';
-import { RECENT_WINDOW } from '../core';
+import { getBigramHistory, getRecentSessions } from '../support/storage';
+import { RECENT_WINDOW } from '../support/core';
 import { findGraduatedBigrams } from './graduation-filter';
 import { DEFAULT_DRILL_TARGET_COUNT, selectAccuracyDrillMix, selectSpeedDrillMix } from './planner';
 

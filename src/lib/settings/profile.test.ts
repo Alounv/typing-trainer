@@ -5,8 +5,8 @@ import 'fake-indexeddb/auto';
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getProfile, saveProfile } from './profile';
-import type { UserSettings } from '../core/types';
-import { clearAll } from '../storage/service';
+import type { UserSettings } from '../support/core/types';
+import { clearAll } from '../support/storage/service';
 
 describe('settings/profile — round-trip', () => {
 	beforeEach(async () => {

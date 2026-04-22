@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { annotateFirstInputs } from './postprocess';
-import type { KeystrokeEvent } from '../core';
+import type { KeystrokeEvent } from '../support/core';
 
 function ev(position: number, expected: string, actual: string, timestamp: number): KeystrokeEvent {
 	return { position, expected, actual, timestamp, wordIndex: 0, positionInWord: position };

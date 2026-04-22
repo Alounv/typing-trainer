@@ -4,7 +4,7 @@ import {
 	isBigramGraduated,
 	CONSECUTIVE_HEALTHY_SESSIONS
 } from './graduation-filter';
-import type { BigramAggregate, BigramClassification } from '../core/types';
+import type { BigramAggregate, BigramClassification } from '../support/core/types';
 
 function agg(classification: BigramClassification, sessionId = 's'): BigramAggregate {
 	return {

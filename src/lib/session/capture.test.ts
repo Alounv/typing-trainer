@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { keystrokeCapture, type CaptureCallbacks } from './capture';
-import type { KeystrokeEvent } from '../core';
+import type { KeystrokeEvent } from '../support/core';
 
 /**
  * The capture attachment only uses `addEventListener` / `removeEventListener`

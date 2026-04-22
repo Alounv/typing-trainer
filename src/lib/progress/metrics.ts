@@ -1,4 +1,4 @@
-import { DEFAULT_THRESHOLDS, MIN_OCCURRENCES_FOR_CLASSIFICATION } from '../core';
+import { DEFAULT_THRESHOLDS, MIN_OCCURRENCES_FOR_CLASSIFICATION } from '../support/core';
 import type {
 	BigramAggregate,
 	BigramClassification,
@@ -6,7 +6,7 @@ import type {
 	ClassificationThresholds,
 	PriorityBigram,
 	SessionSummary
-} from '../core';
+} from '../support/core';
 import { classifyBigram } from '../skill';
 import type { FrequencyTable } from '../corpus';
 

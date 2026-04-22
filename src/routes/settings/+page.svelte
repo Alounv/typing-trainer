@@ -21,8 +21,8 @@
 		DEFAULT_DIAGNOSTIC_WORD_BUDGET,
 		DEFAULT_SPEED_THRESHOLD_MS,
 		DEFAULT_HIGH_ERROR_THRESHOLD
-	} from '$lib/core';
-	import type { Language, UserSettings } from '$lib/core';
+	} from '$lib/support/core';
+	import type { Language, UserSettings } from '$lib/support/core';
 	import type { BuiltinCorpusId } from '$lib/corpus';
 	import DataTransfer from '$lib/settings/DataTransfer.svelte';
 

@@ -15,8 +15,8 @@
 	import { resolve } from '$app/paths';
 	import { SvelteSet } from 'svelte/reactivity';
 	import TypingSurface from './TypingSurface.svelte';
-	import type { KeystrokeEvent } from '$lib/core';
-	import type { DiagnosticReport, DrillMode, SessionType, SessionSummary } from '$lib/core';
+	import type { KeystrokeEvent } from '$lib/support/core';
+	import type { DiagnosticReport, DrillMode, SessionType, SessionSummary } from '$lib/support/core';
 	import { SessionRunner } from '../runner';
 	import { computeGhostPosition, paceForMode } from '../pacer';
 	import { saveSession } from '../persistence';

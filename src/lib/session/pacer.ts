@@ -1,4 +1,4 @@
-import type { DrillMode } from '../core';
+import type { DrillMode } from '../support/core';
 
 export const SPEED_PACE_MULTIPLIER = 1;
 

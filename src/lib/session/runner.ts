@@ -7,7 +7,7 @@ import type {
 	KeystrokeEvent,
 	SessionSummary,
 	SessionType
-} from '../core';
+} from '../support/core';
 
 /**
  * Inputs for turning a finished capture into a persistable summary.

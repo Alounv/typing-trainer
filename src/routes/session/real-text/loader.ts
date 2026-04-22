@@ -6,8 +6,8 @@ import {
 	generateText
 } from '$lib/corpus';
 import type { BuiltinCorpusId } from '$lib/corpus';
-import { CHARS_PER_WORD, DEFAULT_REAL_TEXT_WORD_BUDGET } from '$lib/core';
-import type { UserSettings } from '$lib/core';
+import { CHARS_PER_WORD, DEFAULT_REAL_TEXT_WORD_BUDGET } from '$lib/support/core';
+import type { UserSettings } from '$lib/support/core';
 import { getProfile } from '$lib/settings';
 import { consumePlannedSession } from '$lib/plan';
 

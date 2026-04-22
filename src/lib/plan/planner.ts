@@ -2,14 +2,14 @@ import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 	DEFAULT_REAL_TEXT_WORD_BUDGET,
 	DEFAULT_DIAGNOSTIC_WORD_BUDGET
-} from '../core';
+} from '../support/core';
 import type {
 	DrillMode,
 	PriorityBigram,
 	SessionConfig,
 	SessionSummary,
 	UserSettings
-} from '../core';
+} from '../support/core';
 import { planSlotKey } from './types';
 import type { PlanSlotKey, SchedulerInput, PlannedSession } from './types';
 

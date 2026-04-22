@@ -3,7 +3,7 @@ import type {
 	BigramSample,
 	ClassificationThresholds,
 	KeystrokeEvent
-} from '../core';
+} from '../support/core';
 import { classifyBigram } from './classification';
 
 /**

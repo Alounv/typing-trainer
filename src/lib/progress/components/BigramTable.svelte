@@ -1,7 +1,7 @@
 <!-- Sortable bigram table. Default sort matches diagnostic priority-list criterion (priorityScore desc). -->
 <script lang="ts">
 	import type { BigramSummary } from '../metrics';
-	import type { BigramClassification } from '../../core';
+	import type { BigramClassification } from '../../support/core';
 	import BigramSparkline from './BigramSparkline.svelte';
 
 	interface Props {

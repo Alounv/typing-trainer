@@ -5,9 +5,9 @@ import type {
 	SessionType,
 	BigramAggregate,
 	BigramClassification
-} from '../core/types';
+} from '../support/core/types';
 import { WPM_ROLLING_WINDOW } from './metrics';
-import { DEFAULT_HIGH_ERROR_THRESHOLD } from '../core';
+import { DEFAULT_HIGH_ERROR_THRESHOLD } from '../support/core';
 
 function makeAggregate(overrides: Partial<BigramAggregate> = {}): BigramAggregate {
 	return {

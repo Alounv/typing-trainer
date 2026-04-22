@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { BigramAggregate, BigramClassification, SessionSummary } from '$lib/core';
+	import type { BigramAggregate, BigramClassification, SessionSummary } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
 	import {
 		buildErrorRateSeries,

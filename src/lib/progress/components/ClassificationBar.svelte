@@ -12,7 +12,7 @@
 	`DiagnosticReport`.
 -->
 <script lang="ts">
-	import type { BigramClassification } from '../../core';
+	import type { BigramClassification } from '../../support/core';
 
 	/** One row of the bar. `label` and optional `meta` (shown right-aligned, e.g. a date) caption it. */
 	export interface ClassificationBarRow {

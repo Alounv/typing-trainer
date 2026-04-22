@@ -9,15 +9,15 @@
  * - Routes must not import `$lib/storage/*` directly; this module is the
  *   UI-facing boundary for anything profile-shaped.
  */
-import { db, SINGLETON_ID } from '$lib/storage';
+import { db, SINGLETON_ID } from '$lib/support/storage';
 import {
 	DEFAULT_SPEED_THRESHOLD_MS,
 	DEFAULT_HIGH_ERROR_THRESHOLD,
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 	DEFAULT_REAL_TEXT_WORD_BUDGET,
 	DEFAULT_DIAGNOSTIC_WORD_BUDGET
-} from '$lib/core';
-import type { UserSettings } from '$lib/core';
+} from '$lib/support/core';
+import type { UserSettings } from '$lib/support/core';
 
 /**
  * Factory-fresh profile. Function (not a const) so each caller gets a new

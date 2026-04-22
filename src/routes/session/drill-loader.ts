@@ -1,9 +1,9 @@
 import { loadBuiltinCorpus, isBuiltinCorpusId, generateText } from '$lib/corpus';
 import type { BuiltinCorpusId } from '$lib/corpus';
-import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET, RECENT_WINDOW } from '$lib/core';
-import type { DrillMode, UserSettings } from '$lib/core';
+import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET, RECENT_WINDOW } from '$lib/support/core';
+import type { DrillMode, UserSettings } from '$lib/support/core';
 import { getProfile } from '$lib/settings';
-import { getRecentSessions } from '$lib/storage';
+import { getRecentSessions } from '$lib/support/storage';
 import { consumePlannedSession, resolveDrillMix } from '$lib/plan';
 
 const FALLBACK_CORPUS_ID: BuiltinCorpusId = 'en';
