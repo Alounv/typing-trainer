@@ -1,7 +1,13 @@
 import { v4 as uuid } from 'uuid';
 import { annotateFirstInputs } from './postprocess';
-import { extractBigramAggregates, type ClassificationThresholds } from '../skill';
-import type { DrillMode, KeystrokeEvent, SessionSummary, SessionType } from '../core';
+import { extractBigramAggregates } from '../skill';
+import type {
+	ClassificationThresholds,
+	DrillMode,
+	KeystrokeEvent,
+	SessionSummary,
+	SessionType
+} from '../core';
 
 /**
  * Inputs for turning a finished capture into a persistable summary.

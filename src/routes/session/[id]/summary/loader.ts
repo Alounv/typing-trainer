@@ -1,16 +1,10 @@
 import { getSession, getRecentSessions } from '$lib/storage';
-import {
-	computeSessionDelta,
-	detectGraduations,
-	detectMilestone,
-	type SessionDelta,
-	type GraduationEvent,
-	type MilestoneEvent
-} from '$lib/progress';
-import { computePlan, type PlannedSession } from '$lib/plan';
+import { computeSessionDelta, detectGraduations, detectMilestone } from '$lib/progress';
+import type { SessionDelta, GraduationEvent, MilestoneEvent } from '$lib/progress';
+import { computePlan } from '$lib/plan';
+import type { PlannedSession } from '$lib/plan';
+import { RECENT_WINDOW } from '$lib/core';
 import type { SessionSummary } from '$lib/core';
-
-const RECENT_WINDOW = 20;
 
 export type SummaryViewModel =
 	| { status: 'missing' }

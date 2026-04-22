@@ -1,3 +1,3 @@
-export * from './classification';
-export * from './extraction';
-export * from './engine';
+export { classifyBigram } from './classification';
+export { extractBigramAggregates } from './extraction';
+export { generateDiagnosticReport } from './engine';

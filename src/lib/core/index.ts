@@ -1,2 +1,27 @@
-/** Shared domain types. `core` is a DAG leaf — no runtime, no `$lib/*` imports. */
-export * from './types';
+export type {
+	BigramClassification,
+	BigramSample,
+	BigramAggregate,
+	ClassificationThresholds,
+	DiagnosticReport,
+	PriorityBigram,
+	SessionType,
+	SessionSummary,
+	SessionConfig,
+	DrillMode,
+	Language,
+	UserSettings,
+	KeystrokeEvent,
+	CaptureConfig
+} from './types';
+export {
+	DEFAULT_SPEED_THRESHOLD_MS,
+	DEFAULT_HIGH_ERROR_THRESHOLD,
+	DEFAULT_THRESHOLDS,
+	MIN_OCCURRENCES_FOR_CLASSIFICATION,
+	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
+	DEFAULT_REAL_TEXT_WORD_BUDGET,
+	DEFAULT_DIAGNOSTIC_WORD_BUDGET,
+	CHARS_PER_WORD,
+	RECENT_WINDOW
+} from './constants';

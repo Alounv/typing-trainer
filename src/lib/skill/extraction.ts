@@ -1,5 +1,10 @@
-import type { BigramAggregate, BigramSample, KeystrokeEvent } from '../core';
-import { classifyBigram, type ClassificationThresholds } from './classification';
+import type {
+	BigramAggregate,
+	BigramSample,
+	ClassificationThresholds,
+	KeystrokeEvent
+} from '../core';
+import { classifyBigram } from './classification';
 
 /**
  * First-input event stream → per-bigram aggregates. Precondition: `events` is

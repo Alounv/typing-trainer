@@ -1,8 +1,6 @@
-export * from './types';
-export * from './registry';
-export * from './loader';
-export * from './quotes';
-export * from './selection';
-export * from './bigram-drill';
-export * from './real-text';
-export * from './diagnostic-sampler';
+export { isBuiltinCorpusId, loadBuiltinCorpus, hasQuoteBank, loadQuoteBank } from './registry';
+export type { BuiltinCorpusId } from './registry';
+export type { FrequencyTable } from './types';
+export { generateBigramDrillSequence } from './bigram-drill';
+export { generateRealTextSequence } from './real-text';
+export { sampleDiagnosticPassage } from './diagnostic-sampler';

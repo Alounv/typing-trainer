@@ -1,16 +1,13 @@
+import { DEFAULT_THRESHOLDS, MIN_OCCURRENCES_FOR_CLASSIFICATION } from '../core';
 import type {
 	BigramAggregate,
 	BigramClassification,
 	BigramSample,
+	ClassificationThresholds,
 	PriorityBigram,
 	SessionSummary
 } from '../core';
-import {
-	classifyBigram,
-	DEFAULT_THRESHOLDS,
-	MIN_OCCURRENCES_FOR_CLASSIFICATION,
-	type ClassificationThresholds
-} from '../skill';
+import { classifyBigram } from '../skill';
 import type { FrequencyTable } from '../corpus';
 
 /** Mirrors `PRIORITY_TARGETS_TOP_N` in the diagnostic engine. */

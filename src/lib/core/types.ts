@@ -6,6 +6,14 @@
  */
 export type BigramClassification = 'healthy' | 'fluency' | 'hasty' | 'acquisition' | 'unclassified';
 
+/** Thresholds driving the four-way bigram classification. Overridable via `UserSettings.thresholds`. */
+export interface ClassificationThresholds {
+	/** Mean transition time at/under which a bigram counts as fast (ms). */
+	speedMs: number;
+	/** Error rate at/above which a bigram counts as error-prone (0..1). */
+	errorRate: number;
+}
+
 /**
  * Per-occurrence bigram record. Kept in observation order so sliding-window
  * classification (see `progress/metrics`) can pool the last N across sessions.

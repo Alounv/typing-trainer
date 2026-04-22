@@ -14,17 +14,15 @@
 	 * in the footer is the single source of feedback.
 	 */
 	import { onMount } from 'svelte';
+	import { getProfile, saveProfile, buildDefaultProfile, withDefaults } from '$lib/settings';
 	import {
-		getProfile,
-		saveProfile,
-		buildDefaultProfile,
-		withDefaults,
 		DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 		DEFAULT_REAL_TEXT_WORD_BUDGET,
-		DEFAULT_DIAGNOSTIC_WORD_BUDGET
-	} from '$lib/settings';
+		DEFAULT_DIAGNOSTIC_WORD_BUDGET,
+		DEFAULT_SPEED_THRESHOLD_MS,
+		DEFAULT_HIGH_ERROR_THRESHOLD
+	} from '$lib/core';
 	import type { Language, UserSettings } from '$lib/core';
-	import { DEFAULT_SPEED_THRESHOLD_MS, DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/skill';
 	import type { BuiltinCorpusId } from '$lib/corpus';
 	import DataTransfer from '$lib/settings/DataTransfer.svelte';
 

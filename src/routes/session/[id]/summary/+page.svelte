@@ -14,7 +14,7 @@
 	import { loadSummaryContext, type SummaryViewModel } from './loader';
 	import { startPlannedSession, startFreshPlan } from '$lib/plan';
 	import type { BigramAggregate, SessionSummary } from '$lib/core';
-	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/skill';
+	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/core';
 	import SessionDelta from '$lib/progress/components/SessionDelta.svelte';
 	import Graduations from '$lib/progress/components/Graduations.svelte';
 	import MilestoneBanner from '$lib/progress/components/MilestoneBanner.svelte';

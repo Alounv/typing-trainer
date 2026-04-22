@@ -7,7 +7,7 @@ import type {
 	BigramClassification
 } from '../core/types';
 import { WPM_ROLLING_WINDOW } from './metrics';
-import { DEFAULT_HIGH_ERROR_THRESHOLD } from '../skill/classification';
+import { DEFAULT_HIGH_ERROR_THRESHOLD } from '../core';
 
 function makeAggregate(overrides: Partial<BigramAggregate> = {}): BigramAggregate {
 	return {

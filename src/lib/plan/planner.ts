@@ -1,3 +1,8 @@
+import {
+	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
+	DEFAULT_REAL_TEXT_WORD_BUDGET,
+	DEFAULT_DIAGNOSTIC_WORD_BUDGET
+} from '../core';
 import type {
 	DrillMode,
 	PriorityBigram,
@@ -5,12 +10,8 @@ import type {
 	SessionSummary,
 	UserSettings
 } from '../core';
-import {
-	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
-	DEFAULT_REAL_TEXT_WORD_BUDGET,
-	DEFAULT_DIAGNOSTIC_WORD_BUDGET
-} from '../settings';
-import { planSlotKey, type PlanSlotKey, type SchedulerInput, type PlannedSession } from './types';
+import { planSlotKey } from './types';
+import type { PlanSlotKey, SchedulerInput, PlannedSession } from './types';
 
 function resolveWordBudgets(settings?: UserSettings) {
 	return {

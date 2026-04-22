@@ -1,12 +1,8 @@
-import {
-	loadBuiltinCorpus,
-	isBuiltinCorpusId,
-	generateBigramDrillSequence,
-	type BuiltinCorpusId,
-	type FrequencyTable
-} from '$lib/corpus';
+import { loadBuiltinCorpus, isBuiltinCorpusId, generateBigramDrillSequence } from '$lib/corpus';
+import type { BuiltinCorpusId, FrequencyTable } from '$lib/corpus';
+import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET, RECENT_WINDOW } from '$lib/core';
 import type { BigramClassification, DrillMode, UserSettings } from '$lib/core';
-import { getProfile, DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from '$lib/settings';
+import { getProfile } from '$lib/settings';
 import { getBigramHistory, getRecentSessions } from '$lib/storage';
 import { buildLivePriorityTargets, buildLiveUndertrained } from '$lib/progress';
 import {
@@ -18,7 +14,6 @@ import {
 } from '$lib/plan';
 
 const FALLBACK_CORPUS_ID: BuiltinCorpusId = 'en';
-const RECENT_WINDOW = 20;
 /** Cold-start fallback when live priority + undertrained are both empty. */
 const SEED_TARGETS = ['th', 'he', 'in', 'er', 'an'] as const;
 

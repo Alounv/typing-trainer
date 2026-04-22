@@ -4,22 +4,18 @@
  * (reuses it to pick the "Next session" CTA), so neither route-level loader
  * needs to know about the other.
  */
+import { RECENT_WINDOW } from '../core';
 import type { SessionSummary, UserSettings } from '../core';
 import { getProfile } from '../settings';
 import { getBigramHistory, getRecentSessions } from '../storage';
 import { buildLivePriorityTargets, buildLiveUndertrained } from '../progress';
-import { isBuiltinCorpusId, loadBuiltinCorpus, type FrequencyTable } from '../corpus';
+import { isBuiltinCorpusId, loadBuiltinCorpus } from '../corpus';
+import type { FrequencyTable } from '../corpus';
 import { findGraduatedBigrams } from './graduation-filter';
 import { planDailySessions, sliceCompletedFromPlan } from './planner';
 import { readPlanStartedAt } from './plan-window';
-import { planSlotKeyForSession, type PlanSlotKey, type PlannedSession } from './types';
-
-/**
- * How many sessions to pull for cadence + diagnostic-lookup decisions. The
- * planner only peeks at ~10; 20 gives comfortable headroom without pulling a
- * full analytics load.
- */
-const RECENT_WINDOW = 20;
+import { planSlotKeyForSession } from './types';
+import type { PlanSlotKey, PlannedSession } from './types';
 
 export interface PlanContext {
 	/** Plan with completed-today items stripped. Empty = done for today. */

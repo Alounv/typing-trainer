@@ -1,4 +1,4 @@
-import type { CorpusData } from '../corpus';
+import type { CorpusData } from './types';
 
 /**
  * Bigram drill sequence: every word carries at least one target bigram. Filler
