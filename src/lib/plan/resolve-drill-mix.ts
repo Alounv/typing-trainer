@@ -9,7 +9,7 @@ import { DEFAULT_DRILL_TARGET_COUNT, selectAccuracyDrillMix, selectSpeedDrillMix
 /** Cold-start fallback when live priority + undertrained are both empty. */
 const SEED_TARGETS = ['th', 'he', 'in', 'er', 'an'] as const;
 
-export interface DrillMix {
+interface DrillMix {
 	targets: readonly string[];
 	mix?: { priority: string[]; exposure: string[] };
 }

@@ -3,7 +3,7 @@ import { generateBigramDrillSequence } from './bigram-drill';
 import { generateRealTextSequence } from './real-text';
 import { sampleDiagnosticPassage } from './diagnostic-sampler';
 
-export type TextSpec =
+type TextSpec =
 	| {
 			kind: 'bigram-drill';
 			corpus: CorpusData;

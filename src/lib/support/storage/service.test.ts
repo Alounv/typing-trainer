@@ -5,9 +5,9 @@ import 'fake-indexeddb/auto';
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearAll, getBigramHistory, getRecentSessions, getSession } from './service';
-import { saveProfile } from '../settings/profile';
-import { saveSession } from '../session/persistence';
-import type { SessionSummary, BigramAggregate, DiagnosticReport } from '../support/core/types';
+import { saveProfile } from '../../settings/profile';
+import { saveSession } from '../../session/persistence';
+import type { SessionSummary, BigramAggregate, DiagnosticReport } from '../core/types';
 
 function makeAggregate(overrides: Partial<BigramAggregate> = {}): BigramAggregate {
 	return {

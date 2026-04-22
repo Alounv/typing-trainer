@@ -12,7 +12,12 @@ import {
 	type ExportFile
 } from './data-transfer';
 import { getProfile, saveProfile } from './profile';
-import { clearAll, getBigramHistory, getRecentSessions, getSession } from '../support/storage/service';
+import {
+	clearAll,
+	getBigramHistory,
+	getRecentSessions,
+	getSession
+} from '../support/storage/service';
 import { saveSession } from '../session/persistence';
 import type { SessionSummary, UserSettings, BigramAggregate } from '../support/core/types';
 

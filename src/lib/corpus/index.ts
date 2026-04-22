@@ -2,4 +2,3 @@ export { isBuiltinCorpusId, loadBuiltinCorpus, hasQuoteBank, loadQuoteBank } fro
 export type { BuiltinCorpusId } from './registry';
 export type { FrequencyTable } from './types';
 export { generateText } from './generate-text';
-export type { TextSpec } from './generate-text';

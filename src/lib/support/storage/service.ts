@@ -1,5 +1,5 @@
 import { db } from './db';
-import type { SessionSummary, BigramAggregate } from '../support/core';
+import type { SessionSummary, BigramAggregate } from '../core';
 
 export async function getSession(id: string): Promise<SessionSummary | undefined> {
 	return db.sessions.get(id);

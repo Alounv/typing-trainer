@@ -367,7 +367,7 @@ function badness1D(
  * whether to show it (e.g. as supporting copy) rather than folding it into
  * the stacked bar and distorting the mix.
  */
-export interface ClassificationMix {
+interface ClassificationMix {
 	counts: {
 		healthy: number;
 		fluency: number;
