@@ -1,11 +1,10 @@
-/**
- * `practice` lib — public API surface.
- *
- * The "what to practice next" domain. External callers get the two route
- * loaders (`dashboard-loader`, `session-loader`) and the planned-session
- * types.
- */
 export * from './types';
 export * from './plan';
-export * from './dashboard-loader';
-export * from './session-loader';
+export * from './plan-actions';
+export * from './planned';
+
+export * from './bigram-drill';
+export * from './real-text';
+export * from './diagnostic-sampler';
+export * from './graduation-filter';
+export * from './planner';

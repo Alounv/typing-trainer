@@ -6,8 +6,8 @@
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { loadAnalyticsInputs } from './loader';
 	import {
-		loadAnalyticsInputs,
 		buildErrorRateSeries,
 		buildWpmSeries,
 		countGraduations,

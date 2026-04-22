@@ -16,24 +16,25 @@ Two rules. Everything else follows from these.
 Our north star is Carson Gross's ["Codin' Dirty"](https://htmx.org/essays/codin-dirty/). The relevant tenets and how they shape this plan:
 
 - **Coherence over separation.** We merge `bigram` + `diagnostic` → `skill` and fold `typing` → `session` because these concerns belong together. A single domain that does one thing well beats two folders chasing an imagined boundary.
-- **Large files are acceptable when the logic is coherent.** `SessionShell.svelte` stays at ~360 LOC. It is the *crux* of the runtime; its size should reflect that. Same for `planner.ts`. We don't split for LOC alone.
+- **Large files are acceptable when the logic is coherent.** `SessionShell.svelte` stays at ~360 LOC. It is the _crux_ of the runtime; its size should reflect that. Same for `planner.ts`. We don't split for LOC alone.
 - **Minimize class/interface proliferation.** One public function or component per domain. `analyzeSkill(history)` returning a bag beats `classifyBigram` + `extractBigramAggregates` + `generateDiagnosticReport` + `derivePriorityBigrams` as four separate exports.
 - **Pragmatism over purity.** We accept two public surfaces for Progress (`<Summary>` + `<Analytics>`) and Settings (`profile` + `<DataTransfer>`) because forcing one would be ceremony. The rule serves readability, not the other way around.
+- **Sparse, short comments.** Default to none. Only add one when the _why_ is non-obvious — a hidden constraint, a workaround, a counter-intuitive choice. No multi-paragraph JSDoc blocks narrating what the code already says. If a good name would remove the comment, use the name. Current codebase is comment-heavy; trim as we touch files.
 
-When in doubt: *would this change make the "where is X?" question easier or harder?*
+When in doubt: _would this change make the "where is X?" question easier or harder?_
 
 ## Target domain model
 
 Six domains + two support layers.
 
-| Domain       | Responsibility                                                | Public surface                                  |
-| ------------ | ------------------------------------------------------------- | ----------------------------------------------- |
-| **Corpus**   | Produces a string of text for the user to type.               | `generateText(spec)`                            |
-| **Plan**     | Decides what the user should do next.                         | `computePlan(context)`                          |
-| **Session**  | Runs one live typing attempt, first keystroke to persistence. | `<SessionShell>`                                |
-| **Skill**    | Models what the app believes about the user's typing.         | `analyzeSkill(history)`                         |
-| **Progress** | Turns session history into views for the user.                | `<Summary>`, `<Analytics>`                      |
-| **Settings** | Holds user preferences; makes data portable.                  | `profile` store, `<DataTransfer>`               |
+| Domain       | Responsibility                                                | Public surface                    |
+| ------------ | ------------------------------------------------------------- | --------------------------------- |
+| **Corpus**   | Produces a string of text for the user to type.               | `generateText(spec)`              |
+| **Plan**     | Decides what the user should do next.                         | `computePlan(context)`            |
+| **Session**  | Runs one live typing attempt, first keystroke to persistence. | `<SessionShell>`                  |
+| **Skill**    | Models what the app believes about the user's typing.         | `analyzeSkill(history)`           |
+| **Progress** | Turns session history into views for the user.                | `<Summary>`, `<Analytics>`        |
+| **Settings** | Holds user preferences; makes data portable.                  | `profile` store, `<DataTransfer>` |
 
 Support layers (not domains):
 
@@ -42,28 +43,34 @@ Support layers (not domains):
 
 ### Per-domain cards
 
-**Corpus** — *Produces a string of text for the user to type.*
+**Corpus** — _Produces a string of text for the user to type._
+
 - Public: `generateText(spec) → string` — dispatches to bigram-drill weaving, real-text stitching, quotes, diagnostic sampler based on the spec.
 - Internal (not exported): registry, normalization, selection, each generator.
 
-**Plan** — *Decides what the user should do next.*
+**Plan** — _Decides what the user should do next._
+
 - Public: `computePlan(context) → Plan` — returns a rich object with `.nextSession`, `.window`, `.graduations`, whatever the dashboard and summary CTA need.
 - Internal: planner, plan-window, graduation-filter, planned-session stash.
 
-**Session** — *Runs one live typing attempt from first keystroke to persisted summary.*
+**Session** — _Runs one live typing attempt from first keystroke to persisted summary._
+
 - Public: `<SessionShell>` — imported by route file path.
 - Internal: runner, persistence, pacer, capture, postprocess, typing surface & text display (after R3).
 
-**Skill** — *Models what the app believes about the user's typing ability.*
+**Skill** — _Models what the app believes about the user's typing ability._
+
 - Public: `analyzeSkill(history) → SkillModel` — returns `{ aggregates, classifications, diagnosticReport, priorityBigrams }`. One call, one bag.
 - Internal: classification thresholds, extraction, diagnostic engine, baseline-WPM derivation.
 
-**Progress** — *Turns history into views for the user.*
+**Progress** — _Turns history into views for the user._
+
 - Public: `<Summary session history>` and `<Analytics history>` — each a distinct page view.
 - Internal: delta, celebrations, metrics, rolling-window math, chart sub-components.
-- Logic lives *inside* the components. No standalone `computeDelta` / `detectGraduations` exports.
+- Logic lives _inside_ the components. No standalone `computeDelta` / `detectGraduations` exports.
 
-**Settings** — *Holds user preferences and makes data portable.*
+**Settings** — _Holds user preferences and makes data portable._
+
 - Public: `profile` store, `<DataTransfer>`.
 - Internal: serialization, word budgets, theme state, threshold constants (if user-tunable).
 
@@ -79,7 +86,7 @@ Routes compose:
  └── Progress      (reads session summaries only)
 ```
 
-All domain arrows point to Skill or Corpus (leaves). **No edges between peer domains.** The only place that knows "summary page needs Progress *and* Plan" is `routes/session/[id]/summary/+page.ts`.
+All domain arrows point to Skill or Corpus (leaves). **No edges between peer domains.** The only place that knows "summary page needs Progress _and_ Plan" is `routes/session/[id]/summary/+page.ts`.
 
 ## Reshape plan
 
@@ -94,6 +101,7 @@ Deleted `src/lib/session/index.ts`. `<SessionShell>` is the domain's only public
 Move all `*-loader.ts` files from domains to SvelteKit `+page.ts` files at the route layer. Kills the cross-domain orchestration inside `progress/` and `practice/`.
 
 Moves:
+
 - `progress/summary-loader.ts` → `routes/session/[id]/summary/+page.ts`
 - `progress/analytics-loader.ts` → `routes/analytics/+page.ts`
 - `practice/dashboard-loader.ts` → `routes/+page.ts`
@@ -108,6 +116,7 @@ This is the biggest reshape. Order it first because R2–R4 are simpler once dom
 Merge two folders. Single export: `analyzeSkill(history)`.
 
 Moves:
+
 - `bigram/{classification,extraction}.ts` (+ tests) → `skill/`
 - `diagnostic/engine.ts` (+ test) → `skill/`
 - `diagnostic/pacing.ts` (10 LOC, one caller, misnamed) inlined into `skill/engine.ts`
@@ -121,6 +130,7 @@ Import updates across routes and lib files — sweep at execution time.
 Fold `src/lib/typing/` into `src/lib/session/`. Keystroke capture is the input layer of a session.
 
 Provisional shape:
+
 ```
 session/
 ├── components/        # SessionShell, Timer, StatsBar, TextDisplay, TypingSurface
@@ -139,6 +149,7 @@ Confirm at execution: whether `TextDisplay`/`TypingSurface` go flat in `session/
 The name `practice/` conflates "what text to show" (Corpus) and "when to show it" (Plan).
 
 Moves:
+
 - To `corpus/`: `bigram-drill.ts`, `real-text.ts`, `diagnostic-sampler.ts` (+ tests)
 - Rename `practice/` to `plan/`: `planner.ts`, `plan.ts`, `plan-window.ts`, `planned.ts`, `graduation-filter.ts`, `types.ts`
 
@@ -149,6 +160,7 @@ After R1, `session-loader.ts` and `dashboard-loader.ts` are already gone. `plan/
 Final stage, after R1–R4 have stabilized the public surfaces. Move tests so each domain has **one test file per public entry point**, exercising it end-to-end. Drop unit tests tied to internals.
 
 Target shape:
+
 ```
 skill/
 ├── skill.test.ts         # drives analyzeSkill(history) with varied inputs
@@ -166,6 +178,7 @@ corpus/
 For component domains (Session, Progress, Settings), frontier tests become component tests via Testing Library — exercise `<SessionShell>` / `<Summary>` / `<Analytics>` as the user would, not their internals. The existing `e2e/` Playwright suite is the outermost frontier and stays.
 
 Trade-offs we accept:
+
 - Tests need richer fixtures (driving through the domain instead of through an internal function).
 - When a test fails, triangulating which internal broke takes a bit longer.
 - Some exhaustive edge-case coverage (e.g. current `planner.test.ts` is 653 LOC exercising branching in the scheduler) will shrink. That's the point: if an edge case isn't observable through the public surface, it isn't part of the contract.

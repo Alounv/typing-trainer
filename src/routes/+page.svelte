@@ -7,22 +7,22 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import {
-		loadDashboardData,
+		computePlan,
 		startFreshPlan,
 		startPlannedSession,
-		type DashboardData
+		type PlanContext
 	} from '$lib/practice';
 
 	type LoadState =
 		| { status: 'loading' }
-		| { status: 'ready'; data: DashboardData }
+		| { status: 'ready'; data: PlanContext }
 		| { status: 'error'; message: string };
 
 	let state = $state<LoadState>({ status: 'loading' });
 
 	onMount(async () => {
 		try {
-			const data = await loadDashboardData();
+			const data = await computePlan();
 			state = { status: 'ready', data };
 		} catch (err) {
 			state = {

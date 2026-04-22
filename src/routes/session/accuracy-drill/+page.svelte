@@ -12,7 +12,7 @@
 	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
-	import { prepareDrillSession } from '$lib/practice';
+	import { prepareDrillSession } from '../drill-loader';
 
 	type LoadState =
 		| { status: 'loading' }
