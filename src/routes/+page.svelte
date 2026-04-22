@@ -8,11 +8,9 @@
 	import { resolve } from '$app/paths';
 	import {
 		loadDashboardData,
-		planSlotKey,
 		startFreshPlan,
 		startPlannedSession,
-		type DashboardData,
-		type PlanSlotKey
+		type DashboardData
 	} from '$lib/practice';
 
 	type LoadState =
@@ -21,12 +19,6 @@
 		| { status: 'error'; message: string };
 
 	let state = $state<LoadState>({ status: 'loading' });
-
-	// Script-level `$derived` for the debug panel — `<details>` can't host
-	// `{@const}` in Svelte 5.
-	const debugConsumed = $derived.by<boolean[]>(() =>
-		state.status === 'ready' ? consumedByKey(state.data.fullPlan, state.data.completedToday) : []
-	);
 
 	onMount(async () => {
 		try {
@@ -40,26 +32,8 @@
 		}
 	});
 
-	/** Format the planned word budget for the card headline. */
 	function wordsLabel(wordBudget: number): string {
 		return `${wordBudget} words`;
-	}
-
-	/** Per-position slicer trace for the debug panel. */
-	function consumedByKey(
-		fullPlan: DashboardData['fullPlan'],
-		completed: Partial<Record<PlanSlotKey, number>>
-	): boolean[] {
-		const remaining: Partial<Record<PlanSlotKey, number>> = { ...completed };
-		return fullPlan.map((planned) => {
-			const key = planSlotKey(planned.config);
-			const left = remaining[key] ?? 0;
-			if (left > 0) {
-				remaining[key] = left - 1;
-				return true;
-			}
-			return false;
-		});
 	}
 </script>
 
@@ -231,55 +205,5 @@
 				</a>
 			</section>
 		{/if}
-
-		<!-- Temporary debug panel — rip out once the plan-accounting regression is settled. -->
-		<details
-			class="mt-12 rounded-md border border-dashed border-base-content/30 px-4 py-2 text-xs"
-			data-testid="debug-panel"
-		>
-			<summary class="cursor-pointer font-mono tracking-wide text-base-content/60 uppercase"
-				>Debug · planner inputs</summary
-			>
-			<div class="mt-3 space-y-3 font-mono text-[11px] text-base-content/80">
-				<!-- Strike-through = slicer-consumed by key match (not positional). -->
-				<div>
-					<p class="text-base-content/55">
-						Full plan ({data.fullPlan.length}) → remaining ({data.plan.length}):
-					</p>
-					<ol class="ml-4 list-decimal space-y-0.5">
-						{#each data.fullPlan as planned, i (i)}
-							<li
-								class={debugConsumed[i] ? 'text-base-content/35 line-through' : 'text-base-content'}
-							>
-								{planSlotKey(planned.config)}
-							</li>
-						{/each}
-					</ol>
-				</div>
-
-				<div>
-					<p class="text-base-content/55">Completed since cutoff (by slot-key):</p>
-					<pre class="ml-4 whitespace-pre-wrap">{JSON.stringify(data.completedToday, null, 2)}</pre>
-				</div>
-
-				<div>
-					<p class="text-base-content/55">
-						Plan-window cursor:
-						{data.planStartedAt
-							? new Date(data.planStartedAt).toLocaleTimeString()
-							: 'none (using start-of-day)'}
-					</p>
-				</div>
-
-				<div>
-					<p class="text-base-content/55">
-						Graduated from rotation ({data.graduatedFromRotation.size}):
-					</p>
-					<p class="ml-4">
-						{[...data.graduatedFromRotation].join(', ') || '—'}
-					</p>
-				</div>
-			</div>
-		</details>
 	{/if}
 </div>

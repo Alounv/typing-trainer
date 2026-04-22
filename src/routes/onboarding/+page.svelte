@@ -1,2 +1,11 @@
-<h1 class="text-3xl font-bold">Onboarding</h1>
-<p class="mt-2 text-base-content/70">First-run flow: language selection, first diagnostic.</p>
+<div class="mx-auto max-w-3xl space-y-12">
+	<header class="space-y-3">
+		<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
+			First run · v0.1
+		</p>
+		<h1 class="text-4xl font-semibold tracking-tight text-base-content">Onboarding</h1>
+		<p class="max-w-xl text-sm text-base-content/65">
+			First-run flow: language selection, first diagnostic.
+		</p>
+	</header>
+</div>

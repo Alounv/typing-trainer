@@ -119,9 +119,12 @@
 	});
 </script>
 
-<div class="mx-auto max-w-5xl space-y-10">
-	<header class="space-y-2">
-		<h1 class="text-3xl font-semibold tracking-tight">Analytics</h1>
+<div class="mx-auto max-w-3xl space-y-10">
+	<header class="space-y-3">
+		<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
+			Progress · v0.1
+		</p>
+		<h1 class="text-4xl font-semibold tracking-tight text-base-content">Analytics</h1>
 		<p class="text-base-content/65">WPM trend, bigram breakdown, diagnostic history.</p>
 	</header>
 

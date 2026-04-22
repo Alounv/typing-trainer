@@ -126,7 +126,7 @@
 			keyboard hint on the right.
 		-->
 		<div class="space-y-1">
-			<h1 class="text-4xl font-bold tracking-tight">Session summary</h1>
+			<h1 class="text-4xl font-semibold tracking-tight text-base-content">Session summary</h1>
 			{#if state.status === 'ready'}
 				<p
 					class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase"
