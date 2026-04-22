@@ -96,20 +96,23 @@ Status key: ✅ done · 🔄 in progress · ⬜ not started
 
 Deleted `src/lib/session/index.ts`. `<SessionShell>` is the domain's only public surface.
 
-### ⬜ R1 — Loaders out of domains
+### ✅ R1 — Loaders out of domains
 
-Move all `*-loader.ts` files from domains to SvelteKit `+page.ts` files at the route layer. Kills the cross-domain orchestration inside `progress/` and `practice/`.
+Loaders moved from domain folders to route-local `loader.ts` files. `+page.ts` won't work here: Dexie is client-only and SvelteKit's static adapter would try to prerender a universal load function, so loaders stay as plain async functions imported from `./loader` by each route's `onMount`.
 
-Moves:
+Moves landed:
 
-- `progress/summary-loader.ts` → `routes/session/[id]/summary/+page.ts`
-- `progress/analytics-loader.ts` → `routes/analytics/+page.ts`
-- `practice/dashboard-loader.ts` → `routes/+page.ts`
-- `practice/session-loader.ts` → `routes/session/[kind]/+page.ts` (one per drill kind route)
+- `progress/summary-loader.ts` → `routes/session/[id]/summary/loader.ts`
+- `progress/analytics-loader.ts` → `routes/analytics/loader.ts`
+- `practice/session-loader.ts` split →
+  - `prepareDrillSession` → `routes/session/drill-loader.ts` (shared by both drill routes; `routes/session/` is just a folder, not a SvelteKit route)
+  - `prepareRealTextSession` → `routes/session/real-text/loader.ts`
+  - `prepareDiagnosticSession` → `routes/session/diagnostic/loader.ts`
+- `practice/dashboard-loader.ts` → `practice/plan-actions.ts` (nav helpers only; `loadDashboardData` / `DashboardData` aliases deleted, dashboard now calls `computePlan` / `PlanContext` directly)
 
-Consequence: `delta`, `celebrations`, `metrics` stop being public exports. They become internals of `<Summary>` / `<Analytics>`. Same for `planner` / `plan-window` / `graduation-filter` — internals of `computePlan`. Same for `classification` / `extraction` / `engine` — internals of `analyzeSkill`.
+ESLint boundary rule updated: `+page.svelte` files still can't touch `$lib/storage`; route-local `loader.ts` files are the new orchestration layer and are allowed to.
 
-This is the biggest reshape. Order it first because R2–R4 are simpler once domains no longer export loaders.
+Known temporary debt: `practice/index.ts` is widened to re-export its internals (`planned`, `bigram-drill`, `real-text`, `diagnostic-sampler`, `graduation-filter`, `planner`) so the split route loaders can reach them. R4 collapses this back to a single `computePlan` export.
 
 ### ⬜ R2 — Skill merge (bigram + diagnostic → skill)
 
