@@ -3,7 +3,7 @@ import {
 	isBuiltinCorpusId,
 	loadQuoteBank,
 	hasQuoteBank,
-	generateRealTextSequence
+	generateText
 } from '$lib/corpus';
 import type { BuiltinCorpusId } from '$lib/corpus';
 import { CHARS_PER_WORD, DEFAULT_REAL_TEXT_WORD_BUDGET } from '$lib/core';
@@ -31,10 +31,11 @@ export async function prepareRealTextSession(): Promise<RealTextSessionInputs> {
 		hasQuoteBank(language) ? loadQuoteBank(language) : Promise.resolve(undefined),
 		loadBuiltinCorpus(corpusId)
 	]);
-	const seq = generateRealTextSequence({
+	const seq = generateText({
+		kind: 'real-text',
+		corpus,
 		quoteBank: bank,
-		fallbackCorpus: corpus,
-		options: { targetLengthChars: targetChars }
+		targetLengthChars: targetChars
 	});
 	return { text: seq.text };
 }

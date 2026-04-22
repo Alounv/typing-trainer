@@ -3,7 +3,7 @@ import {
 	isBuiltinCorpusId,
 	loadQuoteBank,
 	hasQuoteBank,
-	sampleDiagnosticPassage
+	generateText
 } from '$lib/corpus';
 import type { BuiltinCorpusId } from '$lib/corpus';
 import { CHARS_PER_WORD, DEFAULT_DIAGNOSTIC_WORD_BUDGET } from '$lib/core';
@@ -26,9 +26,11 @@ export async function prepareDiagnosticSession(): Promise<DiagnosticSessionInput
 		: undefined;
 
 	const wordBudget = profile?.wordBudgets?.diagnostic ?? DEFAULT_DIAGNOSTIC_WORD_BUDGET;
-	const passage = sampleDiagnosticPassage(corpus, {
-		targetChars: wordBudget * CHARS_PER_WORD,
-		quoteBank
+	const passage = generateText({
+		kind: 'diagnostic',
+		corpus,
+		quoteBank,
+		targetChars: wordBudget * CHARS_PER_WORD
 	});
 	return { text: passage.text };
 }

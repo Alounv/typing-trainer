@@ -1,21 +1,12 @@
-import { loadBuiltinCorpus, isBuiltinCorpusId, generateBigramDrillSequence } from '$lib/corpus';
-import type { BuiltinCorpusId, FrequencyTable } from '$lib/corpus';
+import { loadBuiltinCorpus, isBuiltinCorpusId, generateText } from '$lib/corpus';
+import type { BuiltinCorpusId } from '$lib/corpus';
 import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET, RECENT_WINDOW } from '$lib/core';
-import type { BigramClassification, DrillMode, UserSettings } from '$lib/core';
+import type { DrillMode, UserSettings } from '$lib/core';
 import { getProfile } from '$lib/settings';
-import { getBigramHistory, getRecentSessions } from '$lib/storage';
-import { buildLivePriorityTargets, buildLiveUndertrained } from '$lib/progress';
-import {
-	consumePlannedSession,
-	findGraduatedBigrams,
-	DEFAULT_DRILL_TARGET_COUNT,
-	selectAccuracyDrillMix,
-	selectSpeedDrillMix
-} from '$lib/plan';
+import { getRecentSessions } from '$lib/storage';
+import { consumePlannedSession, resolveDrillMix } from '$lib/plan';
 
 const FALLBACK_CORPUS_ID: BuiltinCorpusId = 'en';
-/** Cold-start fallback when live priority + undertrained are both empty. */
-const SEED_TARGETS = ['th', 'he', 'in', 'er', 'an'] as const;
 
 interface BigramDrillSessionInputs {
 	text: string;
@@ -43,12 +34,13 @@ export async function prepareDrillSession(routeMode: DrillMode): Promise<BigramD
 		planned?.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0
 			? { targets: planned.config.bigramsTargeted, mix: planned.drillMix }
 			: null;
-	const resolved = fromPlan ?? (await resolveDirectNavMix(routeMode, corpus.bigramFrequencies));
+	const resolved = fromPlan ?? (await resolveDrillMix(routeMode, corpus.bigramFrequencies));
 
-	const seq = generateBigramDrillSequence({
-		targetBigrams: resolved.targets,
+	const seq = generateText({
+		kind: 'bigram-drill',
 		corpus,
-		options: { wordCount: wordBudget }
+		targetBigrams: resolved.targets,
+		wordCount: wordBudget
 	});
 
 	const baselineWPM = await getLatestBaselineWPM();
@@ -67,43 +59,6 @@ async function getLatestBaselineWPM(): Promise<number> {
 	const recent = await getRecentSessions(RECENT_WINDOW);
 	const report = recent.find((s) => s.type === 'diagnostic')?.diagnosticReport;
 	return report?.baselineWPM ?? 0;
-}
-
-async function resolveDirectNavMix(
-	mode: DrillMode,
-	corpusFrequencies: FrequencyTable | undefined
-): Promise<{
-	targets: readonly string[];
-	mix?: { priority: string[]; exposure: string[] };
-}> {
-	const recent = await getRecentSessions(RECENT_WINDOW);
-
-	// Class-scoped per mode so direct-nav matches the planner's own mode-scoped selection.
-	const classes: readonly BigramClassification[] =
-		mode === 'speed' ? ['fluency'] : ['hasty', 'acquisition'];
-	const priorityTargets = buildLivePriorityTargets(
-		recent,
-		corpusFrequencies,
-		undefined,
-		undefined,
-		classes
-	);
-	const undertrained = mode === 'accuracy' ? buildLiveUndertrained(recent, corpusFrequencies) : [];
-
-	const priorityBigrams = priorityTargets.map((p) => p.bigram);
-	const graduated = await findGraduatedBigrams(priorityBigrams, getBigramHistory);
-
-	const mix =
-		mode === 'speed'
-			? selectSpeedDrillMix(priorityTargets, graduated, DEFAULT_DRILL_TARGET_COUNT)
-			: selectAccuracyDrillMix(
-					priorityTargets,
-					undertrained,
-					graduated,
-					DEFAULT_DRILL_TARGET_COUNT
-				);
-	const targets = [...mix.priority, ...mix.exposure];
-	return targets.length > 0 ? { targets, mix } : { targets: SEED_TARGETS };
 }
 
 function resolveCorpusId(profile: UserSettings | undefined): BuiltinCorpusId {

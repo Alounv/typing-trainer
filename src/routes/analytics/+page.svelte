@@ -1,115 +1,25 @@
-<!--
-	Analytics page. Long-term trends: WPM over time, per-bigram breakdown,
-	classification distribution. Dashboard covers "now what?" — this is "how
-	far have I come?". All reads are client-side out of IndexedDB; corpus is
-	loaded lazily so priority scores line up with the user's chosen language.
--->
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { loadAnalyticsInputs } from './loader';
-	import {
-		buildErrorRateSeries,
-		buildWpmSeries,
-		countGraduations,
-		summarizeBigrams,
-		tallyClassificationMix,
-		type BigramSummary,
-		type ClassificationMix,
-		type TrendPoint,
-		type WpmPoint
-	} from '$lib/progress';
-	import WpmChart from '$lib/progress/components/WpmChart.svelte';
-	import ErrorRateChart from '$lib/progress/components/ErrorRateChart.svelte';
-	import BigramTable from '$lib/progress/components/BigramTable.svelte';
-	import ClassificationBar from '$lib/progress/components/ClassificationBar.svelte';
-	import type { SessionSummary, BigramAggregate, BigramClassification } from '$lib/core';
+	import Analytics from '$lib/progress/components/Analytics.svelte';
+	import type { SessionSummary } from '$lib/core';
+	import type { FrequencyTable } from '$lib/corpus';
 
 	type LoadState =
 		| { status: 'loading' }
 		| {
 				status: 'ready';
 				sessions: SessionSummary[];
-				/** Diagnostic-only subset — drives the long-term trend charts so short
-				 * drills and real-text runs don't distort the baseline-ability signal. */
-				diagnosticSessions: SessionSummary[];
-				wpm: WpmPoint[];
-				errorRate: TrendPoint[];
-				bigrams: BigramSummary[];
-				/**
-				 * Live tally of classifications across every bigram the user has
-				 * encountered — the "where do I stand *now*" snapshot, driven by
-				 * the same sliding-window logic as the bigram table.
-				 */
-				liveClassification: ClassificationMix;
-				/** Most recent diagnostic snapshot, for the "Last diagnostic" comparison row. */
-				lastDiagnostic: {
-					counts: Record<Exclude<BigramClassification, 'unclassified'>, number>;
-					timestamp: number;
-				} | null;
-				/**
-				 * Bigrams that transitioned into `healthy` between the two most
-				 * recent diagnostics. `null` until two diagnostics exist — avoids
-				 * an ambiguous "0".
-				 */
-				graduatedCount: number | null;
+				corpusFrequencies: FrequencyTable | undefined;
 		  }
 		| { status: 'error'; message: string };
-
-	/** Two most recent diagnostic sessions with an attached report, newest first. */
-	function pickDiagnosticSessions(sessions: readonly SessionSummary[]): SessionSummary[] {
-		return sessions
-			.filter((s) => s.type === 'diagnostic' && s.diagnosticReport)
-			.sort((a, b) => b.timestamp - a.timestamp)
-			.slice(0, 2);
-	}
-
-	/** Tally classification counts from a session's stored aggregates. */
-	function tallyCounts(
-		aggregates: readonly BigramAggregate[]
-	): Record<Exclude<BigramClassification, 'unclassified'>, number> {
-		const out = { healthy: 0, fluency: 0, hasty: 0, acquisition: 0 };
-		for (const a of aggregates) {
-			if (a.classification !== 'unclassified') out[a.classification]++;
-		}
-		return out;
-	}
 
 	let state = $state<LoadState>({ status: 'loading' });
 
 	onMount(async () => {
 		try {
 			const { sessions, corpusFrequencies } = await loadAnalyticsInputs();
-
-			const diagnosticSessions = sessions.filter((s) => s.type === 'diagnostic');
-			const [latestDiagnosticSession, previousDiagnosticSession] = pickDiagnosticSessions(sessions);
-			// Graduations are a diagnostic-to-diagnostic measurement — unchanged
-			// by the switch to a live "current" row.
-			const graduatedCount =
-				latestDiagnosticSession && previousDiagnosticSession
-					? countGraduations(
-							previousDiagnosticSession.bigramAggregates,
-							latestDiagnosticSession.bigramAggregates
-						)
-					: null;
-
-			const bigrams = summarizeBigrams(sessions, corpusFrequencies);
-
-			state = {
-				status: 'ready',
-				sessions,
-				diagnosticSessions,
-				wpm: buildWpmSeries(diagnosticSessions),
-				errorRate: buildErrorRateSeries(diagnosticSessions),
-				bigrams,
-				liveClassification: tallyClassificationMix(bigrams),
-				lastDiagnostic: latestDiagnosticSession
-					? {
-							counts: tallyCounts(latestDiagnosticSession.bigramAggregates),
-							timestamp: latestDiagnosticSession.timestamp
-						}
-					: null,
-				graduatedCount
-			};
+			state = { status: 'ready', sessions, corpusFrequencies };
 		} catch (err) {
 			state = {
 				status: 'error',
@@ -133,120 +43,6 @@
 	{:else if state.status === 'error'}
 		<p class="text-error" role="alert">{state.message}</p>
 	{:else}
-		<section class="space-y-3" data-testid="wpm-trend">
-			<div class="flex items-baseline justify-between">
-				<h2 class="text-xl font-semibold">WPM trend</h2>
-				<p class="text-sm text-base-content/55">
-					{state.diagnosticSessions.length}
-					{state.diagnosticSessions.length === 1 ? 'diagnostic' : 'diagnostics'}
-				</p>
-			</div>
-			<div class="rounded-lg border border-base-300 bg-base-100 p-4">
-				<WpmChart points={state.wpm} />
-			</div>
-			<p class="text-xs text-base-content/55">
-				Dots are individual diagnostic sessions. The line is a 7-diagnostic rolling average; the
-				shaded band is ±1σ around that average.
-			</p>
-		</section>
-
-		<section class="space-y-3" data-testid="error-rate-trend">
-			<div class="flex items-baseline justify-between">
-				<h2 class="text-xl font-semibold">Error rate</h2>
-				<p class="text-sm text-base-content/55">Per diagnostic</p>
-			</div>
-			<div class="rounded-lg border border-base-300 bg-base-100 p-4">
-				<ErrorRateChart points={state.errorRate} />
-			</div>
-			<p class="text-xs text-base-content/55">
-				Fraction of keystrokes that were first-input errors, per diagnostic. The line smooths across
-				7 diagnostics.
-			</p>
-		</section>
-
-		<section class="space-y-3" data-testid="classification-distribution">
-			<div class="flex items-baseline justify-between">
-				<h2 class="text-xl font-semibold">Classification mix</h2>
-			</div>
-			{#if state.liveClassification.counts.healthy + state.liveClassification.counts.fluency + state.liveClassification.counts.hasty + state.liveClassification.counts.acquisition > 0}
-				<div class="rounded-lg border border-base-300 bg-base-100 p-4">
-					<ClassificationBar
-						current={{
-							label: 'Current classification',
-							counts: state.liveClassification.counts,
-							// "Now" rather than a date — the row is live, not a snapshot.
-							meta: 'Now'
-						}}
-						previous={state.lastDiagnostic
-							? {
-									label: 'Last diagnostic',
-									counts: state.lastDiagnostic.counts,
-									meta: new Date(state.lastDiagnostic.timestamp).toLocaleDateString(undefined, {
-										month: 'short',
-										day: 'numeric',
-										year: 'numeric'
-									})
-								}
-							: null}
-						previousPlaceholder="Run a diagnostic to compare your current mix against a baseline."
-					/>
-				</div>
-				{#if state.liveClassification.unclassified > 0}
-					<!-- Surface undertrained bigrams as supporting copy rather than
-					     folding them into the bar, so the stacked percentages
-					     reflect classified bigrams only. -->
-					<p class="text-xs text-base-content/55">
-						{state.liveClassification.unclassified}
-						{state.liveClassification.unclassified === 1 ? 'bigram is' : 'bigrams are'} still undertrained
-						(fewer than 10 observations) and excluded from the bar.
-					</p>
-				{/if}
-				{#if state.graduatedCount !== null}
-					<p class="text-sm text-base-content/70" data-testid="graduations-delta">
-						<!--
-							Graduations between consecutive diagnostics is the
-							single most motivating number on this page — structural
-							change over effort. 0 is meaningful ("none moved to
-							healthy this period"), hence we still render instead of
-							hiding; only the pre-2-diagnostic state shows a
-							placeholder.
-						-->
-						{#if state.graduatedCount === 0}
-							No bigrams graduated to healthy between diagnostics yet — keep going.
-						{:else if state.graduatedCount === 1}
-							<span class="font-medium text-success">1 bigram</span> graduated to healthy since the previous
-							diagnostic.
-						{:else}
-							<span class="font-medium text-success">{state.graduatedCount} bigrams</span>
-							graduated to healthy since the previous diagnostic.
-						{/if}
-					</p>
-				{/if}
-				<p class="text-xs text-base-content/55">
-					Each segment is a bigram bucket sized by share of your classified bigrams. Goal over time:
-					shift the bar toward green (healthy).
-				</p>
-			{:else}
-				<p class="text-sm text-base-content/60">
-					Not enough practice yet — classifications need at least 10 observations per bigram. Keep
-					drilling and this will fill in.
-				</p>
-			{/if}
-		</section>
-
-		<section class="space-y-3" data-testid="bigram-table">
-			<div class="flex items-baseline justify-between">
-				<h2 class="text-xl font-semibold">Bigram breakdown</h2>
-				<p class="text-sm text-base-content/55">
-					{state.bigrams.length}
-					{state.bigrams.length === 1 ? 'bigram observed' : 'bigrams observed'}
-				</p>
-			</div>
-			<BigramTable rows={state.bigrams} />
-			<p class="text-xs text-base-content/55">
-				Default sort: priority (badness × corpus frequency). Tap any column to re-sort; tap again to
-				flip direction.
-			</p>
-		</section>
+		<Analytics sessions={state.sessions} corpusFrequencies={state.corpusFrequencies} />
 	{/if}
 </div>
