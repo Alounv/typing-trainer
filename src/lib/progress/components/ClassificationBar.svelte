@@ -1,20 +1,12 @@
 <!--
-	Stacked horizontal bar showing the 4-way classification mix. Rendered twice:
-	once for the primary row (today: live classification across all bigrams),
-	once for the comparison row (today: the most recent diagnostic snapshot).
-	The side-by-side layout makes shifts between acquisition/hasty/fluency/healthy
-	visible at a glance — the single most important question the analytics
-	page should answer.
-
-	The component is intentionally agnostic about *what* each row represents:
-	callers supply a label and counts. This keeps it reusable for future
-	diagnostic-vs-diagnostic comparisons without reintroducing a hard dep on
-	`DiagnosticReport`.
+	Stacked horizontal bar showing the 4-way classification mix across all
+	bigrams. Makes shifts between acquisition/hasty/fluency/healthy visible at a
+	glance — the single most important question the analytics page should answer.
 -->
 <script lang="ts">
 	import type { BigramClassification } from '../../support/core';
 
-	/** One row of the bar. `label` and optional `meta` (shown right-aligned, e.g. a date) caption it. */
+	/** `label` and optional `meta` (shown right-aligned, e.g. a date) caption the bar. */
 	export interface ClassificationBarRow {
 		label: string;
 		counts: {
@@ -28,23 +20,10 @@
 	}
 
 	interface Props {
-		/** Primary row — rendered first, full opacity. */
 		current: ClassificationBarRow;
-		/**
-		 * Comparison row, or `null` when there's nothing to compare against
-		 * (e.g. no diagnostic has been run yet). When `null`, `previousPlaceholder`
-		 * takes its place.
-		 */
-		previous: ClassificationBarRow | null;
-		/** Copy shown in place of the `previous` row when it is `null`. */
-		previousPlaceholder?: string;
 	}
 
-	let {
-		current,
-		previous,
-		previousPlaceholder = 'No prior snapshot to compare against yet.'
-	}: Props = $props();
+	let { current }: Props = $props();
 
 	// Display order: worst → best. Mirrors the drill prescription severity
 	// ladder so "moving right" always reads as "getting better".
@@ -70,8 +49,6 @@
 		percent: number;
 	}
 
-	/** Build segment data for one row. Zero-count segments are retained so
-	 * the legend always shows all four buckets (user learns the vocabulary). */
 	function segments(row: ClassificationBarRow): Segment[] {
 		const total = ORDER.reduce((sum, k) => sum + row.counts[k], 0);
 		return ORDER.map((k) => ({
@@ -85,11 +62,9 @@
 	}
 
 	const currentSegments = $derived(segments(current));
-	const previousSegments = $derived(previous ? segments(previous) : null);
 </script>
 
 <div class="space-y-4">
-	<!-- Primary row. -->
 	<div class="space-y-2" data-testid="classification-current">
 		<div class="flex items-baseline justify-between text-sm">
 			<span class="font-medium">{current.label}</span>
@@ -120,84 +95,31 @@
 		</div>
 	</div>
 
-	<!-- Comparison row, or placeholder when nothing to compare against. -->
-	{#if previous && previousSegments}
-		<div class="space-y-2" data-testid="classification-previous">
-			<div class="flex items-baseline justify-between text-sm">
-				<span class="font-medium text-base-content/70">{previous.label}</span>
-				{#if previous.meta}
-					<span class="text-base-content/50">{previous.meta}</span>
-				{/if}
-			</div>
-			<div
-				class="flex h-6 w-full overflow-hidden rounded-md border border-base-300 opacity-70"
-				role="img"
-				aria-label="Classification distribution, {previous.label}"
-			>
-				{#each previousSegments as seg (seg.label)}
-					{#if seg.percent > 0}
-						<div
-							class="{COLOR[
-								seg.label
-							]} flex items-center justify-center text-xs font-medium text-white"
-							style="width: {seg.percent}%"
-							title={`${seg.label}: ${seg.count}`}
-						>
-							{#if seg.percent >= 8}
-								{seg.count}
-							{/if}
-						</div>
-					{/if}
-				{/each}
-			</div>
-		</div>
-	{:else}
-		<p class="text-sm text-base-content/55">{previousPlaceholder}</p>
-	{/if}
+	<dl
+		class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs text-base-content/70"
+	>
+		<dt class="flex items-center gap-1.5 font-medium">
+			<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR.acquisition}"></span>
+			Acquisition
+		</dt>
+		<dd class="text-base-content/65">Slow and error-prone — still learning the pair.</dd>
 
-	<!-- Legend. Always present so the color mapping isn't guesswork. -->
-	<ul class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-base-content/70">
-		{#each ORDER as label (label)}
-			<li class="flex items-center gap-1.5">
-				<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR[label]}"></span>
-				<span>{label}</span>
-			</li>
-		{/each}
-	</ul>
+		<dt class="flex items-center gap-1.5 font-medium">
+			<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR.hasty}"></span>
+			Hasty
+		</dt>
+		<dd class="text-base-content/65">Fast but error-prone — speed outpacing accuracy.</dd>
 
-	<!--
-		Collapsed definitions. The vocabulary (acquisition / hasty / fluency /
-		healthy) is jargon the first time a user sees it — keep the glossary one
-		click away rather than cluttering the primary view.
-	-->
-	<details class="text-xs text-base-content/70">
-		<summary class="cursor-pointer text-base-content/60 select-none hover:text-base-content">
-			What do these mean?
-		</summary>
-		<dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
-			<dt class="flex items-center gap-1.5 font-medium">
-				<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR.acquisition}"></span>
-				Acquisition
-			</dt>
-			<dd class="text-base-content/65">Slow and error-prone — still learning the pair.</dd>
+		<dt class="flex items-center gap-1.5 font-medium">
+			<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR.fluency}"></span>
+			Fluency
+		</dt>
+		<dd class="text-base-content/65">Accurate but slow — needs speed work.</dd>
 
-			<dt class="flex items-center gap-1.5 font-medium">
-				<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR.hasty}"></span>
-				Hasty
-			</dt>
-			<dd class="text-base-content/65">Fast but error-prone — speed outpacing accuracy.</dd>
-
-			<dt class="flex items-center gap-1.5 font-medium">
-				<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR.fluency}"></span>
-				Fluency
-			</dt>
-			<dd class="text-base-content/65">Accurate but slow — needs speed work.</dd>
-
-			<dt class="flex items-center gap-1.5 font-medium">
-				<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR.healthy}"></span>
-				Healthy
-			</dt>
-			<dd class="text-base-content/65">Fast and accurate — the goal.</dd>
-		</dl>
-	</details>
+		<dt class="flex items-center gap-1.5 font-medium">
+			<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR.healthy}"></span>
+			Healthy
+		</dt>
+		<dd class="text-base-content/65">Fast and accurate — the goal.</dd>
+	</dl>
 </div>

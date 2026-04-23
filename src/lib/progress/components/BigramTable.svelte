@@ -8,16 +8,9 @@
 	interface Props {
 		/** Skill's per-bigram assessment plus the sparkline trend from Progress. */
 		rows: (BigramSummary & { trend: BigramTrendPoint[] })[];
-		/**
-		 * Cap on how many rows to render after sorting. The bigram set can be
-		 * large (an English diagnostic surfaces 250+ bigrams); beyond the
-		 * top-worst-50, the long tail is mostly single-occurrence noise that
-		 * crowds the table without informing action.
-		 */
-		limit?: number;
 	}
 
-	let { rows, limit = 50 }: Props = $props();
+	let { rows }: Props = $props();
 
 	/**
 	 * Render whitespace as the open-box glyph (U+2423). Bigrams involving
@@ -52,9 +45,6 @@
 
 	const sorted = $derived.by(() => {
 		const out = [...rows];
-		// Sort the full set first, then slice — the cap is applied *after* the
-		// current sort so changing the sort key surfaces the worst-50 of that
-		// dimension (e.g. sort by errors → top-50 error-prone bigrams).
 		out.sort((a, b) => {
 			const dir = sortDir === 'asc' ? 1 : -1;
 			switch (sortKey) {
@@ -79,10 +69,8 @@
 					return (a.priorityScore - b.priorityScore) * dir;
 			}
 		});
-		return out.slice(0, limit);
+		return out;
 	});
-
-	const truncated = $derived(rows.length > limit);
 
 	function toggleSort(key: SortKey) {
 		if (sortKey === key) {
@@ -197,12 +185,6 @@
 			</tbody>
 		</table>
 	</div>
-	{#if truncated}
-		<p class="mt-2 text-xs text-base-content/55" data-testid="bigram-table-truncation">
-			Showing the top {limit} of {rows.length}
-			bigrams by the current sort. Change the sort to surface a different slice.
-		</p>
-	{/if}
 {/if}
 
 <style>

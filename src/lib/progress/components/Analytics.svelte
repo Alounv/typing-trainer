@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { BigramAggregate, BigramClassification, SessionSummary } from '$lib/support/core';
+	import type { SessionSummary } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
 	import { summarizeBigrams } from '$lib/skill';
 	import {
@@ -29,16 +29,6 @@
 			.slice(0, 2);
 	}
 
-	function tallyCounts(
-		aggregates: readonly BigramAggregate[]
-	): Record<Exclude<BigramClassification, 'unclassified'>, number> {
-		const out = { healthy: 0, fluency: 0, hasty: 0, acquisition: 0 };
-		for (const a of aggregates) {
-			if (a.classification !== 'unclassified') out[a.classification]++;
-		}
-		return out;
-	}
-
 	const diagnosticSessions = $derived(sessions.filter((s) => s.type === 'diagnostic'));
 	const wpm = $derived(buildWpmSeries(diagnosticSessions));
 	const errorRate = $derived(buildErrorRateSeries(diagnosticSessions));
@@ -55,13 +45,6 @@
 		const [latest, previous] = latestAndPrevDiagnostic;
 		return latest && previous
 			? countGraduations(previous.bigramAggregates, latest.bigramAggregates)
-			: null;
-	});
-
-	const lastDiagnostic = $derived.by(() => {
-		const [latest] = latestAndPrevDiagnostic;
-		return latest
-			? { counts: tallyCounts(latest.bigramAggregates), timestamp: latest.timestamp }
 			: null;
 	});
 
@@ -116,18 +99,6 @@
 					counts: liveClassification.counts,
 					meta: 'Now'
 				}}
-				previous={lastDiagnostic
-					? {
-							label: 'Last diagnostic',
-							counts: lastDiagnostic.counts,
-							meta: new Date(lastDiagnostic.timestamp).toLocaleDateString(undefined, {
-								month: 'short',
-								day: 'numeric',
-								year: 'numeric'
-							})
-						}
-					: null}
-				previousPlaceholder="Run a diagnostic to compare your current mix against a baseline."
 			/>
 		</div>
 		{#if liveClassification.unclassified > 0}
