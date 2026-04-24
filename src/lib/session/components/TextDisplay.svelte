@@ -14,7 +14,8 @@
 		| 'typed-error'
 		| 'typed-error-corrected'
 		| 'current'
-		| 'pending';
+		| 'pending'
+		| 'target';
 
 	interface Props {
 		text: string;
@@ -41,6 +42,13 @@
 		 * glide when the caller doesn't know the pace.
 		 */
 		ghostTransitionMs?: number;
+		/**
+		 * Bigrams to highlight as drill targets. Each character whose position
+		 * starts or ends one of these bigrams renders in the `target` color
+		 * while still pending; once typed it falls back to the normal
+		 * correct/error states.
+		 */
+		targetBigrams?: readonly string[];
 	}
 
 	let {
@@ -49,8 +57,22 @@
 		errorPositions = new Set<number>(),
 		correctedPositions = new Set<number>(),
 		ghostPosition,
-		ghostTransitionMs = 150
+		ghostTransitionMs = 150,
+		targetBigrams
 	}: Props = $props();
+
+	const targetPositions = $derived.by(() => {
+		const set = new Set<number>();
+		if (!targetBigrams || targetBigrams.length === 0) return set;
+		const targets = new Set(targetBigrams);
+		for (let i = 0; i < text.length - 1; i++) {
+			if (targets.has(text.slice(i, i + 2))) {
+				set.add(i);
+				set.add(i + 1);
+			}
+		}
+		return set;
+	});
 
 	// Per-keystroke hot path: we deliberately do NOT build a $derived array
 	// of char descriptors here. On long texts (e.g. 2k+ chars) that would
@@ -63,14 +85,15 @@
 		i: number,
 		pos: number,
 		errors: ReadonlySet<number>,
-		corrected: ReadonlySet<number>
+		corrected: ReadonlySet<number>,
+		targets: ReadonlySet<number>
 	): CharState {
 		if (i === pos) return 'current';
 		if (i < pos) {
 			if (!errors.has(i)) return 'typed-correct';
 			return corrected.has(i) ? 'typed-error-corrected' : 'typed-error';
 		}
-		return 'pending';
+		return targets.has(i) ? 'target' : 'pending';
 	}
 
 	// DaisyUI semantic colors keep the drill readable across any active theme.
@@ -87,7 +110,10 @@
 		// behind it is drawn by the animated cursor overlay below (see
 		// `cursorRect`) so motion between keystrokes is a lateral slide
 		// rather than a discrete class swap.
-		current: 'text-primary-content'
+		current: 'text-primary-content',
+		// Pending char that is part of a target bigram — highlights the
+		// transitions the drill is exercising. Cleared once the char is typed.
+		target: 'text-accent'
 	};
 
 	/**
@@ -253,7 +279,7 @@
 
 	<div class="whitespace-pre-wrap">
 		{#each text as char, i (i)}
-			{@const state = stateFor(i, position, errorPositions, correctedPositions)}
+			{@const state = stateFor(i, position, errorPositions, correctedPositions, targetPositions)}
 			<span
 				class="relative transition-colors duration-75 motion-reduce:transition-none {stateClasses[
 					state

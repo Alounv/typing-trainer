@@ -79,6 +79,9 @@
 	}: Props = $props();
 
 	const exposureSet = $derived(new Set(exposureBigrams ?? []));
+	// Highlight only priority targets in the drill text — exposure bigrams
+	// are new, not diagnosed weaknesses, so they don't get the in-text tint.
+	const priorityBigrams = $derived(targetBigrams?.filter((b) => !exposureSet.has(b)));
 	// Legend only shows when both chip styles are actually on screen.
 	const hasMix = $derived(
 		!!exposureBigrams &&
@@ -344,6 +347,7 @@
 			{correctedPositions}
 			{ghostPosition}
 			{ghostTransitionMs}
+			targetBigrams={drillMode ? priorityBigrams : undefined}
 			{onEvent}
 		/>
 	</div>

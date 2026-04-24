@@ -30,6 +30,8 @@
 		ghostPosition?: number;
 		/** Forwarded to TextDisplay so the ghost overlay's CSS slide matches the pace. */
 		ghostTransitionMs?: number;
+		/** Forwarded to TextDisplay; highlights pending chars inside target bigrams. */
+		targetBigrams?: readonly string[];
 		/** Auto-focus the surface on mount. Default: true. */
 		autoFocus?: boolean;
 		/**
@@ -49,6 +51,7 @@
 		correctedPositions,
 		ghostPosition,
 		ghostTransitionMs,
+		targetBigrams,
 		autoFocus = true,
 		announceErrors = false,
 		onEvent,
@@ -88,6 +91,7 @@
 			{correctedPositions}
 			{ghostPosition}
 			{ghostTransitionMs}
+			{targetBigrams}
 		/>
 	</div>
 
