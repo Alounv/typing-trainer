@@ -95,9 +95,7 @@
 		</div>
 	</div>
 
-	<dl
-		class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs text-base-content/70"
-	>
+	<dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs text-base-content/70">
 		<dt class="flex items-center gap-1.5 font-medium">
 			<span class="inline-block h-2.5 w-2.5 rounded-sm {COLOR.acquisition}"></span>
 			Acquisition
