@@ -92,6 +92,10 @@ export function summarizeBigrams(
 		}
 	}
 
+	// Off-corpus bigrams (stray paste, wrong language, exotic punctuation) fall back to the
+	// corpus minimum so they don't outrank real targets. Without a corpus, everything gets 1.
+	const fallbackFreq = corpus ? minPositive(corpus) : 1;
+
 	const rows: BigramSummary[] = [];
 	for (const [bigram, latestAgg] of latest) {
 		const rolling = aggregateLastNOccurrences(sessions, bigram, window);
@@ -100,7 +104,7 @@ export function summarizeBigrams(
 		const errorRate = rolling ? rolling.errorRate : latestAgg.errorRate;
 
 		const badness = badness1D({ meanTime, errorRate }, thresholds);
-		const freq = corpus?.[bigram] ?? 1;
+		const freq = corpus?.[bigram] ?? fallbackFreq;
 		rows.push({
 			bigram,
 			classification,
@@ -178,6 +182,14 @@ export function buildLiveUndertrained(
 	}
 	under.sort((a, b) => b.freq - a.freq);
 	return under.map((u) => u.bigram);
+}
+
+function minPositive(table: FrequencyTable): number {
+	let min = Infinity;
+	for (const v of Object.values(table)) {
+		if (v > 0 && v < min) min = v;
+	}
+	return Number.isFinite(min) ? min : 1;
 }
 
 /** Single-bigram badness scalar. 10% error ≈ 1.0 of badness — same weight as diagnostic engine. */
