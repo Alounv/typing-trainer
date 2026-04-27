@@ -21,24 +21,14 @@ function resolveWordBudgets(settings?: UserSettings) {
 	};
 }
 
-/**
- * Run a full diagnostic every N non-diagnostic sessions. 28 is chosen so the
- * cadence stays roughly weekly for an active user — a full day is up to 6
- * mini-sessions (2 cycles × accuracy + speed + real-text), so 28 ≈ ~5 days of
- * full workouts. Kept at 28 through the cycle refactor so existing users
- * don't see a surprise diagnostic the day of the migration.
- */
+/** ~Weekly cadence: 28 ≈ 5 days of full workouts (6 mini-sessions/day). */
 const DIAGNOSTIC_INTERVAL = 28;
 
-/** Default "top N" priority bigrams to drill per session. */
 export const DEFAULT_DRILL_TARGET_COUNT = 10;
 
 /**
- * A daily plan emits this many treatment cycles. Each cycle is up to three
- * mini-sessions: accuracy drill → speed drill → real-text. Drill slots whose
- * target pool is empty (no fluency targets, or everything graduated) are
- * silently skipped — a cycle can therefore be as short as a single real-text.
- * Real-text always runs; it's the transfer test and shouldn't ever go away.
+ * Each cycle is accuracy drill → speed drill → real-text. Drill slots with
+ * empty target pools are skipped; real-text always runs as the transfer test.
  */
 const CYCLES_PER_DAY = 2;
 
@@ -56,8 +46,6 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 
 	const budgets = resolveWordBudgets(userSettings);
 
-	// 1. First-run: user has never completed a session. Need a diagnostic
-	//    before we can compute baseline WPM.
 	if (recentSessions.length === 0) {
 		return [
 			diagnosticPlan(
@@ -68,8 +56,7 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 		];
 	}
 
-	// 2. Sessions exist but no diagnostic on record — manual deletion or schema
-	//    migration. Fail safe with a fresh diagnostic so drill has targets.
+	// Missing diagnostic (manual delete / schema migration) — fail safe.
 	const latestDiagnostic = findLatestDiagnostic(recentSessions);
 	if (!latestDiagnostic) {
 		return [
@@ -81,8 +68,6 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 		];
 	}
 
-	// 3. Cadence: every DIAGNOSTIC_INTERVAL non-diagnostic sessions, re-run
-	//    so thresholds and priority targets stay current.
 	const since = sessionsSinceLastDiagnostic(recentSessions);
 	if (since >= DIAGNOSTIC_INTERVAL) {
 		return [
@@ -94,11 +79,6 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 		];
 	}
 
-	// 4. Default daily = treatment cycle. Split the priority list by class so
-	//    hasty/acquisition bigrams feed the accuracy-drill (no speed pressure,
-	//    pacer at 0.60× baseline) and fluency bigrams feed the speed-drill
-	//    (pacer at 1.17× baseline). Undertrained backfill goes to accuracy —
-	//    unknown bigrams are an error risk, not a speed-ceiling problem.
 	const accuracyMix = selectAccuracyDrillMix(
 		accuracyPriorityTargets,
 		undertrainedBigrams,
@@ -114,7 +94,6 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	const accuracyHasTargets = accuracyMix.priority.length > 0 || accuracyMix.exposure.length > 0;
 	const speedHasTargets = speedMix.priority.length > 0;
 
-	// Nothing to drill → real-text only, one per cycle.
 	const drillPlanItems: PlannedSession[] =
 		!accuracyHasTargets && !speedHasTargets
 			? Array.from({ length: CYCLES_PER_DAY }, () =>
@@ -122,10 +101,8 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 				)
 			: buildDrillCycles(accuracyMix, speedMix, budgets, accuracyHasTargets, speedHasTargets);
 
-	// Fresh-plan diagnostic: "Start fresh plan" bumps the plan-window cursor.
-	// If the latest diagnostic on file predates that cursor the user's targets
-	// are stale from the fresh-plan perspective — prepend a diagnostic so the
-	// first thing they see is "refresh your baseline."
+	// "Start fresh plan" bumps planStartedAt; diagnostics older than that are
+	// stale relative to the new window, so prepend a refresher.
 	if (planStartedAt && latestDiagnostic.timestamp < planStartedAt) {
 		return [
 			diagnosticPlan(
@@ -144,7 +121,6 @@ function findLatestDiagnostic(recent: readonly SessionSummary[]): SessionSummary
 	return recent.find((s) => s.type === 'diagnostic');
 }
 
-// [accuracy, speed, real-text] per cycle; empty drill slots skipped, real-text always runs.
 function buildDrillCycles(
 	accuracyMix: { priority: string[]; exposure: string[] },
 	speedMix: { priority: string[]; exposure: string[] },
@@ -161,7 +137,7 @@ function buildDrillCycles(
 	return plan;
 }
 
-// Infinity if no diagnostic found → "definitely due". `recent` is newest-first.
+// `recent` is newest-first; Infinity means "no diagnostic found, definitely due".
 function sessionsSinceLastDiagnostic(recent: readonly { type: string }[]): number {
 	for (let i = 0; i < recent.length; i++) {
 		if (recent[i].type === 'diagnostic') return i;
@@ -170,14 +146,10 @@ function sessionsSinceLastDiagnostic(recent: readonly { type: string }[]): numbe
 }
 
 /**
- * Accuracy-mode selection: priority = `hasty` + `acquisition` targets (both fail
- * on accuracy — hasty from rushing, acquisition from not yet knowing the
- * motor pattern); exposure = undertrained corpus backfill, since unmeasured
- * bigrams are also an error risk. Graduated filter applies; exposure is
- * deduped against priority.
+ * Priority = `hasty` + `acquisition` (both fail on accuracy); exposure =
+ * undertrained backfill (unmeasured bigrams are an error risk too).
  *
- * Exported so the drill route's direct-nav fallback can reuse the same
- * selection as the planner — otherwise the two entry points would disagree.
+ * Exported so the drill route's direct-nav fallback uses the same selection.
  */
 export function selectAccuracyDrillMix(
 	priorityTargets: readonly PriorityBigram[],
@@ -211,11 +183,9 @@ export function selectAccuracyDrillMix(
 }
 
 /**
- * Speed-mode selection: priority = `fluency` targets only (accurate but
- * slow — the class that benefits from pacer pressure). No exposure pool:
- * undertrained bigrams go to accuracy mode where the "don't push speed yet"
- * policy applies. Exposure kept in the return shape for symmetry with
- * {@link selectAccuracyDrillMix} / `PlannedSession.drillMix`.
+ * Priority = `fluency` only (accurate but slow). No exposure: undertrained
+ * bigrams go to accuracy mode where "don't push speed yet" applies. Empty
+ * exposure kept in the return shape for symmetry with {@link selectAccuracyDrillMix}.
  */
 export function selectSpeedDrillMix(
 	priorityTargets: readonly PriorityBigram[],
@@ -248,7 +218,7 @@ function drillPlan(
 	mode: DrillMode,
 	wordBudget: number
 ): PlannedSession {
-	// Priority first so `bigramsTargeted` stays correctly ordered for source-blind consumers.
+	// Priority first so `bigramsTargeted` order matches importance.
 	const targets = [...mix.priority, ...mix.exposure];
 	const config: SessionConfig = {
 		type: 'bigram-drill',
@@ -264,11 +234,6 @@ function drillPlan(
 	};
 }
 
-/**
- * "Why this mix" line. Accuracy mix can carry priority + exposure (undertrained
- * backfill goes here); speed mix is priority-only. Copy reflects the treatment
- * intent, not just counts — "slow them down" vs "push past the ceiling."
- */
 function buildDrillRationale(
 	mix: { priority: string[]; exposure: string[] },
 	mode: DrillMode
@@ -278,7 +243,6 @@ function buildDrillRationale(
 	if (mode === 'speed') {
 		return `Push speed on your ${p} accurate-but-slow ${p === 1 ? 'bigram' : 'bigrams'}.`;
 	}
-	// Accuracy mode: exposure-backfill branch + mixed branch are both possible.
 	if (p > 0 && e === 0) return `Slow-down practice on your ${p} error-prone bigrams.`;
 	if (p === 0 && e > 0) {
 		return `Building exposure on ${e} common bigrams — not enough data yet to pinpoint weaknesses.`;
@@ -287,10 +251,8 @@ function buildDrillRationale(
 }
 
 /**
- * Drop completed-today items, matched by `PlanSlotKey` so an accuracy
- * completion consumes the accuracy slot (not any bigram-drill). Preserves
- * interleaving: [acc, speed, rt, acc, speed, rt] minus 1 acc + 1 rt leaves
- * [speed, rt, acc, speed, rt].
+ * Drop completed-today items by `PlanSlotKey` so an accuracy completion
+ * consumes only an accuracy slot. Preserves interleaving order.
  */
 export function sliceCompletedFromPlan(
 	plan: readonly PlannedSession[],

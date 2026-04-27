@@ -2,16 +2,6 @@ import type { SessionSummary, BigramAggregate, BigramClassification } from '../s
 import { DEFAULT_HIGH_ERROR_THRESHOLD } from '../support/core';
 import { countGraduations, WPM_ROLLING_WINDOW } from './metrics';
 
-/**
- * Session delta — the post-session "how did this compare?" view model.
- *
- * Pure: given the current session and its history, produce a display-ready
- * object. No I/O, no classifier calls beyond what's already baked into the
- * session summaries. This is 8.1 only — no "bad session" attribution (8.2),
- * no celebration copy (8.3/8.4/8.5). Those layers plug in later without
- * changing the shape below.
- */
-
 /** How far a metric must move from its rolling baseline to clear the "flat" band. */
 const FLAT_BAND_PCT = 0.03;
 
@@ -19,33 +9,24 @@ type MetricVerdict = 'up' | 'down' | 'flat' | 'first';
 
 interface MetricDelta {
 	current: number;
-	/** Average of the last `WPM_ROLLING_WINDOW` sessions BEFORE `current`. */
+	/** Average of the last `WPM_ROLLING_WINDOW` sessions before `current`. */
 	rollingAvg: number | null;
-	/** `(current - rollingAvg) / rollingAvg`. `null` when there's no baseline yet. */
+	/** `null` when there's no baseline yet. */
 	deltaPct: number | null;
-	/** Size of the window `rollingAvg` was computed over (may be < full window for new users). */
+	/** May be smaller than the full window for new users. */
 	baselineSampleSize: number;
 	verdict: MetricVerdict;
 }
 
 interface BigramDelta {
-	/**
-	 * Number of distinct bigrams this session drilled / encountered. For
-	 * `bigram-drill` sessions we take `bigramsTargeted`; for other types we
-	 * count distinct bigrams with a clean timing sample (so the card shows
-	 * "you touched 42 bigrams" rather than 0).
-	 */
 	drilled: number;
-	/** Bigrams that were non-healthy in the previous session and are healthy now. */
 	graduatedToHealthy: number;
-	/** Bigrams that were healthy in the previous session and have fallen out. */
 	regressed: number;
 }
 
 interface ErrorFloorInfo {
 	current: number;
 	threshold: number;
-	/** True when `current` is at or below the spec's high-error threshold. */
 	below: boolean;
 }
 
@@ -54,17 +35,12 @@ export interface SessionDelta {
 	errorRate: MetricDelta;
 	bigrams: BigramDelta;
 	errorFloor: ErrorFloorInfo;
-	/** One-line neutral interpretation — deterministic, built from the parts above. */
 	summarySentence: string;
 }
 
 /**
- * Main entry point.
- *
- * `history` must include every session ever recorded (ordered or not — we
- * sort internally). `current` is included if it appears in `history`; we
- * filter it out before building the baseline so a session never compares
- * itself against itself.
+ * `history` may be unordered and may include `current` — we filter and sort
+ * so a session never compares itself against itself.
  */
 export function computeSessionDelta(
 	current: SessionSummary,
@@ -99,7 +75,6 @@ export function computeSessionDelta(
 }
 
 function buildMetricDelta(current: number, priorValues: readonly number[]): MetricDelta {
-	// Take the most recent `WPM_ROLLING_WINDOW` values; `priorValues` is oldest-first.
 	const windowed = priorValues.slice(-WPM_ROLLING_WINDOW);
 	if (windowed.length === 0) {
 		return {
@@ -111,11 +86,8 @@ function buildMetricDelta(current: number, priorValues: readonly number[]): Metr
 		};
 	}
 	const rollingAvg = windowed.reduce((a, b) => a + b, 0) / windowed.length;
-	// Guard a zero-baseline divide — can happen early on with errorRate=0 streaks.
-	// When the baseline is zero and current is also zero, there's no movement;
-	// when baseline is zero and current is positive, treat as an "up" (for error
-	// rate this reads as "you got worse" — correct — and for WPM a 0 baseline
-	// is essentially impossible, so the edge case is just defensive).
+	// Zero-baseline guard for early errorRate=0 streaks: 0→0 is flat, 0→positive
+	// reads as "up" (correct for error rate; WPM=0 baselines are essentially impossible).
 	const deltaPct =
 		rollingAvg === 0
 			? current === 0
@@ -142,9 +114,8 @@ function buildMetricDelta(current: number, priorValues: readonly number[]): Metr
 }
 
 function buildBigramDelta(current: SessionSummary, prior: readonly SessionSummary[]): BigramDelta {
-	// "Previous session" = the most recent prior session that actually carried
-	// bigram data. Skipping empty/diagnostic-only priors gives a more meaningful
-	// comparison than "the one right before this one, even if it was empty".
+	// Most recent prior with bigram data — skipping empty priors gives a
+	// more meaningful comparison.
 	const prev = [...prior].reverse().find((s) => s.bigramAggregates.length > 0);
 	const graduatedToHealthy = prev
 		? countGraduations(prev.bigramAggregates, current.bigramAggregates)
@@ -158,7 +129,6 @@ function buildBigramDelta(current: SessionSummary, prior: readonly SessionSummar
 	};
 }
 
-/** Mirror of `countGraduations` but for the "was healthy, no longer is" direction. */
 function countRegressions(
 	before: readonly BigramAggregate[],
 	after: readonly BigramAggregate[]
@@ -177,16 +147,14 @@ function countDrilled(s: SessionSummary): number {
 	if (s.type === 'bigram-drill' && s.bigramsTargeted?.length) {
 		return new Set(s.bigramsTargeted).size;
 	}
-	// Diagnostic / real-text: count distinct bigrams we observed cleanly enough
-	// to have a timing sample. Using `occurrences > 0` rather than a finite
-	// meanTime so error-only bigrams still count — the user did encounter them.
+	// `occurrences > 0` rather than finite meanTime so error-only bigrams still
+	// count — the user did encounter them.
 	return new Set(s.bigramAggregates.filter((a) => a.occurrences > 0).map((a) => a.bigram)).size;
 }
 
 /**
- * Deterministic interpretation line. Factual, not coachy — "68 WPM · 4% above
- * your 7-session average · 2 bigrams graduated to healthy." Keep this testable;
- * if we ever add variation, it should come from data, not random choice.
+ * Deterministic interpretation line — kept testable. Any variation should
+ * come from data, not random choice.
  */
 function buildSummarySentence(parts: {
 	wpm: MetricDelta;

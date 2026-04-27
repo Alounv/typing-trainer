@@ -1,17 +1,16 @@
 import type { KeystrokeEvent } from '../support/core';
 
 /**
- * Keystroke event after correction lookahead. One per position (the first input);
- * retypes collapse into the annotations on that event.
+ * One per position (the first input); retypes collapse into annotations on
+ * that event.
  */
 interface AnnotatedKeystrokeEvent extends KeystrokeEvent {
-	/** True if the user retyped a correct character at this position later. */
 	corrected: boolean;
-	/** Ms between the first input and the correcting retype. 0 if never corrected. */
+	/** Ms between first input and correcting retype. 0 if never corrected. */
 	correctionDelay: number;
 }
 
-/** Collapses raw events into first-input-per-position annotations. Analytics credit any correction regardless of delay. */
+/** Analytics credit any correction regardless of delay. */
 export function annotateFirstInputs(events: readonly KeystrokeEvent[]): AnnotatedKeystrokeEvent[] {
 	const buckets = new Map<number, KeystrokeEvent[]>();
 	for (const e of events) {
