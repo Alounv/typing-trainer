@@ -1,10 +1,10 @@
 <script lang="ts">
-	import type { BigramAggregate, SessionSummary } from '$lib/support/core';
+	import type { SessionSummary } from '$lib/support/core';
 	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/support/core';
 	import { computeSessionDelta } from '../delta';
-	import { detectGraduations, detectMilestone } from '../celebrations';
+	import { detectMovements, detectMilestone } from '../celebrations';
 	import SessionDelta from './SessionDelta.svelte';
-	import Graduations from './Graduations.svelte';
+	import BigramMovements from './BigramMovements.svelte';
 	import MilestoneBanner from './MilestoneBanner.svelte';
 
 	interface Props {
@@ -18,36 +18,25 @@
 	const delta = $derived(computeSessionDelta(session, recentSessions));
 	const milestone = $derived(detectMilestone(session, recentSessions));
 
-	// Mirrors the rule inside `computeSessionDelta` so the sentence and the list
-	// agree on which prior session they're comparing against.
-	const graduations = $derived.by(() => {
+	// Mirrors the rule inside `computeSessionDelta` so the list compares against
+	// the same prior session.
+	const movements = $derived.by(() => {
 		const prevWithBigrams =
 			recentSessions
 				.filter((s) => s.id !== session.id && s.bigramAggregates.length > 0)
 				.sort((a, b) => b.timestamp - a.timestamp)[0] ?? null;
-		return detectGraduations(
+		return detectMovements(
 			prevWithBigrams ? prevWithBigrams.bigramAggregates : null,
 			session.bigramAggregates
 		);
 	});
 
-	// Traffic-light threshold: green below warn, yellow between, red above the high-error floor.
 	const ERROR_WARN_THRESHOLD = DEFAULT_HIGH_ERROR_THRESHOLD / 2;
 	function errorRateColour(rate: number): string {
 		if (rate > DEFAULT_HIGH_ERROR_THRESHOLD) return 'text-error';
 		if (rate > ERROR_WARN_THRESHOLD) return 'text-warning';
 		return 'text-success';
 	}
-
-	/** Slowest-5 by mean time. NaN means every occurrence had a first-input error somewhere in the pair. */
-	function slowestFive(aggregates: readonly BigramAggregate[]): BigramAggregate[] {
-		return aggregates
-			.filter((a) => Number.isFinite(a.meanTime))
-			.toSorted((a, b) => b.meanTime - a.meanTime)
-			.slice(0, 5);
-	}
-
-	const slowest = $derived(slowestFive(session.bigramAggregates));
 </script>
 
 <MilestoneBanner event={milestone} />
@@ -79,41 +68,4 @@
 
 <SessionDelta {delta} />
 
-<Graduations events={graduations} />
-
-<section class="space-y-4">
-	<div class="flex items-baseline justify-between">
-		<h2 class="text-xl font-semibold tracking-tight">Slowest transitions</h2>
-		<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
-			Top 5 · mean time
-		</p>
-	</div>
-	{#if slowest.length === 0}
-		<p class="text-sm text-base-content/65">
-			No clean bigram samples yet — need at least one error-free adjacent pair.
-		</p>
-	{:else}
-		<ul class="divide-y divide-base-300 border-y border-base-300" data-testid="slowest-tiles">
-			{#each slowest as b (b.bigram)}
-				<li class="grid grid-cols-[auto_1fr_auto] items-baseline gap-6 py-3">
-					<span
-						class="font-mono text-xl tracking-wide text-base-content"
-						aria-label={`bigram ${b.bigram}`}
-					>
-						{b.bigram === ' ' ? '␣' : b.bigram.replace(/ /g, '␣')}
-					</span>
-					<span class="font-mono text-sm text-base-content/80 tabular-nums">
-						{b.meanTime.toFixed(0)}<span class="text-base-content/40"> ms</span>
-					</span>
-					{#if b.errorRate > 0}
-						<span class="font-mono text-xs tracking-[0.18em] text-error uppercase tabular-nums">
-							{(b.errorRate * 100).toFixed(0)}% err
-						</span>
-					{:else}
-						<span class="text-xs tracking-[0.18em] text-base-content/40 uppercase">Clean</span>
-					{/if}
-				</li>
-			{/each}
-		</ul>
-	{/if}
-</section>
+<BigramMovements events={movements} />

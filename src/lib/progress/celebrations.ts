@@ -1,92 +1,67 @@
 import type { BigramAggregate, BigramClassification, SessionSummary } from '../support/core';
 import { buildWpmSeries } from './metrics';
 
-/**
- * Celebration detection (Phase 8.3).
- *
- * Pure functions that compare the previous session's per-bigram classifications
- * against the current session's and emit the "threshold crossings worth
- * celebrating" — not effort, only structural change. Consumed by the summary
- * page as an inline callout list.
- *
- * Spec §10.4 originally called for two tiers: escaped-acquisition ("no longer
- * an acquisition gap") and full graduation ("graduated to healthy"). We also
- * emit a third tier — hasty → fluency — because trading errors for a slower
- * but clean execution is the canonical "clean up your typing" move and the
- * user sees no feedback for it otherwise.
- *
- * A bigram that wasn't present in the previous session is treated as "new";
- * landing in `healthy` on first appearance still counts as a graduation (the
- * user converted a blank row into a solved one). Landing in a non-healthy
- * class on first appearance emits nothing — there's no prior state to improve
- * from.
- */
+export type MovementDirection = 'up' | 'down';
 
-export type GraduationTier =
-	| 'healthy' // anything (non-healthy) → healthy
-	| 'escaped-acquisition' // acquisition → hasty | fluency
-	| 'cleaned-up'; // hasty → fluency
+type RankedClass = Exclude<BigramClassification, 'unclassified'>;
 
-export interface GraduationEvent {
+export interface MovementEvent {
 	bigram: string;
-	tier: GraduationTier;
-	/** Previous classification, or `null` when this bigram wasn't in the prior session. */
-	from: BigramClassification | null;
-	to: BigramClassification;
+	/** `null` when this bigram wasn't in the prior session. */
+	from: RankedClass | null;
+	to: RankedClass;
+	direction: MovementDirection;
 }
 
 /**
- * Detect graduation events between two per-session bigram snapshots.
- *
- * `prev` may be `null` when there's no prior session with bigram data yet; in
- * that case we only emit `healthy`-tier events for bigrams that appeared
- * already classified as healthy (treating "first appearance in healthy" as a
- * graduation from a blank baseline).
- *
- * Results are ordered by tier (`healthy` first, then `escaped-acquisition`,
- * then `cleaned-up`) so the UI can render the most celebratory line first.
+ * Class hierarchy. hasty (fast but errors) sits below fluency (accurate but
+ * slow) because cleaning up errors is the axis to optimise first.
  */
-export function detectGraduations(
+const RANK: Record<RankedClass, number> = {
+	acquisition: 0,
+	hasty: 1,
+	fluency: 2,
+	healthy: 3
+};
+
+/**
+ * Emit a movement for any bigram whose classification changed between the
+ * previous and current session. First-appearance bigrams only emit when they
+ * land in `healthy` (treated as an improvement from a blank baseline);
+ * `unclassified` on either side is skipped as noise.
+ */
+export function detectMovements(
 	prev: readonly BigramAggregate[] | null,
 	current: readonly BigramAggregate[]
-): GraduationEvent[] {
+): MovementEvent[] {
 	const prevClass = new Map<string, BigramClassification>();
 	if (prev) {
 		for (const a of prev) prevClass.set(a.bigram, a.classification);
 	}
 
-	const events: GraduationEvent[] = [];
+	const events: MovementEvent[] = [];
 	for (const agg of current) {
 		const from = prevClass.get(agg.bigram) ?? null;
 		const to = agg.classification;
-		// Skip unclassified transitions in either direction — too noisy.
 		if (to === 'unclassified' || from === 'unclassified') continue;
+		if (from === to) continue;
 
-		// Full graduation: ended in healthy, wasn't already healthy.
-		if (to === 'healthy' && from !== 'healthy') {
-			events.push({ bigram: agg.bigram, tier: 'healthy', from, to });
-			continue;
-		}
-		if (from === null) continue; // first appearance but not healthy — nothing to say yet
-
-		// Escaped acquisition: was acquisition, now hasty or fluency.
-		if (from === 'acquisition' && (to === 'hasty' || to === 'fluency')) {
-			events.push({ bigram: agg.bigram, tier: 'escaped-acquisition', from, to });
+		if (from === null) {
+			if (to === 'healthy') events.push({ bigram: agg.bigram, from, to, direction: 'up' });
 			continue;
 		}
 
-		// Cleaned up: traded errors for clean (hasty → fluency). Same rank-wise
-		// improvement in the "error-free" axis, which is the axis the user
-		// should be optimising first.
-		if (from === 'hasty' && to === 'fluency') {
-			events.push({ bigram: agg.bigram, tier: 'cleaned-up', from, to });
-			continue;
-		}
+		const direction: MovementDirection = RANK[to] > RANK[from] ? 'up' : 'down';
+		events.push({ bigram: agg.bigram, from, to, direction });
 	}
 
-	// Tier order: the most celebratory tier renders first.
-	const TIER_ORDER: GraduationTier[] = ['healthy', 'escaped-acquisition', 'cleaned-up'];
-	events.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
+	// Improvements first; within a group, larger jumps first.
+	events.sort((a, b) => {
+		if (a.direction !== b.direction) return a.direction === 'up' ? -1 : 1;
+		const aJump = a.from === null ? RANK[a.to] : Math.abs(RANK[a.to] - RANK[a.from]);
+		const bJump = b.from === null ? RANK[b.to] : Math.abs(RANK[b.to] - RANK[b.from]);
+		return bJump - aJump;
+	});
 	return events;
 }
 
