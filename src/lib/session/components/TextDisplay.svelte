@@ -9,6 +9,8 @@
 	 * natural spaces. Drill sentences are short enough that mid-word breaks
 	 * don't occur in practice.
 	 */
+	import { SvelteSet } from 'svelte/reactivity';
+
 	type CharState =
 		| 'typed-correct'
 		| 'typed-error'
@@ -62,7 +64,8 @@
 	}: Props = $props();
 
 	const targetPositions = $derived.by(() => {
-		const set = new Set<number>();
+		const set = new SvelteSet<number>();
+
 		if (!targetBigrams || targetBigrams.length === 0) return set;
 		const targets = new Set(targetBigrams);
 		for (let i = 0; i < text.length - 1; i++) {
