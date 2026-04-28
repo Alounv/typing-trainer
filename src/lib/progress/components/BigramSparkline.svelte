@@ -30,11 +30,10 @@
 		return points
 			.map((p, i) => {
 				const x = INSET + (i / (points.length - 1)) * innerW;
-				// Faster (lower meanTime) = higher on screen → "improving" reads as "up".
+				// SVG y grows downward: yMin (fastest) → small y → top of SVG.
+				// Improving reads as "up".
 				const y = INSET + ((p.meanTime - yMin) / yRange) * innerH;
-				// Flip so small meanTime goes up, matching intuition.
-				const flipped = height - y;
-				return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${flipped.toFixed(1)}`;
+				return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
 			})
 			.join(' ');
 	});
@@ -52,7 +51,7 @@
 		const last = points.at(-1)!;
 		const x = INSET + innerW;
 		const y = INSET + ((last.meanTime - yMin) / yRange) * innerH;
-		return { x, y: height - y };
+		return { x, y };
 	});
 
 	// Direction hint — green if improving (last faster than first), muted otherwise.

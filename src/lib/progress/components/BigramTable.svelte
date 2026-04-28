@@ -156,7 +156,7 @@
 							Occ.{sortIndicator('occurrences')}
 						</button>
 					</th>
-					<th>Trend</th>
+					<th>Speed Trend</th>
 					<th class="text-right">
 						<button type="button" class="table-sort-btn" onclick={() => toggleSort('priority')}>
 							Priority{sortIndicator('priority')}
