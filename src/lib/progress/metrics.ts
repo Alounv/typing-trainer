@@ -43,7 +43,7 @@ function rollingStdDev(values: readonly number[], window: number): (number | nul
 }
 
 /** Smoothing window for WPM trend. Spec §10.6 calls for a 7-session average. */
-export const WPM_ROLLING_WINDOW = 7;
+const WPM_ROLLING_WINDOW = 7;
 /** Sparkline depth — number of sliding-window points to plot per bigram. */
 const BIGRAM_SPARKLINE_DEPTH = 10;
 /** Window size for the sliding-window sparkline. Matches `BIGRAM_CLASSIFICATION_WINDOW`

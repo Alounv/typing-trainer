@@ -4,7 +4,6 @@
  * (reuses it to pick the "Next session" CTA), so neither route-level loader
  * needs to know about the other.
  */
-import { RECENT_WINDOW } from '../support/core';
 import type { SessionSummary, UserSettings } from '../support/core';
 import { getProfile } from '../settings';
 import { getBigramHistory, getRecentSessions } from '../support/storage';
@@ -12,7 +11,7 @@ import { buildLivePriorityTargets, buildLiveUndertrained } from '../skill';
 import { isBuiltinCorpusId, loadBuiltinCorpus } from '../corpus';
 import type { FrequencyTable } from '../corpus';
 import { findGraduatedBigrams } from './graduation-filter';
-import { planDailySessions, sliceCompletedFromPlan } from './planner';
+import { planDailySessions, sliceCompletedFromPlan, startOfCalendarDayMs } from './planner';
 import { readPlanStartedAt } from './plan-window';
 import { planSlotKeyForSession } from './types';
 import type { PlanSlotKey, PlannedSession } from './types';
@@ -34,26 +33,20 @@ export interface PlanContext {
 	lastSession?: SessionSummary;
 	graduatedFromRotation: ReadonlySet<string>;
 	userSettings?: UserSettings;
-	/**
-	 * Recent-session window used for planning — exposed so the summary page
-	 * (which also needs it for delta / graduation / milestone detection) can
-	 * reuse the same fetch instead of doing a second one.
-	 */
-	recentSessions: readonly SessionSummary[];
 }
 
 interface ComputePlanOptions {
 	/**
-	 * Optional pre-fetched recent sessions. Passed in by the summary page so
-	 * the delta + graduation + milestone computations share the fetch with
-	 * the planner. Absent → the loader does its own read.
+	 * Optional pre-fetched session set. The summary page already loads up to
+	 * `STATS_SESSION_CAP` sessions for its own UI; passing them here lets the
+	 * planner reuse that fetch. Absent → the planner does its own read.
 	 */
-	recentSessions?: readonly SessionSummary[];
+	statsSessions?: readonly SessionSummary[];
 }
 
 /** Resolve everything the dashboard needs: planner + graduation filter in one await. */
 export async function computePlan(opts: ComputePlanOptions = {}): Promise<PlanContext> {
-	const recentSessions = opts.recentSessions ?? (await getRecentSessions(RECENT_WINDOW));
+	const statsSessions = opts.statsSessions ?? (await getRecentSessions());
 
 	const userSettings = await getProfile();
 	const corpusFrequencies = await loadCorpusFrequencies(userSettings);
@@ -61,20 +54,20 @@ export async function computePlan(opts: ComputePlanOptions = {}): Promise<PlanCo
 	// Class-scoped so an error-weighted ranking can't starve the fluency-only
 	// speed drill. See `SchedulerInput` comment.
 	const accuracyPriorityTargets = buildLivePriorityTargets(
-		recentSessions,
+		statsSessions,
 		corpusFrequencies,
 		undefined,
 		undefined,
-		['hasty', 'acquisition']
+		['hasty', 'acquisition', 'unclassified']
 	);
 	const speedPriorityTargets = buildLivePriorityTargets(
-		recentSessions,
+		statsSessions,
 		corpusFrequencies,
 		undefined,
 		undefined,
 		['fluency']
 	);
-	const undertrainedBigrams = buildLiveUndertrained(recentSessions, corpusFrequencies);
+	const undertrainedBigrams = buildLiveUndertrained(statsSessions, corpusFrequencies);
 
 	const priorityBigrams = [
 		...accuracyPriorityTargets.map((p) => p.bigram),
@@ -86,7 +79,7 @@ export async function computePlan(opts: ComputePlanOptions = {}): Promise<PlanCo
 	const cutoffMs = Math.max(startOfCalendarDayMs(), planStartedAt);
 
 	const fullPlan = planDailySessions({
-		recentSessions,
+		statsSessions,
 		accuracyPriorityTargets,
 		speedPriorityTargets,
 		undertrainedBigrams,
@@ -97,7 +90,7 @@ export async function computePlan(opts: ComputePlanOptions = {}): Promise<PlanCo
 
 	// Only the slice since `cutoffMs` counts toward today's plan. The natural
 	// day-rollover and the manual "Start fresh plan" action share one mechanism.
-	const completedToday = countCompletedSince(recentSessions, cutoffMs);
+	const completedToday = countCompletedSince(statsSessions, cutoffMs);
 	const plan = sliceCompletedFromPlan(fullPlan, completedToday);
 
 	return {
@@ -106,10 +99,9 @@ export async function computePlan(opts: ComputePlanOptions = {}): Promise<PlanCo
 		allDoneForToday: plan.length === 0 && fullPlan.length > 0,
 		completedToday,
 		planStartedAt,
-		lastSession: recentSessions[0],
+		lastSession: statsSessions[0],
 		graduatedFromRotation,
-		userSettings,
-		recentSessions
+		userSettings
 	};
 }
 
@@ -127,12 +119,6 @@ function countCompletedSince(
 		out[key] = (out[key] ?? 0) + 1;
 	}
 	return out;
-}
-
-function startOfCalendarDayMs(): number {
-	const d = new Date();
-	d.setHours(0, 0, 0, 0);
-	return d.getTime();
 }
 
 /** English fallback when the profile is missing or points at an unsupported corpus. */

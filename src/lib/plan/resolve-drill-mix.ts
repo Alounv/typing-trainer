@@ -2,7 +2,6 @@ import type { BigramClassification, DrillMode } from '../support/core';
 import type { FrequencyTable } from '../corpus';
 import { buildLivePriorityTargets, buildLiveUndertrained } from '../skill';
 import { getBigramHistory, getRecentSessions } from '../support/storage';
-import { RECENT_WINDOW } from '../support/core';
 import { findGraduatedBigrams } from './graduation-filter';
 import { DEFAULT_DRILL_TARGET_COUNT, selectAccuracyDrillMix, selectSpeedDrillMix } from './planner';
 
@@ -22,19 +21,19 @@ export async function resolveDrillMix(
 	mode: DrillMode,
 	corpusFrequencies: FrequencyTable | undefined
 ): Promise<DrillMix> {
-	const recent = await getRecentSessions(RECENT_WINDOW);
+	const stats = await getRecentSessions();
 
 	// Class-scoped per mode so direct-nav matches the planner's own mode-scoped selection.
 	const classes: readonly BigramClassification[] =
-		mode === 'speed' ? ['fluency'] : ['hasty', 'acquisition'];
+		mode === 'speed' ? ['fluency'] : ['hasty', 'acquisition', 'unclassified'];
 	const priorityTargets = buildLivePriorityTargets(
-		recent,
+		stats,
 		corpusFrequencies,
 		undefined,
 		undefined,
 		classes
 	);
-	const undertrained = mode === 'accuracy' ? buildLiveUndertrained(recent, corpusFrequencies) : [];
+	const undertrained = mode === 'accuracy' ? buildLiveUndertrained(stats, corpusFrequencies) : [];
 
 	const priorityBigrams = priorityTargets.map((p) => p.bigram);
 	const graduated = await findGraduatedBigrams(priorityBigrams, getBigramHistory);

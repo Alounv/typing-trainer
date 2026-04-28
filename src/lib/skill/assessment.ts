@@ -34,20 +34,19 @@ interface RollingBigramAggregate {
 }
 
 /**
- * Pool the last `window` per-occurrence samples for `bigram`, newest session first.
- * Legacy sessions without samples are skipped. Returns `undefined` when no session carries samples.
+ * Pool the last `window` per-occurrence samples for `bigram`. Caller pre-sorts sessions
+ * newest-first and pre-builds the `bigramIndex` so we don't redo that O(n log n + m)
+ * setup per bigram in a hot loop.
  */
 function aggregateLastNOccurrences(
-	sessions: readonly SessionSummary[],
+	orderedNewestFirst: readonly SessionSummary[],
+	bigramIndex: ReadonlyMap<string, ReadonlyMap<string, BigramAggregate>>,
 	bigram: string,
-	window: number = BIGRAM_CLASSIFICATION_WINDOW
+	window: number
 ): RollingBigramAggregate | undefined {
-	if (window < 1) throw new RangeError('window must be ≥ 1');
-	const ordered = [...sessions].sort((a, b) => b.timestamp - a.timestamp);
-
 	const pooled: BigramSample[] = [];
-	for (const s of ordered) {
-		const agg = s.bigramAggregates.find((a) => a.bigram === bigram);
+	for (const s of orderedNewestFirst) {
+		const agg = bigramIndex.get(s.id)?.get(bigram);
 		if (!agg || !agg.samples) continue;
 		const remaining = window - pooled.length;
 		if (remaining <= 0) break;
@@ -69,6 +68,22 @@ function aggregateLastNOccurrences(
 }
 
 /**
+ * Per-session map from bigram → aggregate, so the rolling-window pooler can do an
+ * O(1) lookup instead of an O(per-session-bigrams) scan on every (bigram, session) pair.
+ */
+function indexBigramAggregates(
+	sessions: readonly SessionSummary[]
+): Map<string, Map<string, BigramAggregate>> {
+	const out = new Map<string, Map<string, BigramAggregate>>();
+	for (const s of sessions) {
+		const inner = new Map<string, BigramAggregate>();
+		for (const agg of s.bigramAggregates) inner.set(agg.bigram, agg);
+		out.set(s.id, inner);
+	}
+	return out;
+}
+
+/**
  * Aggregate all observed bigrams into rows. Class/meanTime/errorRate come from the rolling
  * window (see `aggregateLastNOccurrences`) so a small recent session can't mask a
  * well-established bigram. `occurrences` is the lifetime sum. Legacy data without samples
@@ -80,8 +95,13 @@ export function summarizeBigrams(
 	thresholds: ClassificationThresholds = DEFAULT_THRESHOLDS,
 	window: number = BIGRAM_CLASSIFICATION_WINDOW
 ): BigramSummary[] {
+	if (window < 1) throw new RangeError('window must be ≥ 1');
+
 	// Sessions oldest-first so the final pass overwrites with the newest snapshot.
 	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
+	// Newest-first ordering used by the rolling-window pooler — hoisted so we sort once.
+	const orderedNewestFirst = [...ordered].reverse();
+	const bigramIndex = indexBigramAggregates(sessions);
 
 	const latest = new Map<string, BigramAggregate>();
 	const occurrences = new Map<string, number>();
@@ -98,7 +118,7 @@ export function summarizeBigrams(
 
 	const rows: BigramSummary[] = [];
 	for (const [bigram, latestAgg] of latest) {
-		const rolling = aggregateLastNOccurrences(sessions, bigram, window);
+		const rolling = aggregateLastNOccurrences(orderedNewestFirst, bigramIndex, bigram, window);
 		const classification = rolling ? classifyBigram(rolling, thresholds) : latestAgg.classification;
 		const meanTime = rolling ? rolling.meanTime : latestAgg.meanTime;
 		const errorRate = rolling ? rolling.errorRate : latestAgg.errorRate;
@@ -126,7 +146,8 @@ export function summarizeBigrams(
  *
  * Pass `classifications` to scope the top-N: the score bakes in a 10× error weight, so
  * hasty/acquisition dominate a cross-class ranking and can starve fluency. Accuracy
- * callers pass `['hasty', 'acquisition']`; speed callers pass `['fluency']`.
+ * callers pass `['hasty', 'acquisition', 'unclassified']` (under-observed bigrams that
+ * already look error-prone are worth drilling); speed callers pass `['fluency']`.
  */
 export function buildLivePriorityTargets(
 	sessions: readonly SessionSummary[],
@@ -139,8 +160,12 @@ export function buildLivePriorityTargets(
 	const allowed = classifications ? new Set<BigramClassification>(classifications) : undefined;
 	const out: PriorityBigram[] = [];
 	for (const r of rows) {
-		if (r.classification === 'healthy' || r.classification === 'unclassified') continue;
-		if (allowed && !allowed.has(r.classification)) continue;
+		if (r.classification === 'healthy') continue;
+		if (allowed) {
+			if (!allowed.has(r.classification)) continue;
+		} else if (r.classification === 'unclassified') {
+			continue;
+		}
 		out.push({
 			bigram: r.bigram,
 			score: r.priorityScore,

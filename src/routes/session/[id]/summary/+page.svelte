@@ -94,7 +94,6 @@
 	{:else}
 		<Summary
 			session={state.session}
-			recentSessions={state.recentSessions}
 			statsSessions={state.statsSessions}
 			corpusFrequencies={state.corpusFrequencies}
 		/>

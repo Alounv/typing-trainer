@@ -5,8 +5,12 @@ export async function getSession(id: string): Promise<SessionSummary | undefined
 	return db.sessions.get(id);
 }
 
+const STATS_SESSION_CAP = 500;
+
 /** Newest first. Backed by the `timestamp` index. */
-export async function getRecentSessions(limit: number): Promise<SessionSummary[]> {
+export async function getRecentSessions(
+	limit: number = STATS_SESSION_CAP
+): Promise<SessionSummary[]> {
 	return db.sessions.orderBy('timestamp').reverse().limit(limit).toArray();
 }
 

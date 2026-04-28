@@ -3,7 +3,6 @@ import { getProfile } from '$lib/settings';
 import { isBuiltinCorpusId, loadBuiltinCorpus, type FrequencyTable } from '$lib/corpus';
 import type { SessionSummary, UserSettings } from '$lib/support/core';
 
-const SESSION_CAP = 500;
 const FALLBACK_CORPUS_ID = 'en';
 
 interface AnalyticsInputs {
@@ -14,7 +13,7 @@ interface AnalyticsInputs {
 }
 
 export async function loadAnalyticsInputs(): Promise<AnalyticsInputs> {
-	const [sessions, profile] = await Promise.all([getRecentSessions(SESSION_CAP), getProfile()]);
+	const [sessions, profile] = await Promise.all([getRecentSessions(), getProfile()]);
 
 	// Best-effort: corpus failures still render the chart (summarizeBigrams falls back to freq=1).
 	let corpusFrequencies: FrequencyTable | undefined;

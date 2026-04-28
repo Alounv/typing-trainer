@@ -23,6 +23,3 @@ export const DEFAULT_DIAGNOSTIC_WORD_BUDGET = 100;
 
 /** 5 chars ≈ 1 word — translates word budgets into char targets. */
 export const CHARS_PER_WORD = 5;
-
-/** Recent-session window shared by loaders and the planner. */
-export const RECENT_WINDOW = 20;

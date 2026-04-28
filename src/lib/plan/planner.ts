@@ -21,9 +21,6 @@ function resolveWordBudgets(settings?: UserSettings) {
 	};
 }
 
-/** ~Weekly cadence: 28 ≈ 5 days of full workouts (6 mini-sessions/day). */
-const DIAGNOSTIC_INTERVAL = 28;
-
 export const DEFAULT_DRILL_TARGET_COUNT = 10;
 
 /**
@@ -34,7 +31,7 @@ const CYCLES_PER_DAY = 2;
 
 export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	const {
-		recentSessions,
+		statsSessions,
 		graduatedFromRotation,
 		accuracyPriorityTargets,
 		speedPriorityTargets,
@@ -46,7 +43,7 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 
 	const budgets = resolveWordBudgets(userSettings);
 
-	if (recentSessions.length === 0) {
+	if (statsSessions.length === 0) {
 		return [
 			diagnosticPlan(
 				budgets.diagnostic,
@@ -57,7 +54,7 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	}
 
 	// Missing diagnostic (manual delete / schema migration) — fail safe.
-	const latestDiagnostic = findLatestDiagnostic(recentSessions);
+	const latestDiagnostic = findLatestDiagnostic(statsSessions);
 	if (!latestDiagnostic) {
 		return [
 			diagnosticPlan(
@@ -68,13 +65,12 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 		];
 	}
 
-	const since = sessionsSinceLastDiagnostic(recentSessions);
-	if (since >= DIAGNOSTIC_INTERVAL) {
+	if (latestDiagnostic.timestamp < startOfCalendarDayMs()) {
 		return [
 			diagnosticPlan(
 				budgets.diagnostic,
-				'Weekly diagnostic',
-				`${since} sessions since your last diagnostic — time to refresh targets.`
+				'Daily diagnostic',
+				'First session of the day — refreshes your baseline and drill targets.'
 			)
 		];
 	}
@@ -137,17 +133,16 @@ function buildDrillCycles(
 	return plan;
 }
 
-// `recent` is newest-first; Infinity means "no diagnostic found, definitely due".
-function sessionsSinceLastDiagnostic(recent: readonly { type: string }[]): number {
-	for (let i = 0; i < recent.length; i++) {
-		if (recent[i].type === 'diagnostic') return i;
-	}
-	return Number.POSITIVE_INFINITY;
+export function startOfCalendarDayMs(): number {
+	const d = new Date();
+	d.setHours(0, 0, 0, 0);
+	return d.getTime();
 }
 
 /**
- * Priority = `hasty` + `acquisition` (both fail on accuracy); exposure =
- * undertrained backfill (unmeasured bigrams are an error risk too).
+ * Priority = `hasty` + `acquisition` + `unclassified` (all fail on accuracy or
+ * lack the data to prove they don't); exposure = undertrained backfill
+ * (corpus bigrams the user simply hasn't seen yet).
  *
  * Exported so the drill route's direct-nav fallback uses the same selection.
  */
@@ -161,7 +156,12 @@ export function selectAccuracyDrillMix(
 
 	const priority: string[] = [];
 	for (const t of priorityTargets) {
-		if (t.classification !== 'hasty' && t.classification !== 'acquisition') continue;
+		if (
+			t.classification !== 'hasty' &&
+			t.classification !== 'acquisition' &&
+			t.classification !== 'unclassified'
+		)
+			continue;
 		if (filter.has(t.bigram)) continue;
 		priority.push(t.bigram);
 		if (priority.length >= count) break;

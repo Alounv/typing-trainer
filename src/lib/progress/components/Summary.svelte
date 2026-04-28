@@ -3,35 +3,22 @@
 	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
 	import { summarizeBigrams } from '$lib/skill';
-	import { computeSessionDelta } from '../delta';
 	import { detectWindowedMovements, detectMilestone } from '../celebrations';
 	import { buildBigramTrend } from '../metrics';
-	import SessionDelta from './SessionDelta.svelte';
 	import BigramMovements from './BigramMovements.svelte';
 	import MilestoneBanner from './MilestoneBanner.svelte';
 	import BigramTable from './BigramTable.svelte';
 
 	interface Props {
 		session: SessionSummary;
-		/** Recent window including the current session — delta filters `session` out internally. */
-		recentSessions: readonly SessionSummary[];
-		/**
-		 * Wider session window for the drilled-bigram table. Uses the same 500-cap as Analytics
-		 * so the 10-occurrence stats window can fill for rare bigrams.
-		 */
-		statsSessions?: readonly SessionSummary[];
+		/** Newest-first session list (capped at storage limit). */
+		statsSessions: readonly SessionSummary[];
 		corpusFrequencies?: FrequencyTable | undefined;
 	}
 
-	let {
-		session,
-		recentSessions,
-		statsSessions = recentSessions,
-		corpusFrequencies = undefined
-	}: Props = $props();
+	let { session, statsSessions, corpusFrequencies = undefined }: Props = $props();
 
-	const delta = $derived(computeSessionDelta(session, recentSessions));
-	const milestone = $derived(detectMilestone(session, recentSessions));
+	const milestone = $derived(detectMilestone(session, statsSessions));
 
 	const drilledBigrams = $derived(session.bigramsTargeted ?? []);
 	const drilledRows = $derived.by(() => {
@@ -89,8 +76,6 @@
 		</div>
 	</dl>
 </section>
-
-<SessionDelta {delta} />
 
 <BigramMovements events={movements} />
 

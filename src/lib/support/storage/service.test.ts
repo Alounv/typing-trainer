@@ -52,13 +52,13 @@ describe('storage service — round-trip', () => {
 		expect(await getSession('does-not-exist')).toBeUndefined();
 	});
 
-	it('lists recent sessions newest-first, respecting the limit', async () => {
+	it('lists recent sessions newest-first', async () => {
 		await saveSession(makeSession({ id: 'a', timestamp: 1_000 }));
 		await saveSession(makeSession({ id: 'b', timestamp: 3_000 }));
 		await saveSession(makeSession({ id: 'c', timestamp: 2_000 }));
 
-		const recent = await getRecentSessions(2);
-		expect(recent.map((s) => s.id)).toEqual(['b', 'c']);
+		const recent = await getRecentSessions();
+		expect(recent.map((s) => s.id)).toEqual(['b', 'c', 'a']);
 	});
 
 	it('mirrors embedded aggregates into the bigram history table', async () => {

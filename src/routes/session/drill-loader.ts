@@ -1,6 +1,6 @@
 import { loadBuiltinCorpus, isBuiltinCorpusId, generateText } from '$lib/corpus';
 import type { BuiltinCorpusId } from '$lib/corpus';
-import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET, RECENT_WINDOW } from '$lib/support/core';
+import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from '$lib/support/core';
 import type { DrillMode, UserSettings } from '$lib/support/core';
 import { getProfile } from '$lib/settings';
 import { getRecentSessions } from '$lib/support/storage';
@@ -56,7 +56,7 @@ export async function prepareDrillSession(routeMode: DrillMode): Promise<BigramD
 
 /** 0 when no diagnostic on file — shell treats that as "hide the ghost cursor." */
 async function getLatestBaselineWPM(): Promise<number> {
-	const recent = await getRecentSessions(RECENT_WINDOW);
+	const recent = await getRecentSessions();
 	const report = recent.find((s) => s.type === 'diagnostic')?.diagnosticReport;
 	return report?.baselineWPM ?? 0;
 }

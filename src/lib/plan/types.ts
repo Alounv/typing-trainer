@@ -53,11 +53,8 @@ export interface PlannedSession {
 }
 
 export interface SchedulerInput {
-	/**
-	 * Newest-first (matching `getRecentSessions`). The planner only reads
-	 * enough to decide diagnostic cadence; a window of ~20 is plenty.
-	 */
-	recentSessions: readonly SessionSummary[];
+	/** Newest-first session history (matching `getRecentSessions`). */
+	statsSessions: readonly SessionSummary[];
 	/**
 	 * Bigrams that the "3 consecutive healthy sessions" filter has
 	 * retired from active drill rotation. Planner removes these from

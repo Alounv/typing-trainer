@@ -63,12 +63,12 @@ export interface PriorityBigram {
 	meanTime: number;
 	errorRate: number;
 	/**
-	 * Non-healthy class this bigram falls into. `unclassified` and `healthy`
-	 * never appear in the priority list, so the type excludes them — this lets
-	 * the drill planner route hasty/acquisition → accuracy-drill and
-	 * fluency → speed-drill without re-deriving the class at plan time.
+	 * Class this bigram falls into. `healthy` never appears (no need to drill).
+	 * `unclassified` is allowed so the accuracy drill can pick up under-observed
+	 * but error-prone bigrams; the planner routes hasty/acquisition/unclassified
+	 * → accuracy-drill and fluency → speed-drill.
 	 */
-	classification: Exclude<BigramClassification, 'healthy' | 'unclassified'>;
+	classification: Exclude<BigramClassification, 'healthy'>;
 }
 
 export type SessionType = 'diagnostic' | 'bigram-drill' | 'real-text';
