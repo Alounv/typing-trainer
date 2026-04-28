@@ -24,10 +24,11 @@ function resolveWordBudgets(settings?: UserSettings) {
 export const DEFAULT_DRILL_TARGET_COUNT = 10;
 
 /**
- * Each cycle is accuracy drill → speed drill → real-text. Drill slots with
+ * Each cycle is accuracy × 2 → speed × 2 → real-text. Drill slots with
  * empty target pools are skipped; real-text always runs as the transfer test.
  */
 const CYCLES_PER_DAY = 2;
+const DRILLS_PER_MODE_PER_CYCLE = 2;
 
 export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	const {
@@ -126,8 +127,16 @@ function buildDrillCycles(
 ): PlannedSession[] {
 	const plan: PlannedSession[] = [];
 	for (let i = 0; i < CYCLES_PER_DAY; i++) {
-		if (accuracyHasTargets) plan.push(drillPlan(accuracyMix, 'accuracy', budgets.bigramDrill));
-		if (speedHasTargets) plan.push(drillPlan(speedMix, 'speed', budgets.bigramDrill));
+		if (accuracyHasTargets) {
+			for (let j = 0; j < DRILLS_PER_MODE_PER_CYCLE; j++) {
+				plan.push(drillPlan(accuracyMix, 'accuracy', budgets.bigramDrill));
+			}
+		}
+		if (speedHasTargets) {
+			for (let j = 0; j < DRILLS_PER_MODE_PER_CYCLE; j++) {
+				plan.push(drillPlan(speedMix, 'speed', budgets.bigramDrill));
+			}
+		}
 		plan.push(realtextPlan(budgets.realText));
 	}
 	return plan;

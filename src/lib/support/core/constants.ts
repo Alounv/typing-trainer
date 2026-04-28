@@ -15,7 +15,7 @@ export const MIN_OCCURRENCES_FOR_CLASSIFICATION = 10;
 
 // --- Word budget defaults (user-tunable via profile) ---
 
-export const DEFAULT_BIGRAM_DRILL_WORD_BUDGET = 50;
+export const DEFAULT_BIGRAM_DRILL_WORD_BUDGET = 25;
 export const DEFAULT_REAL_TEXT_WORD_BUDGET = 25;
 export const DEFAULT_DIAGNOSTIC_WORD_BUDGET = 100;
 
