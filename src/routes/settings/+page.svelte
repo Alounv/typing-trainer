@@ -20,7 +20,10 @@
 		DEFAULT_REAL_TEXT_WORD_BUDGET,
 		DEFAULT_DIAGNOSTIC_WORD_BUDGET,
 		DEFAULT_SPEED_THRESHOLD_MS,
-		DEFAULT_HIGH_ERROR_THRESHOLD
+		DEFAULT_HIGH_ERROR_THRESHOLD,
+		DEFAULT_CYCLES_PER_DAY,
+		DEFAULT_ACCURACY_DRILLS_PER_CYCLE,
+		DEFAULT_SPEED_DRILLS_PER_CYCLE
 	} from '$lib/support/core';
 	import type { Language, UserSettings } from '$lib/support/core';
 	import type { BuiltinCorpusId } from '$lib/corpus';
@@ -148,7 +151,8 @@
 		</p>
 		<h1 class="text-4xl font-semibold tracking-tight text-base-content">Tune the trainer</h1>
 		<p class="max-w-xl text-base-content/65">
-			Language, word budgets, classification thresholds. Stored locally — no account, no sync.
+			Language, word budgets, classification thresholds, plan structure. Stored locally — no
+			account, no sync.
 		</p>
 	</header>
 
@@ -328,6 +332,80 @@
 							data-testid="threshold-errorrate"
 						/>
 						<span class="font-mono text-xs text-base-content/40">%</span>
+					</dd>
+				</div>
+			</dl>
+		</section>
+
+		<section class="space-y-6" aria-labelledby="plan-heading">
+			<div class="flex items-baseline gap-4">
+				<span class="font-mono text-xs text-base-content/40 tabular-nums">04</span>
+				<h2 id="plan-heading" class="text-xl font-semibold tracking-tight">Plan structure</h2>
+			</div>
+			<p class="max-w-xl text-sm text-base-content/65">
+				How many cycles per day, and how many accuracy/speed drill repetitions per cycle. Each cycle
+				ends with a real-text run.
+			</p>
+
+			<dl class="divide-y divide-base-300 border-y border-base-300">
+				<div class="flex items-center justify-between gap-6 py-4">
+					<dt class="text-sm">
+						<label for="plan-cycles" class="cursor-pointer">Cycles per day</label>
+						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
+							>default {DEFAULT_CYCLES_PER_DAY}</span
+						>
+					</dt>
+					<dd class="flex items-baseline gap-2">
+						<input
+							id="plan-cycles"
+							type="number"
+							min="1"
+							max="10"
+							class="w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
+							bind:value={form.planStructure!.cyclesPerDay}
+							data-testid="plan-cycles"
+						/>
+						<span class="font-mono text-xs text-base-content/40">cycles</span>
+					</dd>
+				</div>
+				<div class="flex items-center justify-between gap-6 py-4">
+					<dt class="text-sm">
+						<label for="plan-accuracy" class="cursor-pointer">Accuracy drills per cycle</label>
+						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
+							>default {DEFAULT_ACCURACY_DRILLS_PER_CYCLE}</span
+						>
+					</dt>
+					<dd class="flex items-baseline gap-2">
+						<input
+							id="plan-accuracy"
+							type="number"
+							min="0"
+							max="10"
+							class="w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
+							bind:value={form.planStructure!.accuracyDrillsPerCycle}
+							data-testid="plan-accuracy"
+						/>
+						<span class="font-mono text-xs text-base-content/40">reps</span>
+					</dd>
+				</div>
+				<div class="flex items-center justify-between gap-6 py-4">
+					<dt class="text-sm">
+						<label for="plan-speed" class="cursor-pointer">Speed drills per cycle</label>
+						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
+							>default {DEFAULT_SPEED_DRILLS_PER_CYCLE}</span
+						>
+					</dt>
+					<dd class="flex items-baseline gap-2">
+						<input
+							id="plan-speed"
+							type="number"
+							min="0"
+							max="10"
+							class="w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
+							bind:value={form.planStructure!.speedDrillsPerCycle}
+							data-testid="plan-speed"
+						/>
+						<span class="font-mono text-xs text-base-content/40">reps</span>
 					</dd>
 				</div>
 			</dl>

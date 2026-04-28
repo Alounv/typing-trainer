@@ -19,6 +19,12 @@ export const DEFAULT_BIGRAM_DRILL_WORD_BUDGET = 25;
 export const DEFAULT_REAL_TEXT_WORD_BUDGET = 25;
 export const DEFAULT_DIAGNOSTIC_WORD_BUDGET = 100;
 
+// --- Plan structure defaults (user-tunable via profile) ---
+
+export const DEFAULT_CYCLES_PER_DAY = 2;
+export const DEFAULT_ACCURACY_DRILLS_PER_CYCLE = 2;
+export const DEFAULT_SPEED_DRILLS_PER_CYCLE = 2;
+
 // --- Shared conversions / windows ---
 
 /** 5 chars ≈ 1 word — translates word budgets into char targets. */

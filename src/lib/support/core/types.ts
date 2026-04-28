@@ -144,6 +144,15 @@ export interface UserSettings {
 		realText: number;
 		diagnostic: number;
 	};
+	/**
+	 * Shape of the daily plan: how many cycles, and how many accuracy/speed
+	 * drill repetitions per cycle. Absent keys fall back to `DEFAULT_*` constants.
+	 */
+	planStructure?: {
+		cyclesPerDay: number;
+		accuracyDrillsPerCycle: number;
+		speedDrillsPerCycle: number;
+	};
 }
 
 /** Atomic keystroke unit. `corrected` / `correctionDelay` are derived in post-processing. */

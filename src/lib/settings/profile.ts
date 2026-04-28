@@ -15,7 +15,10 @@ import {
 	DEFAULT_HIGH_ERROR_THRESHOLD,
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 	DEFAULT_REAL_TEXT_WORD_BUDGET,
-	DEFAULT_DIAGNOSTIC_WORD_BUDGET
+	DEFAULT_DIAGNOSTIC_WORD_BUDGET,
+	DEFAULT_CYCLES_PER_DAY,
+	DEFAULT_ACCURACY_DRILLS_PER_CYCLE,
+	DEFAULT_SPEED_DRILLS_PER_CYCLE
 } from '$lib/support/core';
 import type { UserSettings } from '$lib/support/core';
 
@@ -36,6 +39,11 @@ export function buildDefaultProfile(): UserSettings {
 			bigramDrill: DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 			realText: DEFAULT_REAL_TEXT_WORD_BUDGET,
 			diagnostic: DEFAULT_DIAGNOSTIC_WORD_BUDGET
+		},
+		planStructure: {
+			cyclesPerDay: DEFAULT_CYCLES_PER_DAY,
+			accuracyDrillsPerCycle: DEFAULT_ACCURACY_DRILLS_PER_CYCLE,
+			speedDrillsPerCycle: DEFAULT_SPEED_DRILLS_PER_CYCLE
 		}
 	};
 }
@@ -51,7 +59,8 @@ export function withDefaults(stored: UserSettings): UserSettings {
 		...defaults,
 		...stored,
 		thresholds: { ...defaults.thresholds!, ...(stored.thresholds ?? {}) },
-		wordBudgets: { ...defaults.wordBudgets!, ...(stored.wordBudgets ?? {}) }
+		wordBudgets: { ...defaults.wordBudgets!, ...(stored.wordBudgets ?? {}) },
+		planStructure: { ...defaults.planStructure!, ...(stored.planStructure ?? {}) }
 	};
 }
 

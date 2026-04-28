@@ -1,7 +1,10 @@
 import {
 	DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 	DEFAULT_REAL_TEXT_WORD_BUDGET,
-	DEFAULT_DIAGNOSTIC_WORD_BUDGET
+	DEFAULT_DIAGNOSTIC_WORD_BUDGET,
+	DEFAULT_CYCLES_PER_DAY,
+	DEFAULT_ACCURACY_DRILLS_PER_CYCLE,
+	DEFAULT_SPEED_DRILLS_PER_CYCLE
 } from '../support/core';
 import type {
 	DrillMode,
@@ -21,14 +24,24 @@ function resolveWordBudgets(settings?: UserSettings) {
 	};
 }
 
+function resolvePlanStructure(settings?: UserSettings) {
+	return {
+		cyclesPerDay: settings?.planStructure?.cyclesPerDay ?? DEFAULT_CYCLES_PER_DAY,
+		accuracyDrillsPerCycle:
+			settings?.planStructure?.accuracyDrillsPerCycle ?? DEFAULT_ACCURACY_DRILLS_PER_CYCLE,
+		speedDrillsPerCycle:
+			settings?.planStructure?.speedDrillsPerCycle ?? DEFAULT_SPEED_DRILLS_PER_CYCLE
+	};
+}
+
 export const DEFAULT_DRILL_TARGET_COUNT = 10;
 
 /**
- * Each cycle is accuracy × 2 → speed × 2 → real-text. Drill slots with
- * empty target pools are skipped; real-text always runs as the transfer test.
+ * Each cycle is accuracy drills → speed drills → real-text. Counts are
+ * user-tunable via `UserSettings.planStructure`; defaults live in
+ * `support/core/constants`. Drill slots with empty target pools are skipped;
+ * real-text always runs as the transfer test.
  */
-const CYCLES_PER_DAY = 2;
-const DRILLS_PER_MODE_PER_CYCLE = 2;
 
 export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	const {
@@ -43,6 +56,7 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 	} = input;
 
 	const budgets = resolveWordBudgets(userSettings);
+	const structure = resolvePlanStructure(userSettings);
 
 	if (statsSessions.length === 0) {
 		return [
@@ -93,10 +107,17 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 
 	const drillPlanItems: PlannedSession[] =
 		!accuracyHasTargets && !speedHasTargets
-			? Array.from({ length: CYCLES_PER_DAY }, () =>
+			? Array.from({ length: structure.cyclesPerDay }, () =>
 					realtextPlan(budgets.realText, 'no-targets-left')
 				)
-			: buildDrillCycles(accuracyMix, speedMix, budgets, accuracyHasTargets, speedHasTargets);
+			: buildDrillCycles(
+					accuracyMix,
+					speedMix,
+					budgets,
+					structure,
+					accuracyHasTargets,
+					speedHasTargets
+				);
 
 	// "Start fresh plan" bumps planStartedAt; diagnostics older than that are
 	// stale relative to the new window, so prepend a refresher.
@@ -122,18 +143,23 @@ function buildDrillCycles(
 	accuracyMix: { priority: string[]; exposure: string[] },
 	speedMix: { priority: string[]; exposure: string[] },
 	budgets: { bigramDrill: number; realText: number; diagnostic: number },
+	structure: {
+		cyclesPerDay: number;
+		accuracyDrillsPerCycle: number;
+		speedDrillsPerCycle: number;
+	},
 	accuracyHasTargets: boolean,
 	speedHasTargets: boolean
 ): PlannedSession[] {
 	const plan: PlannedSession[] = [];
-	for (let i = 0; i < CYCLES_PER_DAY; i++) {
+	for (let i = 0; i < structure.cyclesPerDay; i++) {
 		if (accuracyHasTargets) {
-			for (let j = 0; j < DRILLS_PER_MODE_PER_CYCLE; j++) {
+			for (let j = 0; j < structure.accuracyDrillsPerCycle; j++) {
 				plan.push(drillPlan(accuracyMix, 'accuracy', budgets.bigramDrill));
 			}
 		}
 		if (speedHasTargets) {
-			for (let j = 0; j < DRILLS_PER_MODE_PER_CYCLE; j++) {
+			for (let j = 0; j < structure.speedDrillsPerCycle; j++) {
 				plan.push(drillPlan(speedMix, 'speed', budgets.bigramDrill));
 			}
 		}
