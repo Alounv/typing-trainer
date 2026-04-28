@@ -88,7 +88,7 @@
 				{drilledRows.length === 1 ? 'bigram' : 'bigrams'} targeted
 			</p>
 		</div>
-		<BigramTable rows={drilledRows} />
+		<BigramTable rows={drilledRows} focus={session.drillMode} />
 		<p class="text-xs text-base-content/55">
 			Stats span the last 10 occurrences across all sessions — same as the Analytics page.
 		</p>

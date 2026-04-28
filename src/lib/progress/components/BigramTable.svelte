@@ -8,9 +8,12 @@
 	interface Props {
 		/** Skill's per-bigram assessment plus the sparkline trend from Progress. */
 		rows: (BigramSummary & { trend: BigramTrendPoint[] })[];
+		focus?: 'accuracy' | 'speed';
 	}
 
-	let { rows }: Props = $props();
+	let { rows, focus }: Props = $props();
+	const showSpeed = $derived(focus !== 'accuracy');
+	const showErrors = $derived(focus !== 'speed');
 
 	/**
 	 * Render whitespace as the open-box glyph (U+2423). Bigrams involving
@@ -163,18 +166,22 @@
 							Occ.{sortIndicator('occurrences')}
 						</button>
 					</th>
-					<th class="text-right">
-						<button type="button" class="table-sort-btn" onclick={() => toggleSort('meanTime')}>
-							Speed{sortIndicator('meanTime')}
-						</button>
-					</th>
-					<th></th>
-					<th class="text-right">
-						<button type="button" class="table-sort-btn" onclick={() => toggleSort('errorRate')}>
-							Errors{sortIndicator('errorRate')}
-						</button>
-					</th>
-					<th></th>
+					{#if showSpeed}
+						<th class="text-right">
+							<button type="button" class="table-sort-btn" onclick={() => toggleSort('meanTime')}>
+								Speed{sortIndicator('meanTime')}
+							</button>
+						</th>
+						<th></th>
+					{/if}
+					{#if showErrors}
+						<th class="text-right">
+							<button type="button" class="table-sort-btn" onclick={() => toggleSort('errorRate')}>
+								Errors{sortIndicator('errorRate')}
+							</button>
+						</th>
+						<th></th>
+					{/if}
 					<th class="text-right">
 						<button type="button" class="table-sort-btn" onclick={() => toggleSort('priority')}>
 							Priority{sortIndicator('priority')}
@@ -194,10 +201,14 @@
 							</span>
 						</td>
 						<td class="text-right font-mono tabular-nums">{fmtOccurrences(row.occurrences)}</td>
-						<td class="text-right font-mono tabular-nums">{fmtWpm(row.meanTime)}</td>
-						<td><BigramSparkline points={row.trend} metric="meanTime" /></td>
-						<td class="text-right font-mono tabular-nums">{fmtPct(row.errorRate)}</td>
-						<td><BigramSparkline points={row.trend} metric="errorRate" /></td>
+						{#if showSpeed}
+							<td class="text-right font-mono tabular-nums">{fmtWpm(row.meanTime)}</td>
+							<td><BigramSparkline points={row.trend} metric="meanTime" /></td>
+						{/if}
+						{#if showErrors}
+							<td class="text-right font-mono tabular-nums">{fmtPct(row.errorRate)}</td>
+							<td><BigramSparkline points={row.trend} metric="errorRate" /></td>
+						{/if}
 						<td class="text-right font-mono tabular-nums">{row.priorityScore.toFixed(2)}</td>
 					</tr>
 				{/each}

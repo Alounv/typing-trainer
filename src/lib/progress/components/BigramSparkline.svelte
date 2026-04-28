@@ -3,15 +3,13 @@
 	rate). Used standalone on the analytics page and embedded in trend columns of the
 	bigram table. No axis labels — the point is shape, not values.
 
-	Convention: lower value = better. Improving reads as "up" (line climbs), green when
-	the latest value is below the oldest in the window.
 -->
 <script lang="ts">
 	import type { BigramTrendPoint } from '../metrics';
 
 	interface Props {
 		points: BigramTrendPoint[];
-		/** Which metric to plot. Both follow lower=better semantics. */
+		/** Which metric to plot. */
 		metric?: 'meanTime' | 'errorRate';
 		/** Outer width in CSS pixels. Table column = ~80px, standalone = larger. */
 		width?: number;
@@ -35,8 +33,11 @@
 	// change" doesn't read as "stuck at the worst value".
 	function projectY(value: number, yMin: number, yRange: number | null, innerH: number): number {
 		if (yRange === null) return INSET + innerH / 2;
-		// SVG y grows downward: yMin (best) → small y → top of SVG. Improving reads as "up".
-		return INSET + ((value - yMin) / yRange) * innerH;
+		// meanTime: lower (faster) → top of SVG, so improving reads as "up".
+		// errorRate: lower (cleaner) → bottom of SVG, so improving reads as "down".
+		const norm = (value - yMin) / yRange;
+		const projected = metric === 'errorRate' ? 1 - norm : norm;
+		return INSET + projected * innerH;
 	}
 
 	const path = $derived.by(() => {
