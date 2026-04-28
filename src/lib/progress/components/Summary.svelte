@@ -1,34 +1,58 @@
 <script lang="ts">
 	import type { SessionSummary } from '$lib/support/core';
 	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/support/core';
+	import type { FrequencyTable } from '$lib/corpus';
+	import { summarizeBigrams } from '$lib/skill';
 	import { computeSessionDelta } from '../delta';
-	import { detectMovements, detectMilestone } from '../celebrations';
+	import { detectWindowedMovements, detectMilestone } from '../celebrations';
+	import { buildBigramTrend } from '../metrics';
 	import SessionDelta from './SessionDelta.svelte';
 	import BigramMovements from './BigramMovements.svelte';
 	import MilestoneBanner from './MilestoneBanner.svelte';
+	import BigramTable from './BigramTable.svelte';
 
 	interface Props {
 		session: SessionSummary;
 		/** Recent window including the current session — delta filters `session` out internally. */
 		recentSessions: readonly SessionSummary[];
+		/**
+		 * Wider session window for the drilled-bigram table. Uses the same 500-cap as Analytics
+		 * so the 10-occurrence stats window can fill for rare bigrams.
+		 */
+		statsSessions?: readonly SessionSummary[];
+		corpusFrequencies?: FrequencyTable | undefined;
 	}
 
-	let { session, recentSessions }: Props = $props();
+	let {
+		session,
+		recentSessions,
+		statsSessions = recentSessions,
+		corpusFrequencies = undefined
+	}: Props = $props();
 
 	const delta = $derived(computeSessionDelta(session, recentSessions));
 	const milestone = $derived(detectMilestone(session, recentSessions));
 
-	// Mirrors the rule inside `computeSessionDelta` so the list compares against
-	// the same prior session.
+	const drilledBigrams = $derived(session.bigramsTargeted ?? []);
+	const drilledRows = $derived.by(() => {
+		if (drilledBigrams.length === 0) return [];
+		const targeted = new Set(drilledBigrams);
+		const summaries = summarizeBigrams(statsSessions, corpusFrequencies);
+		return summaries
+			.filter((row) => targeted.has(row.bigram))
+			.map((row) => ({ ...row, trend: buildBigramTrend(statsSessions, row.bigram) }));
+	});
+
+	// Compare windowed classifications before vs. after this session so movements
+	// reflect the user's overall standing — same view as the bigram table — rather
+	// than a single noisy session's per-session classification. For drill sessions
+	// the list is scoped to the drilled bigrams to stay aligned with the table
+	// below; non-drill sessions surface all movements.
 	const movements = $derived.by(() => {
-		const prevWithBigrams =
-			recentSessions
-				.filter((s) => s.id !== session.id && s.bigramAggregates.length > 0)
-				.sort((a, b) => b.timestamp - a.timestamp)[0] ?? null;
-		return detectMovements(
-			prevWithBigrams ? prevWithBigrams.bigramAggregates : null,
-			session.bigramAggregates
-		);
+		const all = detectWindowedMovements(statsSessions, session.id);
+		if (drilledBigrams.length === 0) return all;
+		const targeted = new Set(drilledBigrams);
+		return all.filter((m) => targeted.has(m.bigram));
 	});
 
 	const ERROR_WARN_THRESHOLD = DEFAULT_HIGH_ERROR_THRESHOLD / 2;
@@ -69,3 +93,19 @@
 <SessionDelta {delta} />
 
 <BigramMovements events={movements} />
+
+{#if drilledRows.length > 0}
+	<section class="space-y-3" data-testid="drilled-bigrams-table">
+		<div class="flex items-baseline justify-between">
+			<h2 class="text-xl font-semibold">Drilled bigrams</h2>
+			<p class="text-sm text-base-content/55">
+				{drilledRows.length}
+				{drilledRows.length === 1 ? 'bigram' : 'bigrams'} targeted
+			</p>
+		</div>
+		<BigramTable rows={drilledRows} />
+		<p class="text-xs text-base-content/55">
+			Stats span the last 10 occurrences across all sessions — same as the Analytics page.
+		</p>
+	</section>
+{/if}

@@ -44,8 +44,11 @@ function rollingStdDev(values: readonly number[], window: number): (number | nul
 
 /** Smoothing window for WPM trend. Spec §10.6 calls for a 7-session average. */
 export const WPM_ROLLING_WINDOW = 7;
-/** Sparkline depth for per-bigram mean transition time. Spec §10.6. */
-const BIGRAM_SPARKLINE_DEPTH = 8;
+/** Sparkline depth — number of sliding-window points to plot per bigram. */
+const BIGRAM_SPARKLINE_DEPTH = 10;
+/** Window size for the sliding-window sparkline. Matches `BIGRAM_CLASSIFICATION_WINDOW`
+ *  so the last point equals the value shown in the table cell. */
+const BIGRAM_SPARKLINE_WINDOW = 10;
 
 /**
  * Single point on a per-session trend chart. Shared shape across metrics so one chart
@@ -93,36 +96,65 @@ export function buildErrorRateSeries(sessions: readonly SessionSummary[]): Trend
 	return buildMetricSeries(sessions, (s) => s.errorRate);
 }
 
-/** One point on a per-bigram sparkline: session timestamp + mean transition time. */
+/** One point on a per-bigram sparkline. Each point is a rolling-window summary
+ *  over `BIGRAM_SPARKLINE_WINDOW` consecutive occurrences. */
 export interface BigramTrendPoint {
-	sessionId: string;
-	timestamp: number;
 	meanTime: number;
 	errorRate: number;
 }
 
 /**
- * Extract the last N sessions' mean-time trend for a single bigram. Sessions that didn't
- * observe the bigram are skipped (no gaps emitted).
+ * Pool the most recent samples for `bigram` in chronological order (oldest →
+ * newest). Walks sessions newest-first and prepends each session's tail so
+ * sessions arrive newest-first while samples within a session keep their
+ * original observation order. Stops once `limit` samples have been collected.
+ */
+function poolRecentSamples(
+	sessions: readonly SessionSummary[],
+	bigram: string,
+	limit: number
+): { correct: boolean; timing: number | null }[] {
+	const ordered = [...sessions].sort((a, b) => b.timestamp - a.timestamp);
+	const pool: { correct: boolean; timing: number | null }[] = [];
+	for (const s of ordered) {
+		const agg = s.bigramAggregates.find((a) => a.bigram === bigram);
+		if (!agg || !agg.samples) continue;
+		const remaining = limit - pool.length;
+		if (remaining <= 0) break;
+		const tail = agg.samples.slice(Math.max(0, agg.samples.length - remaining));
+		pool.unshift(...tail);
+		if (pool.length >= limit) break;
+	}
+	return pool;
+}
+
+/**
+ * Sliding-window trend: pool the most recent `window + depth - 1` occurrences,
+ * then slide a `window`-sized window across them, emitting one point per
+ * position. The last point's metrics equal those shown in the table cell.
+ *
+ * Returns `[]` when the pool can't fill a single window — the sparkline then
+ * falls back to its empty state.
  */
 export function buildBigramTrend(
 	sessions: readonly SessionSummary[],
 	bigram: string,
+	window: number = BIGRAM_SPARKLINE_WINDOW,
 	depth: number = BIGRAM_SPARKLINE_DEPTH
 ): BigramTrendPoint[] {
+	const samples = poolRecentSamples(sessions, bigram, window + depth - 1);
+	if (samples.length < window) return [];
 	const points: BigramTrendPoint[] = [];
-	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
-	for (const s of ordered) {
-		const agg = s.bigramAggregates.find((a) => a.bigram === bigram);
-		if (!agg || !Number.isFinite(agg.meanTime)) continue;
+	for (let end = window; end <= samples.length; end++) {
+		const slice = samples.slice(end - window, end);
+		const errorCount = slice.reduce((n, s) => n + (s.correct ? 0 : 1), 0);
+		const timings = slice.map((s) => s.timing).filter((t): t is number => t !== null);
 		points.push({
-			sessionId: s.id,
-			timestamp: s.timestamp,
-			meanTime: agg.meanTime,
-			errorRate: agg.errorRate
+			meanTime: timings.length === 0 ? NaN : timings.reduce((a, b) => a + b, 0) / timings.length,
+			errorRate: errorCount / slice.length
 		});
 	}
-	return points.slice(-depth);
+	return points;
 }
 
 /**

@@ -92,7 +92,12 @@
 	{:else if state.status === 'error'}
 		<p class="text-error" role="alert">Couldn't load session: {state.message}</p>
 	{:else}
-		<Summary session={state.session} recentSessions={state.recentSessions} />
+		<Summary
+			session={state.session}
+			recentSessions={state.recentSessions}
+			statsSessions={state.statsSessions}
+			corpusFrequencies={state.corpusFrequencies}
+		/>
 
 		<div class="flex flex-wrap items-center gap-6 pt-2">
 			{#if state.next}

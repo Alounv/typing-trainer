@@ -12,7 +12,7 @@ import { classifyBigram } from './classification';
 
 /** Pooled-samples window for per-bigram classification. Resists single-session outliers
  *  while tracking recent behavior. */
-const BIGRAM_CLASSIFICATION_WINDOW = 50;
+const BIGRAM_CLASSIFICATION_WINDOW = 10;
 
 /** Priority target cap — mirrors the diagnostic engine's `PRIORITY_TARGETS_TOP_N`. */
 const LIVE_PRIORITY_TARGETS_TOP_N = 10;

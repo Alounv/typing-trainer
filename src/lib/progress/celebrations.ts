@@ -1,4 +1,5 @@
-import type { BigramAggregate, BigramClassification, SessionSummary } from '../support/core';
+import type { BigramClassification, SessionSummary } from '../support/core';
+import { summarizeBigrams } from '$lib/skill';
 import { buildWpmSeries } from './metrics';
 
 export type MovementDirection = 'up' | 'down';
@@ -25,34 +26,38 @@ const RANK: Record<RankedClass, number> = {
 };
 
 /**
- * Emit a movement for any bigram whose classification changed between the
- * previous and current session. First-appearance bigrams only emit when they
- * land in `healthy` (treated as an improvement from a blank baseline);
+ * Compare rolling-window classifications before vs. after the named session.
+ * "Before" excludes the current session entirely; "after" includes it. This
+ * matches the classification displayed in the bigram table, so a movement
+ * shown here means the user's overall standing on that bigram actually moved
+ * — not just a single session of bad luck.
+ *
+ * First-appearance bigrams only emit when they land in `healthy`;
  * `unclassified` on either side is skipped as noise.
  */
-export function detectMovements(
-	prev: readonly BigramAggregate[] | null,
-	current: readonly BigramAggregate[]
+export function detectWindowedMovements(
+	allSessions: readonly SessionSummary[],
+	currentSessionId: string
 ): MovementEvent[] {
+	const before = allSessions.filter((s) => s.id !== currentSessionId);
+	const beforeRows = summarizeBigrams(before);
+	const afterRows = summarizeBigrams(allSessions);
 	const prevClass = new Map<string, BigramClassification>();
-	if (prev) {
-		for (const a of prev) prevClass.set(a.bigram, a.classification);
-	}
+	for (const r of beforeRows) prevClass.set(r.bigram, r.classification);
 
 	const events: MovementEvent[] = [];
-	for (const agg of current) {
-		const from = prevClass.get(agg.bigram) ?? null;
-		const to = agg.classification;
+	for (const { bigram, classification: to } of afterRows) {
+		const from = prevClass.get(bigram) ?? null;
 		if (to === 'unclassified' || from === 'unclassified') continue;
 		if (from === to) continue;
 
 		if (from === null) {
-			if (to === 'healthy') events.push({ bigram: agg.bigram, from, to, direction: 'up' });
+			if (to === 'healthy') events.push({ bigram, from, to, direction: 'up' });
 			continue;
 		}
 
 		const direction: MovementDirection = RANK[to] > RANK[from] ? 'up' : 'down';
-		events.push({ bigram: agg.bigram, from, to, direction });
+		events.push({ bigram, from, to, direction });
 	}
 
 	// Improvements first; within a group, larger jumps first.

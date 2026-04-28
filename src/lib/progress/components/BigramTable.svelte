@@ -105,11 +105,28 @@
 		}
 	}
 
-	function fmtMs(v: number): string {
-		return Number.isFinite(v) ? `${v.toFixed(0)} ms` : '—';
+	/**
+	 * Convert mean transition time (ms per character) to WPM. Uses CHARS_PER_WORD = 5,
+	 * matching the rest of the app's WPM definition.
+	 */
+	function fmtWpm(meanTimeMs: number): string {
+		if (!Number.isFinite(meanTimeMs) || meanTimeMs <= 0) return '—';
+		const wpm = 60_000 / meanTimeMs / 5;
+		return `${wpm.toFixed(0)} WPM`;
 	}
 	function fmtPct(v: number): string {
-		return `${(v * 100).toFixed(1)}%`;
+		// Zero error rate is the goal — collapse to a dash so the eye glides past
+		// clean rows and lands on the ones that still need attention.
+		if (v === 0) return '—';
+		return `${(v * 100).toFixed(0)}%`;
+	}
+	/**
+	 * Once we cross the 10-occurrence stats window the exact lifetime count stops
+	 * mattering — collapse to "—" so the eye doesn't get drawn to a noisy number.
+	 * Bigrams with zero occurrences never reach this table, so the dash is unambiguous.
+	 */
+	function fmtOccurrences(n: number): string {
+		return n >= 10 ? '—' : String(n);
 	}
 </script>
 
@@ -142,21 +159,22 @@
 						</button>
 					</th>
 					<th class="text-right">
-						<button type="button" class="table-sort-btn" onclick={() => toggleSort('meanTime')}>
-							Mean{sortIndicator('meanTime')}
+						<button type="button" class="table-sort-btn" onclick={() => toggleSort('occurrences')}>
+							Occ.{sortIndicator('occurrences')}
 						</button>
 					</th>
+					<th class="text-right">
+						<button type="button" class="table-sort-btn" onclick={() => toggleSort('meanTime')}>
+							Speed{sortIndicator('meanTime')}
+						</button>
+					</th>
+					<th></th>
 					<th class="text-right">
 						<button type="button" class="table-sort-btn" onclick={() => toggleSort('errorRate')}>
 							Errors{sortIndicator('errorRate')}
 						</button>
 					</th>
-					<th class="text-right">
-						<button type="button" class="table-sort-btn" onclick={() => toggleSort('occurrences')}>
-							Occ.{sortIndicator('occurrences')}
-						</button>
-					</th>
-					<th>Speed Trend</th>
+					<th></th>
 					<th class="text-right">
 						<button type="button" class="table-sort-btn" onclick={() => toggleSort('priority')}>
 							Priority{sortIndicator('priority')}
@@ -175,10 +193,11 @@
 								{row.classification}
 							</span>
 						</td>
-						<td class="text-right font-mono tabular-nums">{fmtMs(row.meanTime)}</td>
+						<td class="text-right font-mono tabular-nums">{fmtOccurrences(row.occurrences)}</td>
+						<td class="text-right font-mono tabular-nums">{fmtWpm(row.meanTime)}</td>
+						<td><BigramSparkline points={row.trend} metric="meanTime" /></td>
 						<td class="text-right font-mono tabular-nums">{fmtPct(row.errorRate)}</td>
-						<td class="text-right font-mono tabular-nums">{row.occurrences}</td>
-						<td><BigramSparkline points={row.trend} /></td>
+						<td><BigramSparkline points={row.trend} metric="errorRate" /></td>
 						<td class="text-right font-mono tabular-nums">{row.priorityScore.toFixed(2)}</td>
 					</tr>
 				{/each}
