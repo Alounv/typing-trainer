@@ -5,13 +5,25 @@ export async function getSession(id: string): Promise<SessionSummary | undefined
 	return db.sessions.get(id);
 }
 
-const STATS_SESSION_CAP = 500;
+const STATS_SESSION_CAP = 100;
 
 /** Newest first. Backed by the `timestamp` index. */
 export async function getRecentSessions(
 	limit: number = STATS_SESSION_CAP
 ): Promise<SessionSummary[]> {
 	return db.sessions.orderBy('timestamp').reverse().limit(limit).toArray();
+}
+
+/** Newest-first, diagnostics only. Streams the timestamp index so the cap counts diagnostics. */
+export async function getRecentDiagnosticSessions(
+	limit: number = STATS_SESSION_CAP
+): Promise<SessionSummary[]> {
+	return db.sessions
+		.orderBy('timestamp')
+		.reverse()
+		.filter((s) => s.type === 'diagnostic')
+		.limit(limit)
+		.toArray();
 }
 
 /** All aggregates for one bigram, newest first. Powers sparklines. */

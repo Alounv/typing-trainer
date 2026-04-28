@@ -16,20 +16,17 @@
 
 	interface Props {
 		sessions: readonly SessionSummary[];
+		diagnosticSessions: readonly SessionSummary[];
 		corpusFrequencies: FrequencyTable | undefined;
 	}
 
-	let { sessions, corpusFrequencies }: Props = $props();
+	let { sessions, diagnosticSessions, corpusFrequencies }: Props = $props();
 
 	/** Two most recent diagnostic sessions with an attached report, newest first. */
 	function pickDiagnosticSessions(list: readonly SessionSummary[]): SessionSummary[] {
-		return list
-			.filter((s) => s.type === 'diagnostic' && s.diagnosticReport)
-			.sort((a, b) => b.timestamp - a.timestamp)
-			.slice(0, 2);
+		return list.filter((s) => s.diagnosticReport).slice(0, 2);
 	}
 
-	const diagnosticSessions = $derived(sessions.filter((s) => s.type === 'diagnostic'));
 	const wpm = $derived(buildWpmSeries(diagnosticSessions));
 	const errorRate = $derived(buildErrorRateSeries(diagnosticSessions));
 	const bigrams = $derived(summarizeBigrams(sessions, corpusFrequencies));
@@ -38,7 +35,7 @@
 	);
 	const liveClassification = $derived(tallyClassificationMix(bigrams));
 
-	const latestAndPrevDiagnostic = $derived(pickDiagnosticSessions(sessions));
+	const latestAndPrevDiagnostic = $derived(pickDiagnosticSessions(diagnosticSessions));
 
 	/** Graduations are a diagnostic-to-diagnostic measurement; `null` until two exist. */
 	const graduatedCount = $derived.by(() => {

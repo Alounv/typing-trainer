@@ -10,6 +10,7 @@
 		| {
 				status: 'ready';
 				sessions: SessionSummary[];
+				diagnosticSessions: SessionSummary[];
 				corpusFrequencies: FrequencyTable | undefined;
 		  }
 		| { status: 'error'; message: string };
@@ -18,8 +19,8 @@
 
 	onMount(async () => {
 		try {
-			const { sessions, corpusFrequencies } = await loadAnalyticsInputs();
-			state = { status: 'ready', sessions, corpusFrequencies };
+			const { sessions, diagnosticSessions, corpusFrequencies } = await loadAnalyticsInputs();
+			state = { status: 'ready', sessions, diagnosticSessions, corpusFrequencies };
 		} catch (err) {
 			state = {
 				status: 'error',
@@ -43,6 +44,10 @@
 	{:else if state.status === 'error'}
 		<p class="text-error" role="alert">{state.message}</p>
 	{:else}
-		<Analytics sessions={state.sessions} corpusFrequencies={state.corpusFrequencies} />
+		<Analytics
+			sessions={state.sessions}
+			diagnosticSessions={state.diagnosticSessions}
+			corpusFrequencies={state.corpusFrequencies}
+		/>
 	{/if}
 </div>
