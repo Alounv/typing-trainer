@@ -111,7 +111,7 @@ export function summarizeBigrams(
 			meanTime,
 			errorRate,
 			occurrences: occurrences.get(bigram) ?? latestAgg.occurrences,
-			priorityScore: badness * freq
+			priorityScore: classification === 'healthy' ? 0 : badness * freq * 1000
 		});
 	}
 
