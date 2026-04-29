@@ -94,7 +94,12 @@
 	// no reactivity; we shadow the bits the UI reads in $state so the
 	// rendered readouts update correctly.
 	let position = $state(0);
+	// Every wrong position — drives red coloring in TextDisplay.
 	const errorPositions = new SvelteSet<number>();
+	// Subset: first wrong position in each burst. Drives the live error counter
+	// and corrected-marking eligibility — fumble follow-ups are noise and don't
+	// count. Mirrors the burst-follow-up rule in postprocess.ts / extraction.ts.
+	const countedErrorPositions = new SvelteSet<number>();
 	const correctedPositions = new SvelteSet<number>();
 	let errorCount = $state(0);
 	let elapsedMs = $state(0);
@@ -158,11 +163,27 @@
 		// Error / correction state for the drill rendering. We don't read
 		// these off the runner (it only cares about first-input accuracy);
 		// these sets drive the character-state classes on TextDisplay.
+		// Burst rule: only the first wrong position in a run counts toward the
+		// error tally and is eligible for the corrected mark — a fumble of
+		// several wrongs in a row registers as one mistake, not many.
 		if (event.actual !== event.expected) {
-			if (!errorPositions.has(event.position)) errorCount++;
+			if (!errorPositions.has(event.position)) {
+				const prevWasWrong = errorPositions.has(event.position - 1);
+				if (!prevWasWrong) {
+					countedErrorPositions.add(event.position);
+					errorCount++;
+				}
+			}
 			errorPositions.add(event.position);
 		} else if (errorPositions.has(event.position)) {
-			correctedPositions.add(event.position);
+			if (countedErrorPositions.has(event.position)) {
+				// First-of-burst position that's now correctly retyped → dotted.
+				correctedPositions.add(event.position);
+			} else {
+				// Burst follow-up corrected: scrub the red so it renders plain.
+				// (Was never counted as a real error, doesn't get a corrected mark.)
+				errorPositions.delete(event.position);
+			}
 		}
 
 		// Finalize as soon as the last char is typed rather than waiting for the next timer tick.
