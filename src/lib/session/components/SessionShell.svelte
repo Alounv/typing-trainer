@@ -101,7 +101,7 @@
 	// count. Mirrors the burst-follow-up rule in postprocess.ts / extraction.ts.
 	const countedErrorPositions = new SvelteSet<number>();
 	const correctedPositions = new SvelteSet<number>();
-	let errorCount = $state(0);
+	const errorCount = $derived(countedErrorPositions.size);
 	let elapsedMs = $state(0);
 	let running = $state(false);
 	let saving = $state(false);
@@ -167,12 +167,8 @@
 		// error tally and is eligible for the corrected mark — a fumble of
 		// several wrongs in a row registers as one mistake, not many.
 		if (event.actual !== event.expected) {
-			if (!errorPositions.has(event.position)) {
-				const prevWasWrong = errorPositions.has(event.position - 1);
-				if (!prevWasWrong) {
-					countedErrorPositions.add(event.position);
-					errorCount++;
-				}
+			if (!errorPositions.has(event.position) && !errorPositions.has(event.position - 1)) {
+				countedErrorPositions.add(event.position);
 			}
 			errorPositions.add(event.position);
 		} else if (errorPositions.has(event.position)) {
