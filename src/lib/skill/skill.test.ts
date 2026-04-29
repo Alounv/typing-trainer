@@ -6,6 +6,7 @@ import {
 	generateDiagnosticReport,
 	summarizeBigrams
 } from './index';
+import { annotateFirstInputs } from '../session/postprocess';
 import type {
 	BigramAggregate,
 	BigramClassification,
@@ -72,6 +73,54 @@ describe('extractBigramAggregates', () => {
 		expect(th.occurrences).toBe(2);
 		expect(th.meanTime).toBe(100);
 		expect(th.errorCount).toBe(0); // right char ('h') was always correct
+	});
+
+	describe('burst follow-ups', () => {
+		// Pipeline test: raw events → annotateFirstInputs → extractBigramAggregates.
+		// Only the first wrong key in a run should produce a bigram error sample;
+		// subsequent wrongs are dropped entirely (no occurrence, no error).
+		it('drops follow-up wrongs in a burst from bigram stats', () => {
+			// Expected "hello"; user typed "hxyzlo". Positions 1,2,3 wrong in a row.
+			const raw: KeystrokeEvent[] = [
+				ev(0, 'h', 'h', 0),
+				ev(1, 'e', 'x', 100),
+				ev(2, 'l', 'y', 200),
+				ev(3, 'l', 'z', 300),
+				ev(4, 'o', 'o', 400)
+			];
+			const result = extractBigramAggregates(annotateFirstInputs(raw), 's1');
+
+			// "he": right (e) wrong, first in burst → kept as 1 occurrence, 1 error.
+			const he = result.find((r) => r.bigram === 'he')!;
+			expect(he.occurrences).toBe(1);
+			expect(he.errorCount).toBe(1);
+
+			// "el" and "ll": right chars (l, l) are burst follow-ups → fully dropped.
+			expect(result.find((r) => r.bigram === 'el')).toBeUndefined();
+			expect(result.find((r) => r.bigram === 'll')).toBeUndefined();
+
+			// "lo": right (o) is correct, not in burst → kept (1 occurrence, 0 error).
+			// Left (l) wrong so timing is null but the occurrence still counts.
+			const lo = result.find((r) => r.bigram === 'lo')!;
+			expect(lo.occurrences).toBe(1);
+			expect(lo.errorCount).toBe(0);
+		});
+
+		it('non-consecutive wrongs are not bursts', () => {
+			// "abcde" typed "axcye": wrongs at positions 1 and 3, separated by a correct 'c'.
+			const raw: KeystrokeEvent[] = [
+				ev(0, 'a', 'a', 0),
+				ev(1, 'b', 'x', 100),
+				ev(2, 'c', 'c', 200),
+				ev(3, 'd', 'y', 300),
+				ev(4, 'e', 'e', 400)
+			];
+			const result = extractBigramAggregates(annotateFirstInputs(raw), 's1');
+
+			// Both 'b' and 'd' wrongs should produce errors against their right-char bigrams.
+			expect(result.find((r) => r.bigram === 'ab')!.errorCount).toBe(1);
+			expect(result.find((r) => r.bigram === 'cd')!.errorCount).toBe(1);
+		});
 	});
 
 	it('classifies with enough occurrences and clean timing', () => {

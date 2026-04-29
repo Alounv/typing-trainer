@@ -28,6 +28,9 @@ export function extractBigramAggregates(
 		const left = sorted[i];
 		const right = sorted[i + 1];
 		if (right.position !== left.position + 1) continue;
+		// Drop fumble follow-ups (annotateFirstInputs flags them): only the first
+		// wrong key in a burst counts; subsequent wrongs are noise.
+		if ((right as { burstFollowUp?: boolean }).burstFollowUp) continue;
 
 		const key = left.expected + right.expected;
 		let bucket = buckets.get(key);

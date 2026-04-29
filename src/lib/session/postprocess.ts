@@ -8,6 +8,12 @@ interface AnnotatedKeystrokeEvent extends KeystrokeEvent {
 	corrected: boolean;
 	/** Ms between first input and correcting retype. 0 if never corrected. */
 	correctionDelay: number;
+	/**
+	 * True iff this position's first input was wrong AND the immediately preceding
+	 * position's first input was also wrong. Marks fumble follow-ups so downstream
+	 * stats can drop them — only the first error in a burst should count.
+	 */
+	burstFollowUp: boolean;
 }
 
 /** Analytics credit any correction regardless of delay. */
@@ -39,9 +45,19 @@ export function annotateFirstInputs(events: readonly KeystrokeEvent[]): Annotate
 			}
 		}
 
-		annotated.push({ ...first, corrected, correctionDelay });
+		annotated.push({ ...first, corrected, correctionDelay, burstFollowUp: false });
 	}
 
 	annotated.sort((a, b) => a.position - b.position);
+
+	for (let i = 1; i < annotated.length; i++) {
+		const cur = annotated[i];
+		const prev = annotated[i - 1];
+		const curWrong = cur.actual !== cur.expected;
+		const prevWrong = prev.actual !== prev.expected;
+		const adjacent = prev.position === cur.position - 1;
+		cur.burstFollowUp = curWrong && prevWrong && adjacent;
+	}
+
 	return annotated;
 }
