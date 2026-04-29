@@ -8,7 +8,7 @@ import type { SessionSummary, UserSettings } from '../support/core';
 import { getProfile } from '../settings';
 import { getBigramHistory, getRecentSessions } from '../support/storage';
 import { buildLivePriorityTargets, buildLiveUndertrained } from '../skill';
-import { isBuiltinCorpusId, loadBuiltinCorpus } from '../corpus';
+import { loadBuiltinCorpus } from '../corpus';
 import type { FrequencyTable } from '../corpus';
 import { findGraduatedBigrams } from './graduation-filter';
 import { planDailySessions, sliceCompletedFromPlan, startOfCalendarDayMs } from './planner';
@@ -121,17 +121,12 @@ function countCompletedSince(
 	return out;
 }
 
-/** English fallback when the profile is missing or points at an unsupported corpus. */
-const FALLBACK_CORPUS_ID = 'en';
-
 /** Best-effort corpus load; `undefined` degrades undertrained/weighting to a no-op. */
 async function loadCorpusFrequencies(
 	profile: UserSettings | undefined
 ): Promise<FrequencyTable | undefined> {
 	try {
-		const pickedId = profile?.corpusIds?.[0];
-		const corpusId = pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
-		const corpus = await loadBuiltinCorpus(corpusId);
+		const corpus = await loadBuiltinCorpus(profile?.language ?? 'en');
 		return corpus.bigramFrequencies;
 	} catch {
 		return undefined;

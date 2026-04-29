@@ -1,16 +1,6 @@
-import {
-	loadBuiltinCorpus,
-	isBuiltinCorpusId,
-	loadQuoteBank,
-	hasQuoteBank,
-	generateText
-} from '$lib/corpus';
-import type { BuiltinCorpusId } from '$lib/corpus';
+import { loadBuiltinCorpus, loadQuoteBank, hasQuoteBank, generateText } from '$lib/corpus';
 import { CHARS_PER_WORD, DEFAULT_DIAGNOSTIC_WORD_BUDGET } from '$lib/support/core';
-import type { UserSettings } from '$lib/support/core';
 import { getProfile } from '$lib/settings';
-
-const FALLBACK_CORPUS_ID: BuiltinCorpusId = 'en';
 
 interface DiagnosticSessionInputs {
 	text: string;
@@ -18,9 +8,7 @@ interface DiagnosticSessionInputs {
 
 export async function prepareDiagnosticSession(): Promise<DiagnosticSessionInputs> {
 	const profile = await getProfile();
-	const corpusId = resolveCorpusId(profile);
-
-	const corpus = await loadBuiltinCorpus(corpusId);
+	const corpus = await loadBuiltinCorpus(profile?.language ?? 'en');
 	const quoteBank = hasQuoteBank(corpus.config.language)
 		? await loadQuoteBank(corpus.config.language)
 		: undefined;
@@ -33,9 +21,4 @@ export async function prepareDiagnosticSession(): Promise<DiagnosticSessionInput
 		targetChars: wordBudget * CHARS_PER_WORD
 	});
 	return { text: passage.text };
-}
-
-function resolveCorpusId(profile: UserSettings | undefined): BuiltinCorpusId {
-	const pickedId = profile?.corpusIds?.[0];
-	return pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
 }

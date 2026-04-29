@@ -1,17 +1,7 @@
-import {
-	loadBuiltinCorpus,
-	isBuiltinCorpusId,
-	loadQuoteBank,
-	hasQuoteBank,
-	generateText
-} from '$lib/corpus';
-import type { BuiltinCorpusId } from '$lib/corpus';
+import { loadBuiltinCorpus, loadQuoteBank, hasQuoteBank, generateText } from '$lib/corpus';
 import { CHARS_PER_WORD, DEFAULT_REAL_TEXT_WORD_BUDGET } from '$lib/support/core';
-import type { UserSettings } from '$lib/support/core';
 import { getProfile } from '$lib/settings';
 import { consumePlannedSession } from '$lib/plan';
-
-const FALLBACK_CORPUS_ID: BuiltinCorpusId = 'en';
 
 interface RealTextSessionInputs {
 	text: string;
@@ -24,12 +14,11 @@ export async function prepareRealTextSession(): Promise<RealTextSessionInputs> {
 	const wordBudget =
 		planned?.config.wordBudget ?? profile?.wordBudgets?.realText ?? DEFAULT_REAL_TEXT_WORD_BUDGET;
 	const targetChars = wordBudget * CHARS_PER_WORD;
-	const corpusId = resolveCorpusId(profile);
-	const language = profile?.languages?.[0] ?? 'en';
+	const language = profile?.language ?? 'en';
 
 	const [bank, corpus] = await Promise.all([
 		hasQuoteBank(language) ? loadQuoteBank(language) : Promise.resolve(undefined),
-		loadBuiltinCorpus(corpusId)
+		loadBuiltinCorpus(language)
 	]);
 	const seq = generateText({
 		kind: 'real-text',
@@ -38,9 +27,4 @@ export async function prepareRealTextSession(): Promise<RealTextSessionInputs> {
 		targetLengthChars: targetChars
 	});
 	return { text: seq.text };
-}
-
-function resolveCorpusId(profile: UserSettings | undefined): BuiltinCorpusId {
-	const pickedId = profile?.corpusIds?.[0];
-	return pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
 }

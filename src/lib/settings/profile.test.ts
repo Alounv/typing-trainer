@@ -14,20 +14,23 @@ describe('settings/profile — round-trip', () => {
 	});
 
 	it('round-trips user settings (singleton row)', async () => {
-		const settings: UserSettings = {
-			languages: ['fr', 'en'],
-			corpusIds: ['fr', 'en']
-		};
+		const settings: UserSettings = { language: 'fr' };
 		await saveProfile(settings);
 		expect(await getProfile()).toEqual(settings);
 
 		// Overwriting replaces — not merges.
-		const next: UserSettings = { ...settings, languages: ['en'] };
+		const next: UserSettings = { language: 'en' };
 		await saveProfile(next);
 		expect(await getProfile()).toEqual(next);
 	});
 
 	it('returns undefined before the first save', async () => {
 		expect(await getProfile()).toBeUndefined();
+	});
+
+	it('migrates legacy languages/corpusIds shape on read', async () => {
+		const legacy = { languages: ['fr', 'en'], corpusIds: ['fr', 'en'] };
+		await saveProfile(legacy as unknown as UserSettings);
+		expect(await getProfile()).toEqual({ language: 'fr' });
 	});
 });

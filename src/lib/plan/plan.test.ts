@@ -29,7 +29,7 @@ describe('computePlan', () => {
 	});
 
 	it('returns a plan even with no prior sessions (cold start)', async () => {
-		await saveProfile({ languages: ['en'], corpusIds: ['en'] });
+		await saveProfile({ language: 'en' });
 		const ctx = await computePlan();
 		// Fresh user: plan should have at least one session to offer.
 		expect(ctx.fullPlan.length).toBeGreaterThan(0);
@@ -38,7 +38,7 @@ describe('computePlan', () => {
 	});
 
 	it('treats a session saved today as completed toward the plan', async () => {
-		await saveProfile({ languages: ['en'], corpusIds: ['en'] });
+		await saveProfile({ language: 'en' });
 		await saveSessionFixture(makeSession({ id: 'just-now', timestamp: Date.now() }));
 		const ctx = await computePlan();
 		expect(ctx.lastSession?.id).toBe('just-now');

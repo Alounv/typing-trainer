@@ -98,7 +98,7 @@ describe('storage service — round-trip', () => {
 
 	it('clearAll wipes every table', async () => {
 		await saveSession(makeSession());
-		await saveProfile({ languages: ['en'], corpusIds: ['en'] });
+		await saveProfile({ language: 'en' });
 
 		await clearAll();
 

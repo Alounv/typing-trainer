@@ -1,9 +1,7 @@
 import { getRecentSessions, getRecentDiagnosticSessions } from '$lib/support/storage';
 import { getProfile } from '$lib/settings';
-import { isBuiltinCorpusId, loadBuiltinCorpus, type FrequencyTable } from '$lib/corpus';
+import { loadBuiltinCorpus, type FrequencyTable } from '$lib/corpus';
 import type { SessionSummary, UserSettings } from '$lib/support/core';
-
-const FALLBACK_CORPUS_ID = 'en';
 
 interface AnalyticsInputs {
 	sessions: SessionSummary[];
@@ -23,9 +21,7 @@ export async function loadAnalyticsInputs(): Promise<AnalyticsInputs> {
 	// Best-effort: corpus failures still render the chart (summarizeBigrams falls back to freq=1).
 	let corpusFrequencies: FrequencyTable | undefined;
 	try {
-		const pickedId = profile?.corpusIds?.[0];
-		const corpusId = pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
-		const corpus = await loadBuiltinCorpus(corpusId);
+		const corpus = await loadBuiltinCorpus(profile?.language ?? 'en');
 		corpusFrequencies = corpus.bigramFrequencies;
 	} catch {
 		corpusFrequencies = undefined;

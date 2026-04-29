@@ -20,7 +20,13 @@ import {
 	DEFAULT_ACCURACY_DRILLS_PER_CYCLE,
 	DEFAULT_SPEED_DRILLS_PER_CYCLE
 } from '$lib/support/core';
-import type { UserSettings } from '$lib/support/core';
+import type { Language, UserSettings } from '$lib/support/core';
+
+/** Pre-collapse shape: `languages` + `corpusIds` arrays. Migrated on read. */
+type LegacyProfile = Omit<UserSettings, 'language'> & {
+	languages?: Language[];
+	corpusIds?: string[];
+};
 
 /**
  * Factory-fresh profile. Function (not a const) so each caller gets a new
@@ -29,8 +35,7 @@ import type { UserSettings } from '$lib/support/core';
  */
 export function buildDefaultProfile(): UserSettings {
 	return {
-		languages: ['en'],
-		corpusIds: ['en'],
+		language: 'en',
 		thresholds: {
 			speedMs: DEFAULT_SPEED_THRESHOLD_MS,
 			errorRate: DEFAULT_HIGH_ERROR_THRESHOLD
@@ -64,6 +69,14 @@ export function withDefaults(stored: UserSettings): UserSettings {
 	};
 }
 
+/** Translate a stored profile (potentially in the legacy shape) to current. */
+function migrate(raw: UserSettings | LegacyProfile): UserSettings {
+	if ('language' in raw && raw.language) return raw as UserSettings;
+	const legacy = raw as LegacyProfile;
+	const { languages, corpusIds: _corpusIds, ...rest } = legacy;
+	return { ...(rest as Omit<UserSettings, 'language'>), language: languages?.[0] ?? 'en' };
+}
+
 /**
  * Raw profile as stored. `undefined` before first save (pre-onboarding) —
  * preserved so callers that care about that distinction (e.g. "is this a
@@ -71,7 +84,7 @@ export function withDefaults(stored: UserSettings): UserSettings {
  */
 export async function getProfile(): Promise<UserSettings | undefined> {
 	const record = await db.profile.get(SINGLETON_ID);
-	return record?.settings;
+	return record?.settings ? migrate(record.settings) : undefined;
 }
 
 export async function saveProfile(settings: UserSettings): Promise<void> {

@@ -1,12 +1,9 @@
-import { loadBuiltinCorpus, isBuiltinCorpusId, generateText } from '$lib/corpus';
-import type { BuiltinCorpusId } from '$lib/corpus';
+import { loadBuiltinCorpus, generateText } from '$lib/corpus';
 import { DEFAULT_BIGRAM_DRILL_WORD_BUDGET } from '$lib/support/core';
-import type { DrillMode, UserSettings } from '$lib/support/core';
+import type { DrillMode } from '$lib/support/core';
 import { getProfile } from '$lib/settings';
 import { getRecentSessions } from '$lib/support/storage';
 import { consumePlannedSession, resolveDrillMix } from '$lib/plan';
-
-const FALLBACK_CORPUS_ID: BuiltinCorpusId = 'en';
 
 interface BigramDrillSessionInputs {
 	text: string;
@@ -27,8 +24,7 @@ export async function prepareDrillSession(routeMode: DrillMode): Promise<BigramD
 		planned?.config.wordBudget ??
 		profile?.wordBudgets?.bigramDrill ??
 		DEFAULT_BIGRAM_DRILL_WORD_BUDGET;
-	const corpusId = resolveCorpusId(profile);
-	const corpus = await loadBuiltinCorpus(corpusId);
+	const corpus = await loadBuiltinCorpus(profile?.language ?? 'en');
 
 	const fromPlan =
 		planned?.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0
@@ -59,9 +55,4 @@ async function getLatestBaselineWPM(): Promise<number> {
 	const recent = await getRecentSessions();
 	const report = recent.find((s) => s.type === 'diagnostic')?.diagnosticReport;
 	return report?.baselineWPM ?? 0;
-}
-
-function resolveCorpusId(profile: UserSettings | undefined): BuiltinCorpusId {
-	const pickedId = profile?.corpusIds?.[0];
-	return pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
 }

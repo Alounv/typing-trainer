@@ -4,6 +4,7 @@
 	import Analytics from '$lib/progress/components/Analytics.svelte';
 	import type { SessionSummary } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
+	import { VERSION } from '$lib/version';
 
 	type LoadState =
 		| { status: 'loading' }
@@ -33,7 +34,7 @@
 <div class="mx-auto max-w-3xl space-y-10">
 	<header class="space-y-3">
 		<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
-			Progress · v0.1
+			Progress · {VERSION}
 		</p>
 		<h1 class="text-4xl font-semibold tracking-tight text-base-content">Analytics</h1>
 		<p class="text-base-content/65">WPM trend, bigram breakdown, diagnostic history.</p>

@@ -41,8 +41,7 @@ describe('planDailySessions — plan structure overrides', () => {
 
 	it('honours user-supplied cycles and per-mode reps', () => {
 		const userSettings: UserSettings = {
-			languages: ['en'],
-			corpusIds: ['en'],
+			language: 'en',
 			planStructure: { cyclesPerDay: 3, accuracyDrillsPerCycle: 1, speedDrillsPerCycle: 4 }
 		};
 		const plan = planDailySessions({ ...baseInput, userSettings });
@@ -54,8 +53,7 @@ describe('planDailySessions — plan structure overrides', () => {
 
 	it('drops a mode entirely when its per-cycle count is zero', () => {
 		const userSettings: UserSettings = {
-			languages: ['en'],
-			corpusIds: ['en'],
+			language: 'en',
 			planStructure: { cyclesPerDay: 2, accuracyDrillsPerCycle: 0, speedDrillsPerCycle: 2 }
 		};
 		const plan = planDailySessions({ ...baseInput, userSettings });
@@ -68,8 +66,7 @@ describe('planDailySessions — plan structure overrides', () => {
 		// `planStructure` is typed strictly, but stored profiles may pre-date a
 		// field. Cast through a partial shape to mimic that legacy state.
 		const userSettings = {
-			languages: ['en'],
-			corpusIds: ['en'],
+			language: 'en',
 			planStructure: { cyclesPerDay: 4 }
 		} as unknown as UserSettings;
 		const plan = planDailySessions({ ...baseInput, userSettings });

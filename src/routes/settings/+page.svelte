@@ -15,6 +15,7 @@
 	 */
 	import { onMount } from 'svelte';
 	import { getProfile, saveProfile, buildDefaultProfile, withDefaults } from '$lib/settings';
+	import { VERSION } from '$lib/version';
 	import {
 		DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
 		DEFAULT_REAL_TEXT_WORD_BUDGET,
@@ -26,16 +27,7 @@
 		DEFAULT_SPEED_DRILLS_PER_CYCLE
 	} from '$lib/support/core';
 	import type { Language, UserSettings } from '$lib/support/core';
-	import type { BuiltinCorpusId } from '$lib/corpus';
 	import DataTransfer from '$lib/settings/DataTransfer.svelte';
-
-	// One corpus per language now — the `corpusIds` array on the profile
-	// is kept parallel to `languages` using the language code itself as
-	// the id (both are `'en'` or `'fr'`).
-	const DEFAULT_CORPUS_PER_LANGUAGE: Record<Language, BuiltinCorpusId> = {
-		en: 'en',
-		fr: 'fr'
-	};
 
 	type LoadState = 'loading' | 'ready' | 'error';
 	let loadState = $state<LoadState>('loading');
@@ -91,38 +83,6 @@
 		return () => clearTimeout(handle);
 	});
 
-	/**
-	 * Toggle a language on/off. Turning a language *on* auto-adds its
-	 * default corpus; turning it *off* strips the corresponding id.
-	 * Priority order is preserved by language: English first if both
-	 * are selected.
-	 */
-	function toggleLanguage(lang: Language, checked: boolean) {
-		if (checked) {
-			if (form.languages.includes(lang)) return;
-			const next = [...form.languages, lang].sort((a, b) => (a === 'en' ? -1 : b === 'en' ? 1 : 0));
-			const nextIds = next.map(
-				(l) => form.corpusIds[form.languages.indexOf(l)] ?? DEFAULT_CORPUS_PER_LANGUAGE[l] ?? ''
-			);
-			// Language newly added hasn't got an index in the old
-			// array; backfill with its default.
-			for (let i = 0; i < next.length; i++) {
-				if (!nextIds[i]) nextIds[i] = DEFAULT_CORPUS_PER_LANGUAGE[next[i]];
-			}
-			form.languages = next;
-			form.corpusIds = nextIds;
-		} else {
-			// Require at least one language selected — otherwise the
-			// app has nothing to draw a corpus from. Silently ignore
-			// an "uncheck the last one" click; the checkbox stays on.
-			if (form.languages.length <= 1) return;
-			const idx = form.languages.indexOf(lang);
-			if (idx === -1) return;
-			form.languages = form.languages.filter((l) => l !== lang);
-			form.corpusIds = form.corpusIds.filter((_, i) => i !== idx);
-		}
-	}
-
 	async function save() {
 		saving = true;
 		saveError = null;
@@ -147,7 +107,7 @@
 <div class="mx-auto max-w-3xl space-y-14">
 	<header class="space-y-3">
 		<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
-			Preferences · v0.1
+			Preferences · {VERSION}
 		</p>
 		<h1 class="text-4xl font-semibold tracking-tight text-base-content">Tune the trainer</h1>
 		<p class="max-w-xl text-base-content/65">
@@ -166,31 +126,30 @@
 				<span class="font-mono text-xs text-base-content/40 tabular-nums">01</span>
 				<h2 id="lang-heading" class="text-xl font-semibold tracking-tight">Language</h2>
 			</div>
-			<p class="max-w-xl text-sm text-base-content/65">
-				Pick what you want to practice. English leads when both are on.
-			</p>
+			<p class="max-w-xl text-sm text-base-content/65">Pick what you want to practice.</p>
 
 			<dl class="divide-y divide-base-300 border-y border-base-300">
 				{#each ['en', 'fr'] as lang (lang)}
 					{@const typedLang = lang as Language}
-					{@const enabled = form.languages.includes(typedLang)}
+					{@const selected = form.language === typedLang}
 					{@const label = typedLang === 'en' ? 'English' : 'French'}
 					<div class="flex items-center justify-between gap-6 py-4">
 						<dt>
 							<label class="flex cursor-pointer items-center gap-3">
 								<input
-									type="checkbox"
+									type="radio"
+									name="language"
 									class="peer sr-only"
-									checked={enabled}
-									onchange={(e) =>
-										toggleLanguage(typedLang, (e.target as HTMLInputElement).checked)}
+									value={typedLang}
+									checked={selected}
+									onchange={() => (form.language = typedLang)}
 									data-testid={`lang-${typedLang}`}
 								/>
 								<!--
-									Custom square pip instead of daisyUI checkbox: a filled
-									square in primary on check, empty with a hairline
-									border otherwise. Pairs tonally with the typed-char
-									state blocks on the drill surface.
+									Custom square pip — same visual language as the rest of
+									the settings form. A radio role-wise, but a filled-square
+									check-mark visually for tonal consistency with the drill
+									surface.
 								-->
 								<span
 									class="inline-block h-3.5 w-3.5 rounded-[2px] border border-base-content/35 transition-colors peer-checked:border-primary peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-base-100"
@@ -201,7 +160,7 @@
 						</dt>
 						<dd>
 							<span class="font-mono text-xs text-base-content/30">
-								{enabled ? 'on' : 'off'}
+								{selected ? 'on' : 'off'}
 							</span>
 						</dd>
 					</div>

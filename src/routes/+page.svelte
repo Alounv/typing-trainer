@@ -7,6 +7,7 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { computePlan, startFreshPlan, startPlannedSession, type PlanContext } from '$lib/plan';
+	import { VERSION } from '$lib/version';
 
 	type LoadState =
 		| { status: 'loading' }
@@ -36,7 +37,7 @@
 	<header class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
 		<div class="space-y-3">
 			<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
-				Typing Trainer · v0.1
+				Typing Trainer · {VERSION}
 			</p>
 			<h1 class="text-4xl font-semibold tracking-tight text-base-content">Today's plan</h1>
 		</div>

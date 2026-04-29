@@ -129,10 +129,8 @@ export type Language = 'en' | 'fr';
 
 /** Persistent user configuration. */
 export interface UserSettings {
-	/** Ordered by priority — first entry drives default corpus selection. */
-	languages: Language[];
-	/** One `CorpusConfig.id` per entry in `languages`. */
-	corpusIds: string[];
+	/** Drives corpus selection — the corpus id is the language code itself. */
+	language: Language;
 	/** Per-user override of the defaults below. Advanced users only. */
 	thresholds?: {
 		speedMs: number;

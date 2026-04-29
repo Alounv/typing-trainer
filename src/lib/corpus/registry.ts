@@ -27,8 +27,8 @@ const BIGRAM_LOADERS: Record<BigramLanguage, () => Promise<FrequencyTable>> = {
  * and the wordlist is only a synth fallback — no user-meaningful knob to
  * tune. Ids are just the language code.
  */
-export const BUILTIN_CORPUS_IDS = ['en', 'fr'] as const;
-export type BuiltinCorpusId = (typeof BUILTIN_CORPUS_IDS)[number];
+const BUILTIN_CORPUS_IDS = ['en', 'fr'] as const;
+type BuiltinCorpusId = (typeof BUILTIN_CORPUS_IDS)[number];
 
 /**
  * Lazy loaders keyed by id. Each corpus file is ~5–90 KB of raw string

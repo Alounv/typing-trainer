@@ -2,10 +2,8 @@ import { getSession, getRecentSessions } from '$lib/support/storage';
 import { computePlan } from '$lib/plan';
 import type { PlannedSession } from '$lib/plan';
 import { getProfile } from '$lib/settings';
-import { isBuiltinCorpusId, loadBuiltinCorpus, type FrequencyTable } from '$lib/corpus';
+import { loadBuiltinCorpus, type FrequencyTable } from '$lib/corpus';
 import type { SessionSummary } from '$lib/support/core';
-
-const FALLBACK_CORPUS_ID = 'en';
 
 export type SummaryViewModel =
 	| { status: 'missing' }
@@ -29,9 +27,7 @@ export async function loadSummaryContext(id: string): Promise<SummaryViewModel> 
 
 	let corpusFrequencies: FrequencyTable | undefined;
 	try {
-		const pickedId = profile?.corpusIds?.[0];
-		const corpusId = pickedId && isBuiltinCorpusId(pickedId) ? pickedId : FALLBACK_CORPUS_ID;
-		const corpus = await loadBuiltinCorpus(corpusId);
+		const corpus = await loadBuiltinCorpus(profile?.language ?? 'en');
 		corpusFrequencies = corpus.bigramFrequencies;
 	} catch {
 		corpusFrequencies = undefined;
