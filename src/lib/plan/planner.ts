@@ -7,6 +7,7 @@ import {
 	DEFAULT_SPEED_DRILLS_PER_CYCLE
 } from '../support/core';
 import type {
+	BigramClassification,
 	DrillMode,
 	PriorityBigram,
 	SessionConfig,
@@ -90,16 +91,18 @@ export function planDailySessions(input: SchedulerInput): PlannedSession[] {
 		];
 	}
 
-	const accuracyMix = selectAccuracyDrillMix(
+	const accuracyMix = selectDrillMix(
 		accuracyPriorityTargets,
-		undertrainedBigrams,
+		ACCURACY_CLASSES,
+		drillTargetCount,
 		graduatedFromRotation,
-		drillTargetCount
+		undertrainedBigrams
 	);
-	const speedMix = selectSpeedDrillMix(
+	const speedMix = selectDrillMix(
 		speedPriorityTargets,
-		graduatedFromRotation,
-		drillTargetCount
+		SPEED_CLASSES,
+		drillTargetCount,
+		graduatedFromRotation
 	);
 
 	const accuracyHasTargets = accuracyMix.priority.length > 0 || accuracyMix.exposure.length > 0;
@@ -174,29 +177,29 @@ export function startOfCalendarDayMs(): number {
 	return d.getTime();
 }
 
-/**
- * Priority = `hasty` + `acquisition` + `unclassified` (all fail on accuracy or
- * lack the data to prove they don't); exposure = undertrained backfill
- * (corpus bigrams the user simply hasn't seen yet).
- *
- * Exported so the drill route's direct-nav fallback uses the same selection.
- */
-export function selectAccuracyDrillMix(
+// Accuracy: bigrams that fail accuracy or lack data, with undertrained backfill.
+// Speed: only `fluency` (accurate-but-slow); undertrained goes to accuracy mode.
+export const ACCURACY_CLASSES: readonly BigramClassification[] = [
+	'hasty',
+	'acquisition',
+	'unclassified'
+];
+export const SPEED_CLASSES: readonly BigramClassification[] = ['fluency'];
+
+/** Exported so the drill route's direct-nav fallback matches the planner's pick. */
+export function selectDrillMix(
 	priorityTargets: readonly PriorityBigram[],
-	undertrainedBigrams: readonly string[],
+	validClasses: readonly BigramClassification[],
+	count: number,
 	graduated: ReadonlySet<string> | undefined,
-	count: number
+	exposurePool: readonly string[] = []
 ): { priority: string[]; exposure: string[] } {
 	const filter = graduated ?? new Set<string>();
+	const allowed = new Set<BigramClassification>(validClasses);
 
 	const priority: string[] = [];
 	for (const t of priorityTargets) {
-		if (
-			t.classification !== 'hasty' &&
-			t.classification !== 'acquisition' &&
-			t.classification !== 'unclassified'
-		)
-			continue;
+		if (!allowed.has(t.classification)) continue;
 		if (filter.has(t.bigram)) continue;
 		priority.push(t.bigram);
 		if (priority.length >= count) break;
@@ -206,7 +209,7 @@ export function selectAccuracyDrillMix(
 	const exposure: string[] = [];
 	if (remaining > 0) {
 		const seen = new Set(priority);
-		for (const b of undertrainedBigrams) {
+		for (const b of exposurePool) {
 			if (filter.has(b)) continue;
 			if (seen.has(b)) continue;
 			exposure.push(b);
@@ -215,29 +218,6 @@ export function selectAccuracyDrillMix(
 	}
 
 	return { priority, exposure };
-}
-
-/**
- * Priority = `fluency` only (accurate but slow). No exposure: undertrained
- * bigrams go to accuracy mode where "don't push speed yet" applies. Empty
- * exposure kept in the return shape for symmetry with {@link selectAccuracyDrillMix}.
- */
-export function selectSpeedDrillMix(
-	priorityTargets: readonly PriorityBigram[],
-	graduated: ReadonlySet<string> | undefined,
-	count: number
-): { priority: string[]; exposure: string[] } {
-	const filter = graduated ?? new Set<string>();
-
-	const priority: string[] = [];
-	for (const t of priorityTargets) {
-		if (t.classification !== 'fluency') continue;
-		if (filter.has(t.bigram)) continue;
-		priority.push(t.bigram);
-		if (priority.length >= count) break;
-	}
-
-	return { priority, exposure: [] };
 }
 
 function diagnosticPlan(wordBudget: number, label: string, rationale: string): PlannedSession {

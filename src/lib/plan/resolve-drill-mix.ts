@@ -1,9 +1,14 @@
-import type { BigramClassification, DrillMode } from '../support/core';
+import type { DrillMode } from '../support/core';
 import type { FrequencyTable } from '../corpus';
 import { buildLivePriorityTargets, buildLiveUndertrained } from '../skill';
 import { getBigramHistory, getRecentSessions } from '../support/storage';
 import { findGraduatedBigrams } from './graduation-filter';
-import { DEFAULT_DRILL_TARGET_COUNT, selectAccuracyDrillMix, selectSpeedDrillMix } from './planner';
+import {
+	ACCURACY_CLASSES,
+	DEFAULT_DRILL_TARGET_COUNT,
+	SPEED_CLASSES,
+	selectDrillMix
+} from './planner';
 
 /** Cold-start fallback when live priority + undertrained are both empty. */
 const SEED_TARGETS = ['th', 'he', 'in', 'er', 'an'] as const;
@@ -24,8 +29,7 @@ export async function resolveDrillMix(
 	const stats = await getRecentSessions();
 
 	// Class-scoped per mode so direct-nav matches the planner's own mode-scoped selection.
-	const classes: readonly BigramClassification[] =
-		mode === 'speed' ? ['fluency'] : ['hasty', 'acquisition', 'unclassified'];
+	const classes = mode === 'speed' ? SPEED_CLASSES : ACCURACY_CLASSES;
 	const priorityTargets = buildLivePriorityTargets(
 		stats,
 		corpusFrequencies,
@@ -33,20 +37,18 @@ export async function resolveDrillMix(
 		undefined,
 		classes
 	);
-	const undertrained = mode === 'accuracy' ? buildLiveUndertrained(stats, corpusFrequencies) : [];
+	const exposurePool = mode === 'accuracy' ? buildLiveUndertrained(stats, corpusFrequencies) : [];
 
 	const priorityBigrams = priorityTargets.map((p) => p.bigram);
 	const graduated = await findGraduatedBigrams(priorityBigrams, getBigramHistory);
 
-	const mix =
-		mode === 'speed'
-			? selectSpeedDrillMix(priorityTargets, graduated, DEFAULT_DRILL_TARGET_COUNT)
-			: selectAccuracyDrillMix(
-					priorityTargets,
-					undertrained,
-					graduated,
-					DEFAULT_DRILL_TARGET_COUNT
-				);
+	const mix = selectDrillMix(
+		priorityTargets,
+		classes,
+		DEFAULT_DRILL_TARGET_COUNT,
+		graduated,
+		exposurePool
+	);
 	const targets = [...mix.priority, ...mix.exposure];
 	return targets.length > 0 ? { targets, mix } : { targets: SEED_TARGETS };
 }

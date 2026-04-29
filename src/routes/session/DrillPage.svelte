@@ -1,15 +1,5 @@
 <script lang="ts">
-	/**
-	 * Shared shell for the two drill routes (`accuracy-drill` / `speed-drill`).
-	 * Each route is otherwise identical to the other except for the `mode` it
-	 * passes upstream to the planner and the copy on screen:
-	 *   - `accuracy`: targets are priority hasty/acquisition + undertrained
-	 *     backfill; no pacer; copy encourages correctness over throughput.
-	 *   - `speed`: targets are fluency bigrams only; pacer at `baselineWPM × 1.17`;
-	 *     copy encourages chasing the ghost.
-	 * Treatment-mode-from-URL is still preserved at the route level — the two
-	 * `+page.svelte` files exist as dedicated URLs for nav clarity.
-	 */
+	/** Shared shell for the two drill routes — copy + mode differ; data plane is shared. */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
 	import type { DrillMode } from '$lib/support/core';

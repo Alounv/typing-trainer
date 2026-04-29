@@ -145,12 +145,7 @@
 									onchange={() => (form.language = typedLang)}
 									data-testid={`lang-${typedLang}`}
 								/>
-								<!--
-									Custom square pip — same visual language as the rest of
-									the settings form. A radio role-wise, but a filled-square
-									check-mark visually for tonal consistency with the drill
-									surface.
-								-->
+								<!-- Custom square pip; tonal match with the drill surface. -->
 								<span
 									class="inline-block h-3.5 w-3.5 rounded-[2px] border border-base-content/35 transition-colors peer-checked:border-primary peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-base-100"
 									aria-hidden="true"

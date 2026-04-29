@@ -3,7 +3,14 @@
  * file is kept type-only so UI components can import `PlannedSession`
  * without pulling in the planning logic.
  */
-import type { PriorityBigram, SessionConfig, SessionSummary, UserSettings } from '../support/core';
+import type {
+	DrillMode,
+	PriorityBigram,
+	SessionConfig,
+	SessionSummary,
+	SessionType,
+	UserSettings
+} from '../support/core';
 
 /**
  * Slot-level key for completed-today accounting. Splits `bigram-drill` by
@@ -15,22 +22,12 @@ export type PlanSlotKey =
 	| 'bigram-drill/speed'
 	| 'real-text';
 
-/** Drill without a mode falls back to accuracy, matching the direct-nav default. */
-export function planSlotKey(config: SessionConfig): PlanSlotKey {
-	if (config.type === 'bigram-drill') {
-		return config.drillMode === 'speed' ? 'bigram-drill/speed' : 'bigram-drill/accuracy';
+/** Accepts either a `SessionConfig` or a `SessionSummary` — drillless drills default to accuracy. */
+export function planSlotKey(item: { type: SessionType; drillMode?: DrillMode }): PlanSlotKey {
+	if (item.type === 'bigram-drill') {
+		return item.drillMode === 'speed' ? 'bigram-drill/speed' : 'bigram-drill/accuracy';
 	}
-	return config.type;
-}
-
-/** Session-shaped overload so callers don't reconstruct a `SessionConfig`. */
-export function planSlotKeyForSession(
-	session: Pick<SessionSummary, 'type' | 'drillMode'>
-): PlanSlotKey {
-	if (session.type === 'bigram-drill') {
-		return session.drillMode === 'speed' ? 'bigram-drill/speed' : 'bigram-drill/accuracy';
-	}
-	return session.type;
+	return item.type;
 }
 
 export interface PlannedSession {

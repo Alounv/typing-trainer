@@ -131,11 +131,8 @@ export type Language = 'en' | 'fr';
 export interface UserSettings {
 	/** Drives corpus selection — the corpus id is the language code itself. */
 	language: Language;
-	/** Per-user override of the defaults below. Advanced users only. */
-	thresholds?: {
-		speedMs: number;
-		errorRate: number;
-	};
+	/** Per-user override of `DEFAULT_THRESHOLDS`. Advanced users only. */
+	thresholds?: ClassificationThresholds;
 	/** Per-user override of `DEFAULT_*_WORD_BUDGET`. Absent keys fall back to defaults. */
 	wordBudgets?: {
 		bigramDrill: number;

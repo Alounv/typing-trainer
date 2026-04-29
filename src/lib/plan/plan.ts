@@ -12,8 +12,8 @@ import { loadBuiltinCorpus } from '../corpus';
 import type { FrequencyTable } from '../corpus';
 import { findGraduatedBigrams } from './graduation-filter';
 import { planDailySessions, sliceCompletedFromPlan, startOfCalendarDayMs } from './planner';
-import { readPlanStartedAt } from './plan-window';
-import { planSlotKeyForSession } from './types';
+import { readPlanStartedAt } from './plan-state';
+import { planSlotKey } from './types';
 import type { PlanSlotKey, PlannedSession } from './types';
 
 export interface PlanContext {
@@ -115,7 +115,7 @@ function countCompletedSince(
 	const out: Partial<Record<PlanSlotKey, number>> = {};
 	for (const s of sessions) {
 		if (s.timestamp < cutoffMs) continue;
-		const key = planSlotKeyForSession(s);
+		const key = planSlotKey(s);
 		out[key] = (out[key] ?? 0) + 1;
 	}
 	return out;
