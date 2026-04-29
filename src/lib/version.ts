@@ -1,3 +1,3 @@
-declare const __COMMIT_HASH__: string;
+declare const __BUILD_DATE__: string;
 
-export const VERSION = __COMMIT_HASH__;
+export const VERSION = `version ${__BUILD_DATE__}`;
