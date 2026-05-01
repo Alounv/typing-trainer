@@ -27,67 +27,16 @@ export interface BigramSummary {
 	priorityScore: number;
 }
 
-interface RollingBigramAggregate {
-	occurrences: number;
-	meanTime: number;
-	errorRate: number;
-}
-
-/**
- * Pool the last `window` per-occurrence samples for `bigram`. Caller pre-sorts sessions
- * newest-first and pre-builds the `bigramIndex` so we don't redo that O(n log n + m)
- * setup per bigram in a hot loop.
- */
-function aggregateLastNOccurrences(
-	orderedNewestFirst: readonly SessionSummary[],
-	bigramIndex: ReadonlyMap<string, ReadonlyMap<string, BigramAggregate>>,
-	bigram: string,
-	window: number
-): RollingBigramAggregate | undefined {
-	const pooled: BigramSample[] = [];
-	for (const s of orderedNewestFirst) {
-		const agg = bigramIndex.get(s.id)?.get(bigram);
-		if (!agg || !agg.samples) continue;
-		const remaining = window - pooled.length;
-		if (remaining <= 0) break;
-		// Take session tail so the window tracks recent attempts, not warm-up.
-		const tail = agg.samples.slice(Math.max(0, agg.samples.length - remaining));
-		pooled.push(...tail);
-		if (pooled.length >= window) break;
-	}
-
-	if (pooled.length === 0) return undefined;
-
-	const timings = pooled.map((s) => s.timing).filter((t): t is number => t !== null);
-	const errorCount = pooled.reduce((n, s) => n + (s.correct ? 0 : 1), 0);
-	return {
-		occurrences: pooled.length,
-		meanTime: timings.length === 0 ? NaN : timings.reduce((a, b) => a + b, 0) / timings.length,
-		errorRate: errorCount / pooled.length
-	};
-}
-
-/**
- * Per-session map from bigram → aggregate, so the rolling-window pooler can do an
- * O(1) lookup instead of an O(per-session-bigrams) scan on every (bigram, session) pair.
- */
-function indexBigramAggregates(
-	sessions: readonly SessionSummary[]
-): Map<string, Map<string, BigramAggregate>> {
-	const out = new Map<string, Map<string, BigramAggregate>>();
-	for (const s of sessions) {
-		const inner = new Map<string, BigramAggregate>();
-		for (const agg of s.bigramAggregates) inner.set(agg.bigram, agg);
-		out.set(s.id, inner);
-	}
-	return out;
-}
-
 /**
  * Aggregate all observed bigrams into rows. Class/meanTime/errorRate come from the rolling
- * window (see `aggregateLastNOccurrences`) so a small recent session can't mask a
+ * window of the last `window` samples per bigram so a small recent session can't mask a
  * well-established bigram. `occurrences` is the lifetime sum. Legacy data without samples
  * falls back to the latest aggregate.
+ *
+ * Single pass with a bigram-keyed inverted index: each bigram walks only the sessions
+ * it actually appears in (newest-first), instead of every session. Earlier versions
+ * indexed session→bigram and walked all sessions per bigram, which was O(B × N) lookups
+ * even when most bigrams appeared in only a handful of sessions.
  */
 export function summarizeBigrams(
 	sessions: readonly SessionSummary[],
@@ -97,18 +46,25 @@ export function summarizeBigrams(
 ): BigramSummary[] {
 	if (window < 1) throw new RangeError('window must be ≥ 1');
 
-	// Sessions oldest-first so the final pass overwrites with the newest snapshot.
-	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
-	// Newest-first ordering used by the rolling-window pooler — hoisted so we sort once.
-	const orderedNewestFirst = [...ordered].reverse();
-	const bigramIndex = indexBigramAggregates(sessions);
+	// Walk newest-first so each bigram's per-session list is already in the order
+	// the rolling-window pooler wants — we never sort the inner arrays.
+	const orderedNewestFirst = [...sessions].sort((a, b) => b.timestamp - a.timestamp);
 
+	// `latest` is the OLDEST agg seen during a newest-first walk (= the newest snapshot
+	// in time, since we hit the newest session first). Set on first encounter only.
 	const latest = new Map<string, BigramAggregate>();
 	const occurrences = new Map<string, number>();
-	for (const s of ordered) {
+	const aggsByBigram = new Map<string, BigramAggregate[]>();
+	for (const s of orderedNewestFirst) {
 		for (const agg of s.bigramAggregates) {
-			latest.set(agg.bigram, agg);
+			if (!latest.has(agg.bigram)) latest.set(agg.bigram, agg);
 			occurrences.set(agg.bigram, (occurrences.get(agg.bigram) ?? 0) + agg.occurrences);
+			let arr = aggsByBigram.get(agg.bigram);
+			if (!arr) {
+				arr = [];
+				aggsByBigram.set(agg.bigram, arr);
+			}
+			arr.push(agg);
 		}
 	}
 
@@ -118,10 +74,46 @@ export function summarizeBigrams(
 
 	const rows: BigramSummary[] = [];
 	for (const [bigram, latestAgg] of latest) {
-		const rolling = aggregateLastNOccurrences(orderedNewestFirst, bigramIndex, bigram, window);
-		const classification = rolling ? classifyBigram(rolling, thresholds) : latestAgg.classification;
-		const meanTime = rolling ? rolling.meanTime : latestAgg.meanTime;
-		const errorRate = rolling ? rolling.errorRate : latestAgg.errorRate;
+		const aggs = aggsByBigram.get(bigram);
+		const pooled: BigramSample[] = [];
+		if (aggs) {
+			// aggs is newest-first by construction. Take session tails to the window cap.
+			for (const agg of aggs) {
+				if (!agg.samples || agg.samples.length === 0) continue;
+				const remaining = window - pooled.length;
+				if (remaining <= 0) break;
+				const start = Math.max(0, agg.samples.length - remaining);
+				for (let i = start; i < agg.samples.length; i++) pooled.push(agg.samples[i]);
+				if (pooled.length >= window) break;
+			}
+		}
+
+		let classification: BigramClassification;
+		let meanTime: number;
+		let errorRate: number;
+		if (pooled.length > 0) {
+			let timingSum = 0;
+			let timingCount = 0;
+			let errorCount = 0;
+			for (const s of pooled) {
+				if (s.timing !== null) {
+					timingSum += s.timing;
+					timingCount++;
+				}
+				if (!s.correct) errorCount++;
+			}
+			meanTime = timingCount === 0 ? NaN : timingSum / timingCount;
+			errorRate = errorCount / pooled.length;
+			classification = classifyBigram(
+				{ occurrences: pooled.length, meanTime, errorRate },
+				thresholds
+			);
+		} else {
+			// Legacy path: pre-sample data has no rolling window to compute from.
+			classification = latestAgg.classification;
+			meanTime = latestAgg.meanTime;
+			errorRate = latestAgg.errorRate;
+		}
 
 		const badness = badness1D({ meanTime, errorRate }, thresholds);
 		const freq = corpus?.[bigram] ?? fallbackFreq;
