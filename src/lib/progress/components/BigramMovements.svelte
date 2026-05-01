@@ -1,11 +1,13 @@
 <script lang="ts">
-	import type { MovementEvent } from '../celebrations';
+	import { groupMovements, type MovementEvent } from '../celebrations';
 
 	interface Props {
 		events: readonly MovementEvent[];
 	}
 
 	let { events }: Props = $props();
+
+	const groups = $derived(groupMovements(events));
 
 	function classLabel(c: MovementEvent['from'] | MovementEvent['to']): string {
 		return c ?? 'new';
@@ -16,7 +18,7 @@
 	}
 </script>
 
-{#if events.length > 0}
+{#if groups.length > 0}
 	<section
 		class="space-y-4"
 		data-testid="bigram-movements"
@@ -31,28 +33,35 @@
 			</p>
 		</div>
 		<ul class="divide-y divide-base-300 border-y border-base-300">
-			{#each events as e (e.bigram + e.from + e.to)}
+			{#each groups as g (`${g.from}→${g.to}`)}
 				<li
-					class="grid grid-cols-[auto_auto_1fr] items-baseline gap-6 py-3"
-					data-testid="movement-event"
-					data-direction={e.direction}
+					class="flex flex-wrap items-baseline gap-x-6 gap-y-2 py-3"
+					data-testid="movement-group"
+					data-direction={g.direction}
+					data-from={g.from ?? 'new'}
+					data-to={g.to}
 				>
 					<span
-						class="font-mono text-xl tracking-wide text-base-content"
-						aria-label={`bigram ${e.bigram}`}
-					>
-						{glyphFor(e.bigram)}
-					</span>
-					<span
 						class={`text-xs font-medium tracking-[0.18em] uppercase ${
-							e.direction === 'up' ? 'text-success' : 'text-warning'
+							g.direction === 'up' ? 'text-success' : 'text-warning'
 						}`}
 					>
-						{e.direction === 'up' ? '↑ Improved' : '↓ Regressed'}
+						{g.direction === 'up' ? '↑ Improved' : '↓ Regressed'}
 					</span>
 					<span class="font-mono text-sm tracking-wide text-base-content/70">
-						{classLabel(e.from)} → {classLabel(e.to)}
+						{classLabel(g.from)} → {classLabel(g.to)}
 					</span>
+					<ul class="flex flex-wrap gap-1.5">
+						{#each g.bigrams as bigram (bigram)}
+							<li
+								class="rounded bg-base-200 px-2 py-0.5 font-mono text-sm tracking-wide text-base-content"
+								data-testid="movement-bigram"
+								aria-label={`bigram ${bigram}`}
+							>
+								{glyphFor(bigram)}
+							</li>
+						{/each}
+					</ul>
 				</li>
 			{/each}
 		</ul>

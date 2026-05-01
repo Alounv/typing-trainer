@@ -14,6 +14,28 @@ export interface MovementEvent {
 	direction: MovementDirection;
 }
 
+export interface MovementGroup {
+	from: MovementEvent['from'];
+	to: MovementEvent['to'];
+	direction: MovementDirection;
+	bigrams: string[];
+}
+
+/** Bucket movement events by `(from, to)` so the UI can render one row per transition. */
+export function groupMovements(events: readonly MovementEvent[]): MovementGroup[] {
+	const byKey = new Map<string, MovementGroup>();
+	for (const e of events) {
+		const key = `${e.from}→${e.to}`;
+		let group = byKey.get(key);
+		if (!group) {
+			group = { from: e.from, to: e.to, direction: e.direction, bigrams: [] };
+			byKey.set(key, group);
+		}
+		group.bigrams.push(e.bigram);
+	}
+	return [...byKey.values()];
+}
+
 /**
  * Class hierarchy. hasty (fast but errors) sits below fluency (accurate but
  * slow) because cleaning up errors is the axis to optimise first.

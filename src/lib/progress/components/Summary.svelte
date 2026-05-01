@@ -32,15 +32,8 @@
 
 	// Compare windowed classifications before vs. after this session so movements
 	// reflect the user's overall standing — same view as the bigram table — rather
-	// than a single noisy session's per-session classification. For drill sessions
-	// the list is scoped to the drilled bigrams to stay aligned with the table
-	// below; non-drill sessions surface all movements.
-	const movements = $derived.by(() => {
-		const all = detectWindowedMovements(statsSessions, session.id);
-		if (drilledBigrams.length === 0) return all;
-		const targeted = new Set(drilledBigrams);
-		return all.filter((m) => targeted.has(m.bigram));
-	});
+	// than a single noisy session's per-session classification.
+	const movements = $derived(detectWindowedMovements(statsSessions, session.id));
 
 	const ERROR_WARN_THRESHOLD = DEFAULT_HIGH_ERROR_THRESHOLD / 2;
 	function errorRateColour(rate: number): string {
