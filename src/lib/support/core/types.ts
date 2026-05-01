@@ -148,6 +148,8 @@ export interface UserSettings {
 		accuracyDrillsPerCycle: number;
 		speedDrillsPerCycle: number;
 	};
+	/** Tint pending letters by the difficulty of the incoming bigram. */
+	colorizeBigramDifficulty?: boolean;
 }
 
 /** Atomic keystroke unit. `corrected` / `correctionDelay` are derived in post-processing. */

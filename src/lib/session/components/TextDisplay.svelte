@@ -10,6 +10,7 @@
 	 * don't occur in practice.
 	 */
 	import { SvelteSet } from 'svelte/reactivity';
+	import { difficultyToColor } from '../bigramDifficulty';
 
 	type CharState =
 		| 'typed-correct'
@@ -51,6 +52,10 @@
 		 * correct/error states.
 		 */
 		targetBigrams?: readonly string[];
+		/** Per-bigram difficulty score in [0, 1]; tints pending letters by the incoming bigram. */
+		bigramDifficultyMap?: Map<string, number> | null;
+		/** DaisyUI CSS variable name the difficulty gradient lerps toward (e.g. `--color-warning`). */
+		difficultyHighlightVar?: string | null;
 	}
 
 	let {
@@ -60,7 +65,9 @@
 		correctedPositions = new Set<number>(),
 		ghostPosition,
 		ghostTransitionMs = 150,
-		targetBigrams
+		targetBigrams,
+		bigramDifficultyMap = null,
+		difficultyHighlightVar = null
 	}: Props = $props();
 
 	const targetPositions = $derived.by(() => {
@@ -283,12 +290,20 @@
 	<div class="whitespace-pre-wrap">
 		{#each text as char, i (i)}
 			{@const state = stateFor(i, position, errorPositions, correctedPositions, targetPositions)}
+			{@const difficultyScore =
+				state === 'pending' && i > 0 && bigramDifficultyMap && difficultyHighlightVar
+					? (bigramDifficultyMap.get(text[i - 1] + char) ?? null)
+					: null}
 			<span
 				class="relative transition-colors duration-75 motion-reduce:transition-none {stateClasses[
 					state
 				]}"
+				style={difficultyScore !== null && difficultyHighlightVar
+					? `color: ${difficultyToColor(difficultyScore, difficultyHighlightVar)}`
+					: ''}
 				data-state={state}
-				data-pos={i}>{char}</span
+				data-pos={i}
+				data-difficulty={difficultyScore !== null ? difficultyScore.toFixed(3) : null}>{char}</span
 			>
 		{/each}
 	</div>

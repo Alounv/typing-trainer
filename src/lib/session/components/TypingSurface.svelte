@@ -20,6 +20,13 @@
 	import TextDisplay from './TextDisplay.svelte';
 	import { keystrokeCapture, type CaptureCallbacks } from '../capture';
 	import type { KeystrokeEvent } from '../../support/core';
+	import { getProfile } from '$lib/settings';
+	import { getAllBigramAggregates } from '$lib/support/storage';
+	import {
+		buildDifficultyMap,
+		highlightVarForMode,
+		type DifficultyMode
+	} from '../bigramDifficulty';
 
 	interface Props {
 		text: string;
@@ -32,6 +39,8 @@
 		ghostTransitionMs?: number;
 		/** Forwarded to TextDisplay; highlights pending chars inside target bigrams. */
 		targetBigrams?: readonly string[];
+		/** Bigram metric for difficulty coloring; `null` disables it. */
+		difficultyMode?: DifficultyMode | null;
 		/** Auto-focus the surface on mount. Default: true. */
 		autoFocus?: boolean;
 		/**
@@ -52,6 +61,7 @@
 		ghostPosition,
 		ghostTransitionMs,
 		targetBigrams,
+		difficultyMode = null,
 		autoFocus = true,
 		announceErrors = false,
 		onEvent,
@@ -59,6 +69,28 @@
 	}: Props = $props();
 
 	let liveMessage = $state('');
+
+	let bigramDifficultyMap = $state<Map<string, number> | null>(null);
+
+	$effect(() => {
+		if (difficultyMode === null) {
+			bigramDifficultyMap = null;
+			return;
+		}
+		const mode = difficultyMode;
+		let cancelled = false;
+		void (async () => {
+			const profile = await getProfile();
+			if (cancelled) return;
+			if (!profile?.colorizeBigramDifficulty) return;
+			const aggregates = await getAllBigramAggregates();
+			if (cancelled) return;
+			bigramDifficultyMap = buildDifficultyMap(aggregates, mode);
+		})();
+		return () => {
+			cancelled = true;
+		};
+	});
 
 	function handleEvent(e: KeystrokeEvent) {
 		if (announceErrors && e.actual !== e.expected) {
@@ -91,7 +123,9 @@
 			{correctedPositions}
 			{ghostPosition}
 			{ghostTransitionMs}
-			{targetBigrams}
+			targetBigrams={bigramDifficultyMap ? undefined : targetBigrams}
+			{bigramDifficultyMap}
+			difficultyHighlightVar={difficultyMode ? highlightVarForMode(difficultyMode) : null}
 		/>
 	</div>
 

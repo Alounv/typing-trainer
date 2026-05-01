@@ -139,7 +139,7 @@
 
 <section class="space-y-6" aria-labelledby="data-heading">
 	<div class="flex items-baseline gap-4">
-		<span class="font-mono text-xs text-base-content/40 tabular-nums">05</span>
+		<span class="font-mono text-xs text-base-content/40 tabular-nums">06</span>
 		<h2 id="data-heading" class="text-xl font-semibold tracking-tight">Data</h2>
 	</div>
 	<p class="max-w-xl text-sm text-base-content/65">

@@ -365,6 +365,48 @@
 			</dl>
 		</section>
 
+		<section class="space-y-6" aria-labelledby="bigramcolor-heading">
+			<div class="flex items-baseline gap-4">
+				<span class="font-mono text-xs text-base-content/40 tabular-nums">05</span>
+				<h2 id="bigramcolor-heading" class="text-xl font-semibold tracking-tight">
+					Bigram difficulty coloring
+				</h2>
+			</div>
+			<p class="max-w-xl text-sm text-base-content/65">
+				Tint pending letters in drill text by the difficulty of the bigram landing on them — easier
+				transitions in green, harder ones in red. The metric follows the exercise: accuracy drills
+				use error rate, speed drills use mean transition time, real-text uses both. Only colors
+				letters you haven't typed yet, so live feedback isn't muddied.
+			</p>
+
+			<dl class="divide-y divide-base-300 border-y border-base-300">
+				<div class="flex items-center justify-between gap-6 py-4">
+					<dt>
+						<label class="flex cursor-pointer items-center gap-3">
+							<input
+								type="checkbox"
+								class="peer sr-only"
+								checked={form.colorizeBigramDifficulty ?? false}
+								onchange={(e) =>
+									(form.colorizeBigramDifficulty = (e.target as HTMLInputElement).checked)}
+								data-testid="bigramcolor-toggle"
+							/>
+							<span
+								class="inline-block h-3.5 w-3.5 rounded-[2px] border border-base-content/35 transition-colors peer-checked:border-primary peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-base-100"
+								aria-hidden="true"
+							></span>
+							<span class="text-sm font-medium">Colorize pending letters</span>
+						</label>
+					</dt>
+					<dd>
+						<span class="font-mono text-xs text-base-content/30">
+							{form.colorizeBigramDifficulty ? 'on' : 'off'}
+						</span>
+					</dd>
+				</div>
+			</dl>
+		</section>
+
 		<DataTransfer />
 
 		<!--

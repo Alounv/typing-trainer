@@ -34,6 +34,12 @@ export async function getBigramHistory(bigram: string): Promise<BigramAggregate[
 		.sort((a, b) => b.sessionId.localeCompare(a.sessionId));
 }
 
+/** Every bigram aggregate ever recorded. Unsorted. */
+export async function getAllBigramAggregates(): Promise<BigramAggregate[]> {
+	const rows = await db.bigramRecords.toArray();
+	return rows.map(({ key: _key, ...rest }) => rest);
+}
+
 /** Wipe all persisted data — used by "reset" and by the test suite. */
 export async function clearAll(): Promise<void> {
 	await db.transaction('rw', [db.sessions, db.bigramRecords, db.profile], async () => {

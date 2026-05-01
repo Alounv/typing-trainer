@@ -48,7 +48,7 @@ export const THEMES = [
 	'silk'
 ] as const;
 
-export type Theme = (typeof THEMES)[number];
+type Theme = (typeof THEMES)[number];
 export type ThemeChoice = Theme | 'system';
 
 const STORAGE_KEY = 'theme';

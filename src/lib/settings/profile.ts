@@ -49,7 +49,8 @@ export function buildDefaultProfile(): UserSettings {
 			cyclesPerDay: DEFAULT_CYCLES_PER_DAY,
 			accuracyDrillsPerCycle: DEFAULT_ACCURACY_DRILLS_PER_CYCLE,
 			speedDrillsPerCycle: DEFAULT_SPEED_DRILLS_PER_CYCLE
-		}
+		},
+		colorizeBigramDifficulty: true
 	};
 }
 

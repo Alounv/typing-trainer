@@ -2,6 +2,7 @@ export {
 	getSession,
 	getRecentSessions,
 	getRecentDiagnosticSessions,
-	getBigramHistory
+	getBigramHistory,
+	getAllBigramAggregates
 } from './service';
 export { db, SINGLETON_ID, bigramRecordKey } from './db';

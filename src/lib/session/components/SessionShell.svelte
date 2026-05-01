@@ -18,6 +18,7 @@
 	import type { KeystrokeEvent } from '$lib/support/core';
 	import type { DiagnosticReport, DrillMode, SessionType, SessionSummary } from '$lib/support/core';
 	import { SessionRunner } from '../runner';
+	import type { DifficultyMode } from '../bigramDifficulty';
 	import { computeGhostPosition, paceForMode } from '../pacer';
 	import { saveSession } from '../persistence';
 	import Timer from './Timer.svelte';
@@ -125,6 +126,15 @@
 	});
 
 	const progressPct = $derived(Math.round((position / text.length) * 100));
+
+	// Real-text and diagnostic intentionally stay neutral.
+	const difficultyMode: DifficultyMode | null = (() => {
+		if (type === 'bigram-drill') {
+			if (drillMode === 'speed') return 'speed';
+			if (drillMode === 'accuracy') return 'errors';
+		}
+		return null;
+	})();
 
 	// Accuracy-drill error budget: the per-drill tolerance is 5% of the
 	// full text length. The overlay bar fills to 100% once the user has
@@ -365,6 +375,7 @@
 			{ghostPosition}
 			{ghostTransitionMs}
 			targetBigrams={drillMode ? priorityBigrams : undefined}
+			{difficultyMode}
 			{onEvent}
 		/>
 	</div>
