@@ -57,6 +57,8 @@ const WPM_ROLLING_WINDOW = 7;
  *  table cell, and the depth shows the same number of windows of history. */
 const BIGRAM_SPARKLINE_WINDOW = BIGRAM_CLASSIFICATION_WINDOW;
 const BIGRAM_SPARKLINE_DEPTH = BIGRAM_CLASSIFICATION_WINDOW;
+/** Total samples per bigram needed to render a full sparkline. */
+export const BIGRAM_SPARKLINE_SAMPLE_LIMIT = BIGRAM_SPARKLINE_WINDOW + BIGRAM_SPARKLINE_DEPTH - 1;
 
 /**
  * Single point on a per-session trend chart. Shared shape across metrics so one chart

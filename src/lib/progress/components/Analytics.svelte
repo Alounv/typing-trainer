@@ -8,6 +8,7 @@
 		buildWpmSeries,
 		buildBigramTrendFromSamples,
 		buildRecentSamplesIndex,
+		BIGRAM_SPARKLINE_SAMPLE_LIMIT,
 		countGraduations,
 		tallyClassificationMix
 	} from '../metrics';
@@ -37,8 +38,9 @@
 		buildHealthyBigramSeries(sessions, corpusFrequencies, thresholds)
 	);
 	const bigrams = $derived(summarizeBigrams(sessions, corpusFrequencies, thresholds));
-	// Sparkline window=10, depth=10 → 19 most-recent samples per bigram suffice.
-	const trendSamplesIdx = $derived(buildRecentSamplesIndex(sessions, 19));
+	const trendSamplesIdx = $derived(
+		buildRecentSamplesIndex(sessions, BIGRAM_SPARKLINE_SAMPLE_LIMIT)
+	);
 	const bigramRows = $derived(
 		bigrams.map((row) => ({
 			...row,
