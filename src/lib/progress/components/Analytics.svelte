@@ -6,7 +6,8 @@
 		buildErrorRateSeries,
 		buildHealthyBigramSeries,
 		buildWpmSeries,
-		buildBigramTrend,
+		buildBigramTrendFromSamples,
+		buildRecentSamplesIndex,
 		countGraduations,
 		tallyClassificationMix
 	} from '../metrics';
@@ -36,8 +37,13 @@
 		buildHealthyBigramSeries(sessions, corpusFrequencies, thresholds)
 	);
 	const bigrams = $derived(summarizeBigrams(sessions, corpusFrequencies, thresholds));
+	// Sparkline window=10, depth=10 → 19 most-recent samples per bigram suffice.
+	const trendSamplesIdx = $derived(buildRecentSamplesIndex(sessions, 19));
 	const bigramRows = $derived(
-		bigrams.map((row) => ({ ...row, trend: buildBigramTrend(sessions, row.bigram) }))
+		bigrams.map((row) => ({
+			...row,
+			trend: buildBigramTrendFromSamples(trendSamplesIdx.get(row.bigram) ?? [])
+		}))
 	);
 	const liveClassification = $derived(tallyClassificationMix(bigrams));
 

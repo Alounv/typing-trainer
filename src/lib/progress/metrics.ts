@@ -1,11 +1,12 @@
 import type {
 	BigramAggregate,
 	BigramClassification,
+	BigramSample,
 	ClassificationThresholds,
 	SessionSummary
 } from '../support/core';
 import type { FrequencyTable } from '../corpus';
-import { summarizeBigrams } from '../skill';
+import { classifyBigram } from '../skill';
 
 /**
  * Rolling average with a trailing window. For positions before the window is full, returns
@@ -109,15 +110,26 @@ function localDateKey(timestamp: number): string {
 	return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
+/** Pooled-samples window for per-bigram classification — mirrors `BIGRAM_CLASSIFICATION_WINDOW`
+ *  in skill/assessment.ts. Kept in sync because this module reproduces that classifier inline
+ *  to avoid an O(D × N × B) re-summarization across kept-day boundaries. */
+const HEALTHY_CLASSIFICATION_WINDOW = 10;
+
 /**
  * Cumulative healthy-bigram count over time, one point per day (last session of the
- * day). The classifier runs on the full history up to and including that session, so
+ * day). The classifier runs on the rolling window of the last
+ * `HEALTHY_CLASSIFICATION_WINDOW` samples per bigram as of each kept session, so
  * intra-day sessions still feed the count — they just don't get their own dot. Sets
  * `rolling = value` so the chart connects the dots; the count itself is the signal.
+ *
+ * Single-pass: we sweep sessions oldest→newest maintaining a rolling buffer of
+ * recent samples per bigram, and classify at each kept-day boundary. Earlier
+ * versions called `summarizeBigrams` once per kept day, which re-walked the
+ * entire history each time (O(D × N × B)).
  */
 export function buildHealthyBigramSeries(
 	sessions: readonly SessionSummary[],
-	corpus: FrequencyTable | undefined,
+	_corpus: FrequencyTable | undefined,
 	thresholds: ClassificationThresholds
 ): TrendPoint[] {
 	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
@@ -127,13 +139,44 @@ export function buildHealthyBigramSeries(
 	}
 	const keep = new Set(lastOfDayIdx.values());
 
+	const buffers = new Map<string, BigramSample[]>();
+	const window = HEALTHY_CLASSIFICATION_WINDOW;
+
 	const out: TrendPoint[] = [];
 	for (let i = 0; i < ordered.length; i++) {
+		const s = ordered[i];
+		for (const agg of s.bigramAggregates) {
+			if (!agg.samples || agg.samples.length === 0) continue;
+			let buf = buffers.get(agg.bigram);
+			if (!buf) {
+				buf = [];
+				buffers.set(agg.bigram, buf);
+			}
+			for (const sample of agg.samples) buf.push(sample);
+			if (buf.length > window) buf.splice(0, buf.length - window);
+		}
+
 		if (!keep.has(i)) continue;
-		const prefix = ordered.slice(0, i + 1);
-		const rows = summarizeBigrams(prefix, corpus, thresholds);
+
 		let healthy = 0;
-		for (const r of rows) if (r.classification === 'healthy') healthy++;
+		for (const buf of buffers.values()) {
+			if (buf.length === 0) continue;
+			let timingSum = 0;
+			let timingCount = 0;
+			let errorCount = 0;
+			for (const sample of buf) {
+				if (sample.timing !== null) {
+					timingSum += sample.timing;
+					timingCount++;
+				}
+				if (!sample.correct) errorCount++;
+			}
+			const meanTime = timingCount === 0 ? NaN : timingSum / timingCount;
+			const errorRate = errorCount / buf.length;
+			const cls = classifyBigram({ occurrences: buf.length, meanTime, errorRate }, thresholds);
+			if (cls === 'healthy') healthy++;
+		}
+
 		out.push({
 			sessionId: ordered[i].id,
 			timestamp: ordered[i].timestamp,
@@ -154,28 +197,59 @@ export interface BigramTrendPoint {
 }
 
 /**
- * Pool the most recent samples for `bigram` in chronological order (oldest →
- * newest). Walks sessions newest-first and prepends each session's tail so
- * sessions arrive newest-first while samples within a session keep their
- * original observation order. Stops once `limit` samples have been collected.
+ * Build a `bigram → most-recent-samples` index in one pass over all sessions.
+ * Each bucket holds at most `limit` samples, oldest→newest within the window.
+ * Use this when computing trends for many bigrams from the same session set —
+ * batches the per-bigram session walk that `buildBigramTrend` would otherwise
+ * do for each call.
  */
-function poolRecentSamples(
+export function buildRecentSamplesIndex(
 	sessions: readonly SessionSummary[],
-	bigram: string,
 	limit: number
-): { correct: boolean; timing: number | null }[] {
-	const ordered = [...sessions].sort((a, b) => b.timestamp - a.timestamp);
-	const pool: { correct: boolean; timing: number | null }[] = [];
+): Map<string, BigramSample[]> {
+	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
+	const out = new Map<string, BigramSample[]>();
 	for (const s of ordered) {
-		const agg = s.bigramAggregates.find((a) => a.bigram === bigram);
-		if (!agg || !agg.samples) continue;
-		const remaining = limit - pool.length;
-		if (remaining <= 0) break;
-		const tail = agg.samples.slice(Math.max(0, agg.samples.length - remaining));
-		pool.unshift(...tail);
-		if (pool.length >= limit) break;
+		for (const agg of s.bigramAggregates) {
+			if (!agg.samples || agg.samples.length === 0) continue;
+			let buf = out.get(agg.bigram);
+			if (!buf) {
+				buf = [];
+				out.set(agg.bigram, buf);
+			}
+			for (const sample of agg.samples) buf.push(sample);
+			if (buf.length > limit) buf.splice(0, buf.length - limit);
+		}
 	}
-	return pool;
+	return out;
+}
+
+/** Same as `buildBigramTrend` but reads from a pre-built sample index — the form to use
+ *  when deriving trends for many bigrams off the same session set. */
+export function buildBigramTrendFromSamples(
+	samples: readonly BigramSample[],
+	window: number = BIGRAM_SPARKLINE_WINDOW
+): BigramTrendPoint[] {
+	if (samples.length < window) return [];
+	const points: BigramTrendPoint[] = [];
+	for (let end = window; end <= samples.length; end++) {
+		let timingSum = 0;
+		let timingCount = 0;
+		let errorCount = 0;
+		for (let k = end - window; k < end; k++) {
+			const s = samples[k];
+			if (s.timing !== null) {
+				timingSum += s.timing;
+				timingCount++;
+			}
+			if (!s.correct) errorCount++;
+		}
+		points.push({
+			meanTime: timingCount === 0 ? NaN : timingSum / timingCount,
+			errorRate: errorCount / window
+		});
+	}
+	return points;
 }
 
 /**
@@ -185,6 +259,9 @@ function poolRecentSamples(
  *
  * Returns `[]` when the pool can't fill a single window — the sparkline then
  * falls back to its empty state.
+ *
+ * Single-bigram convenience wrapper. For many bigrams off the same session set,
+ * call `buildRecentSamplesIndex` once and feed `buildBigramTrendFromSamples`.
  */
 export function buildBigramTrend(
 	sessions: readonly SessionSummary[],
@@ -192,19 +269,8 @@ export function buildBigramTrend(
 	window: number = BIGRAM_SPARKLINE_WINDOW,
 	depth: number = BIGRAM_SPARKLINE_DEPTH
 ): BigramTrendPoint[] {
-	const samples = poolRecentSamples(sessions, bigram, window + depth - 1);
-	if (samples.length < window) return [];
-	const points: BigramTrendPoint[] = [];
-	for (let end = window; end <= samples.length; end++) {
-		const slice = samples.slice(end - window, end);
-		const errorCount = slice.reduce((n, s) => n + (s.correct ? 0 : 1), 0);
-		const timings = slice.map((s) => s.timing).filter((t): t is number => t !== null);
-		points.push({
-			meanTime: timings.length === 0 ? NaN : timings.reduce((a, b) => a + b, 0) / timings.length,
-			errorRate: errorCount / slice.length
-		});
-	}
-	return points;
+	const idx = buildRecentSamplesIndex(sessions, window + depth - 1);
+	return buildBigramTrendFromSamples(idx.get(bigram) ?? [], window);
 }
 
 /**
