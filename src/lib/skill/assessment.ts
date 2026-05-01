@@ -91,8 +91,8 @@ function indexBigramAggregates(
  */
 export function summarizeBigrams(
 	sessions: readonly SessionSummary[],
-	corpus?: FrequencyTable,
-	thresholds: ClassificationThresholds = DEFAULT_THRESHOLDS,
+	corpus: FrequencyTable | undefined,
+	thresholds: ClassificationThresholds,
 	window: number = BIGRAM_CLASSIFICATION_WINDOW
 ): BigramSummary[] {
 	if (window < 1) throw new RangeError('window must be ≥ 1');

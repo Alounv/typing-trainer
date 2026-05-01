@@ -1,4 +1,9 @@
-import type { BigramAggregate, BigramClassification, SessionSummary } from '../support/core';
+import type {
+	BigramAggregate,
+	BigramClassification,
+	ClassificationThresholds,
+	SessionSummary
+} from '../support/core';
 import type { FrequencyTable } from '../corpus';
 import { summarizeBigrams } from '../skill';
 
@@ -112,7 +117,8 @@ function localDateKey(timestamp: number): string {
  */
 export function buildHealthyBigramSeries(
 	sessions: readonly SessionSummary[],
-	corpus?: FrequencyTable
+	corpus: FrequencyTable | undefined,
+	thresholds: ClassificationThresholds
 ): TrendPoint[] {
 	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
 	const lastOfDayIdx = new Map<string, number>();
@@ -125,7 +131,7 @@ export function buildHealthyBigramSeries(
 	for (let i = 0; i < ordered.length; i++) {
 		if (!keep.has(i)) continue;
 		const prefix = ordered.slice(0, i + 1);
-		const rows = summarizeBigrams(prefix, corpus);
+		const rows = summarizeBigrams(prefix, corpus, thresholds);
 		let healthy = 0;
 		for (const r of rows) if (r.classification === 'healthy') healthy++;
 		out.push({

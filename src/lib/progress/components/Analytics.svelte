@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SessionSummary } from '$lib/support/core';
+	import type { ClassificationThresholds, SessionSummary } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
 	import { summarizeBigrams } from '$lib/skill';
 	import {
@@ -20,9 +20,10 @@
 		sessions: readonly SessionSummary[];
 		diagnosticSessions: readonly SessionSummary[];
 		corpusFrequencies: FrequencyTable | undefined;
+		thresholds: ClassificationThresholds;
 	}
 
-	let { sessions, diagnosticSessions, corpusFrequencies }: Props = $props();
+	let { sessions, diagnosticSessions, corpusFrequencies, thresholds }: Props = $props();
 
 	/** Two most recent diagnostic sessions with an attached report, newest first. */
 	function pickDiagnosticSessions(list: readonly SessionSummary[]): SessionSummary[] {
@@ -31,8 +32,10 @@
 
 	const wpm = $derived(buildWpmSeries(diagnosticSessions));
 	const errorRate = $derived(buildErrorRateSeries(diagnosticSessions));
-	const healthyOverTime = $derived(buildHealthyBigramSeries(sessions, corpusFrequencies));
-	const bigrams = $derived(summarizeBigrams(sessions, corpusFrequencies));
+	const healthyOverTime = $derived(
+		buildHealthyBigramSeries(sessions, corpusFrequencies, thresholds)
+	);
+	const bigrams = $derived(summarizeBigrams(sessions, corpusFrequencies, thresholds));
 	const bigramRows = $derived(
 		bigrams.map((row) => ({ ...row, trend: buildBigramTrend(sessions, row.bigram) }))
 	);

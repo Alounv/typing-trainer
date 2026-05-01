@@ -3,7 +3,8 @@ import { computePlan } from '$lib/plan';
 import type { PlannedSession } from '$lib/plan';
 import { getProfile } from '$lib/settings';
 import { loadBuiltinCorpus, type FrequencyTable } from '$lib/corpus';
-import type { SessionSummary } from '$lib/support/core';
+import { DEFAULT_THRESHOLDS } from '$lib/support/core';
+import type { ClassificationThresholds, SessionSummary } from '$lib/support/core';
 
 export type SummaryViewModel =
 	| { status: 'missing' }
@@ -12,6 +13,7 @@ export type SummaryViewModel =
 			session: SessionSummary;
 			statsSessions: readonly SessionSummary[];
 			corpusFrequencies: FrequencyTable | undefined;
+			thresholds: ClassificationThresholds;
 			next: PlannedSession | undefined;
 	  };
 
@@ -38,6 +40,7 @@ export async function loadSummaryContext(id: string): Promise<SummaryViewModel> 
 		session,
 		statsSessions,
 		corpusFrequencies,
+		thresholds: profile?.thresholds ?? DEFAULT_THRESHOLDS,
 		next: plan[0]
 	};
 }

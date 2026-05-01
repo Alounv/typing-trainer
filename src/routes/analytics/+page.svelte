@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { loadAnalyticsInputs } from './loader';
 	import Analytics from '$lib/progress/components/Analytics.svelte';
-	import type { SessionSummary } from '$lib/support/core';
+	import type { ClassificationThresholds, SessionSummary } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
 	import { VERSION } from '$lib/version';
 
@@ -13,6 +13,7 @@
 				sessions: SessionSummary[];
 				diagnosticSessions: SessionSummary[];
 				corpusFrequencies: FrequencyTable | undefined;
+				thresholds: ClassificationThresholds;
 		  }
 		| { status: 'error'; message: string };
 
@@ -20,8 +21,9 @@
 
 	onMount(async () => {
 		try {
-			const { sessions, diagnosticSessions, corpusFrequencies } = await loadAnalyticsInputs();
-			state = { status: 'ready', sessions, diagnosticSessions, corpusFrequencies };
+			const { sessions, diagnosticSessions, corpusFrequencies, thresholds } =
+				await loadAnalyticsInputs();
+			state = { status: 'ready', sessions, diagnosticSessions, corpusFrequencies, thresholds };
 		} catch (err) {
 			state = {
 				status: 'error',
@@ -49,6 +51,7 @@
 			sessions={state.sessions}
 			diagnosticSessions={state.diagnosticSessions}
 			corpusFrequencies={state.corpusFrequencies}
+			thresholds={state.thresholds}
 		/>
 	{/if}
 </div>

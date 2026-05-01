@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SessionSummary } from '$lib/support/core';
+	import type { ClassificationThresholds, SessionSummary } from '$lib/support/core';
 	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
 	import { summarizeBigrams } from '$lib/skill';
@@ -14,16 +14,17 @@
 		/** Newest-first session list (capped at storage limit). */
 		statsSessions: readonly SessionSummary[];
 		corpusFrequencies?: FrequencyTable | undefined;
+		thresholds: ClassificationThresholds;
 	}
 
-	let { session, statsSessions, corpusFrequencies = undefined }: Props = $props();
+	let { session, statsSessions, corpusFrequencies = undefined, thresholds }: Props = $props();
 
 	const milestone = $derived(detectMilestone(session, statsSessions));
 
 	// Compare windowed classifications before vs. after this session so movements
 	// reflect the user's overall standing — same view as the bigram table — rather
 	// than a single noisy session's per-session classification.
-	const allMovements = $derived(detectWindowedMovements(statsSessions, session.id));
+	const allMovements = $derived(detectWindowedMovements(statsSessions, session.id, thresholds));
 
 	// On accuracy/speed drills, hide movements that don't concern the trained
 	// axis — pure-speed transitions clutter an accuracy summary and vice versa.
@@ -41,7 +42,7 @@
 	const movedRows = $derived.by(() => {
 		if (movements.length === 0) return [];
 		const moved = new Set(movements.map((m) => m.bigram));
-		const summaries = summarizeBigrams(statsSessions, corpusFrequencies);
+		const summaries = summarizeBigrams(statsSessions, corpusFrequencies, thresholds);
 		return summaries
 			.filter((row) => moved.has(row.bigram))
 			.map((row) => ({ ...row, trend: buildBigramTrend(statsSessions, row.bigram) }));

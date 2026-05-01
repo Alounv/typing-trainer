@@ -1,4 +1,8 @@
-import type { BigramClassification, SessionSummary } from '../support/core';
+import type {
+	BigramClassification,
+	ClassificationThresholds,
+	SessionSummary
+} from '../support/core';
 import { summarizeBigrams } from '$lib/skill';
 import { buildWpmSeries } from './metrics';
 
@@ -88,11 +92,12 @@ const RANK: Record<RankedClass, number> = {
  */
 export function detectWindowedMovements(
 	allSessions: readonly SessionSummary[],
-	currentSessionId: string
+	currentSessionId: string,
+	thresholds: ClassificationThresholds
 ): MovementEvent[] {
 	const before = allSessions.filter((s) => s.id !== currentSessionId);
-	const beforeRows = summarizeBigrams(before);
-	const afterRows = summarizeBigrams(allSessions);
+	const beforeRows = summarizeBigrams(before, undefined, thresholds);
+	const afterRows = summarizeBigrams(allSessions, undefined, thresholds);
 	const prevClass = new Map<string, BigramClassification>();
 	for (const r of beforeRows) prevClass.set(r.bigram, r.classification);
 

@@ -96,6 +96,7 @@
 			session={state.session}
 			statsSessions={state.statsSessions}
 			corpusFrequencies={state.corpusFrequencies}
+			thresholds={state.thresholds}
 		/>
 
 		<div class="flex flex-wrap items-center gap-6 pt-2">

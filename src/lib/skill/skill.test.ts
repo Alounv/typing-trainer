@@ -7,6 +7,7 @@ import {
 	summarizeBigrams
 } from './index';
 import { annotateFirstInputs } from '../session/postprocess';
+import { DEFAULT_THRESHOLDS } from '../support/core';
 import type {
 	BigramAggregate,
 	BigramClassification,
@@ -171,7 +172,7 @@ describe('summarizeBigrams', () => {
 				})
 			])
 		];
-		const rows = summarizeBigrams(sessions);
+		const rows = summarizeBigrams(sessions, undefined, DEFAULT_THRESHOLDS);
 		const th = rows.find((r) => r.bigram === 'th')!;
 		expect(th.classification).toBe('healthy');
 		expect(th.occurrences).toBe(32);
@@ -194,7 +195,7 @@ describe('summarizeBigrams', () => {
 				})
 			])
 		];
-		const rows = summarizeBigrams(sessions, { th: 10, er: 10 });
+		const rows = summarizeBigrams(sessions, { th: 10, er: 10 }, DEFAULT_THRESHOLDS);
 		expect(rows[0].bigram).toBe('th');
 	});
 });

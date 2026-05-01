@@ -1,7 +1,8 @@
 import { getRecentSessions, getRecentDiagnosticSessions } from '$lib/support/storage';
 import { getProfile } from '$lib/settings';
 import { loadBuiltinCorpus, type FrequencyTable } from '$lib/corpus';
-import type { SessionSummary, UserSettings } from '$lib/support/core';
+import { DEFAULT_THRESHOLDS } from '$lib/support/core';
+import type { ClassificationThresholds, SessionSummary, UserSettings } from '$lib/support/core';
 
 interface AnalyticsInputs {
 	sessions: SessionSummary[];
@@ -9,12 +10,15 @@ interface AnalyticsInputs {
 	profile: UserSettings | undefined;
 	/** `undefined` when the corpus chunk failed to load — consumers treat it as "no frequency weighting". */
 	corpusFrequencies: FrequencyTable | undefined;
+	thresholds: ClassificationThresholds;
 }
 
 export async function loadAnalyticsInputs(): Promise<AnalyticsInputs> {
+	// No cap: cumulative healthy-bigram-over-time needs full history to be accurate
+	// for early dots (otherwise the rolling-window classifier sees a truncated past).
 	const [sessions, diagnosticSessions, profile] = await Promise.all([
-		getRecentSessions(),
-		getRecentDiagnosticSessions(),
+		getRecentSessions(Number.POSITIVE_INFINITY),
+		getRecentDiagnosticSessions(Number.POSITIVE_INFINITY),
 		getProfile()
 	]);
 
@@ -27,5 +31,11 @@ export async function loadAnalyticsInputs(): Promise<AnalyticsInputs> {
 		corpusFrequencies = undefined;
 	}
 
-	return { sessions, diagnosticSessions, profile, corpusFrequencies };
+	return {
+		sessions,
+		diagnosticSessions,
+		profile,
+		corpusFrequencies,
+		thresholds: profile?.thresholds ?? DEFAULT_THRESHOLDS
+	};
 }
