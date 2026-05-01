@@ -4,7 +4,11 @@
 	 *   - a title + lede (per session type)
 	 *   - a thin progress bar above the drill
 	 *   - the typing surface with live error / corrected-state tracking
-	 *   - a Timer + error-count row (WPM is reserved for the summary)
+	 *
+	 * Live elapsed / error readouts are deliberately omitted — those are
+	 * shown on the post-session summary so the eye stays on the text
+	 * during typing. The progress + error-budget hairlines above the
+	 * surface are the only ambient signals.
 	 *
 	 * Wiring: we build a {@link SessionRunner} from the supplied config and
 	 * feed every keystroke event into it. Once the text is fully typed we
@@ -21,8 +25,6 @@
 	import type { DifficultyMode } from '../bigramDifficulty';
 	import { computeGhostPosition, paceForMode } from '../pacer';
 	import { saveSession } from '../persistence';
-	import Timer from './Timer.svelte';
-	import StatsBar from './StatsBar.svelte';
 
 	interface Props {
 		/** Session kind — drives the persisted summary's `type` field. */
@@ -89,6 +91,21 @@
 			exposureBigrams.length > 0 &&
 			!!targetBigrams &&
 			targetBigrams.some((b) => !exposureSet.has(b))
+	);
+	// Word count for the eyebrow micro-label, matching the dashboard plan
+	// card's `Step N · 60 words` vocabulary so the session reads as a
+	// continuation of the plan, not a standalone page.
+	const wordCount = $derived(text.trim().split(/\s+/).filter(Boolean).length);
+	// Eyebrow text per session type. Drills append the mode so the page
+	// stamps both *what kind of session* and *which treatment*. Other
+	// types render their bare type name — `DIAGNOSTIC`, `REAL TEXT`.
+	const eyebrowLabel = $derived(
+		(() => {
+			if (type === 'bigram-drill' && drillMode) return `Drill · ${drillMode}`;
+			if (type === 'diagnostic') return 'Diagnostic';
+			if (type === 'real-text') return 'Real text';
+			return null;
+		})()
 	);
 
 	// Reactive mirrors of runner state. The runner itself is plain TS with
@@ -242,7 +259,34 @@
 		settings page.
 	-->
 	<header class="space-y-6">
-		<h1 class="text-4xl font-semibold tracking-tight">{title}</h1>
+		<div class="space-y-3">
+			{#if eyebrowLabel}
+				<!--
+					Eyebrow micro-label, mirroring the dashboard plan card's
+					`Step N · 60 words` vocabulary. Stamps the page as part of
+					the planned session stack rather than a standalone screen.
+					Drills get a leading dot tinted to match the in-text
+					bigram highlight for the mode — a single quiet
+					differentiator between accuracy and speed without giving
+					the page a second accent color. Diagnostic and real-text
+					skip the dot since they have no mode-specific tint.
+				-->
+				<p
+					class="flex items-baseline gap-2 text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase"
+					data-testid="session-eyebrow"
+				>
+					{#if drillMode}
+						<span
+							aria-hidden="true"
+							class="inline-block h-1.5 w-1.5 rounded-full"
+							style={`background-color: var(${drillMode === 'speed' ? '--color-info' : '--color-warning'})`}
+						></span>
+					{/if}
+					<span>{eyebrowLabel} · {wordCount} words</span>
+				</p>
+			{/if}
+			<h1 class="text-4xl font-semibold tracking-tight">{title}</h1>
+		</div>
 		{#if what || approach}
 			<dl class="max-w-xl space-y-3 text-sm">
 				{#if what}
@@ -306,31 +350,41 @@
 						</li>
 					{/each}
 				</ul>
-				{#if hasMix}
+				{#if hasMix || drillMode === 'accuracy' || drillMode === 'speed'}
+					<!--
+						Legend: every chip style currently on screen, in one
+						compact row. The dashed/filled distinction and the
+						in-text tint share a single line so the briefing block
+						stays one paragraph deep.
+					-->
 					<span></span>
-					<p class="text-[11px] text-base-content/50">
-						<span
-							class="mr-1 inline-block rounded-sm bg-base-200 px-1.5 py-0.5 align-middle font-mono text-base-content/80"
-							>ab</span
-						>
-						diagnosed weakness ·
-						<span
-							class="mx-1 inline-block rounded-sm border border-dashed border-base-content/40 px-1.5 py-0.5 align-middle font-mono text-base-content/60"
-							>cd</span
-						>
-						new bigram — not enough data yet
-					</p>
-				{/if}
-				{#if drillMode === 'accuracy' || drillMode === 'speed'}
-					<span></span>
-					<p class="text-[11px] text-base-content/50">
-						<span
-							class="mx-1 inline-block px-0.5 align-middle font-mono"
-							style={`color: var(${drillMode === 'speed' ? '--color-info' : '--color-warning'})`}
-							>ab</span
-						>
-						{drillMode === 'speed' ? 'slowest bigram' : 'most error-prone bigram'} — tinted in the text
-						as you type
+					<p class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px] text-base-content/50">
+						{#if hasMix}
+							<span class="inline-flex items-baseline gap-1.5">
+								<span
+									class="inline-block rounded-sm bg-base-200 px-1.5 py-0.5 align-middle font-mono text-base-content/80"
+									>ab</span
+								>
+								diagnosed
+							</span>
+							<span class="inline-flex items-baseline gap-1.5">
+								<span
+									class="inline-block rounded-sm border border-dashed border-base-content/40 px-1.5 py-0.5 align-middle font-mono text-base-content/60"
+									>cd</span
+								>
+								exposure
+							</span>
+						{/if}
+						{#if drillMode === 'accuracy' || drillMode === 'speed'}
+							<span class="inline-flex items-baseline gap-1.5">
+								<span
+									class="inline-block px-0.5 align-middle font-mono"
+									style={`color: var(${drillMode === 'speed' ? '--color-info' : '--color-warning'})`}
+									>ab</span
+								>
+								{drillMode === 'speed' ? 'slowest — chase it' : 'error-prone — slow down'}
+							</span>
+						{/if}
 					</p>
 				{/if}
 			</div>
@@ -349,10 +403,16 @@
 				charsTyped approaches the 5% tolerance; clamps at 100% once
 				over budget. Placed above the session progress bar so a
 				glance answers "am I burning my error budget?" without
-				looking at the numeric readout.
+				looking at the numeric readout. The track is invisible until
+				the user actually spends a unit of budget — keeps the empty
+				state quiet so two parallel hairlines don't read as one fat
+				bar.
 			-->
 			<div
-				class="h-0.5 w-full overflow-hidden rounded-full bg-base-300"
+				class="h-0.5 w-full overflow-hidden rounded-full transition-colors duration-150 motion-reduce:transition-none {errorCount >
+				0
+					? 'bg-base-300'
+					: 'bg-transparent'}"
 				role="progressbar"
 				aria-label="Error budget used (5% tolerance)"
 				aria-valuemin="0"
@@ -392,14 +452,21 @@
 		/>
 	</div>
 
-	<div class="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">
-		<Timer {elapsedMs} />
-		<StatsBar {errorCount} {drillMode} />
-		{#if saving}
-			<span class="text-base-content/55">Saving…</span>
-		{/if}
-		{#if saveError}
-			<span class="text-error" role="alert">{saveError}</span>
-		{/if}
-	</div>
+	<!--
+		No live elapsed / error readouts: those are reserved for the
+		post-session summary so they don't pull the eye off the text
+		while typing. The progress + error-budget hairlines above the
+		surface are the only ambient signals. Save state still surfaces
+		so a failed persistence doesn't disappear silently.
+	-->
+	{#if saving || saveError}
+		<div class="flex flex-wrap items-baseline gap-x-6 text-sm">
+			{#if saving}
+				<span class="text-base-content/55">Saving…</span>
+			{/if}
+			{#if saveError}
+				<span class="text-error" role="alert">{saveError}</span>
+			{/if}
+		</div>
+	{/if}
 </div>

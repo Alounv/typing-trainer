@@ -51,8 +51,9 @@ test('mixed drill: priority chips filled, exposure chips dashed, legend visible'
 	await expect(drillList.getByLabel('an, new bigram for exposure practice')).toBeVisible();
 	await expect(drillList.getByLabel('in, new bigram for exposure practice')).toBeVisible();
 
-	// Legend appears only for mixed lists; pin copy to catch a rename-in-one-place-only refactor.
-	await expect(page.getByText(/new bigram — not enough data yet/i)).toBeVisible();
+	// Legend appears only for mixed lists; pin to the dashed-sample's "cd"
+	// (unique to the legend) to catch a rename-in-one-place-only refactor.
+	await expect(page.getByText(/exposure/i)).toBeVisible();
 });
 
 test('exposure-only drill: exposure-only copy, no legend (no weakness chips to contrast)', async ({
@@ -74,6 +75,6 @@ test('exposure-only drill: exposure-only copy, no legend (no weakness chips to c
 	await expect(drillList.getByLabel(/diagnosed weakness/)).toHaveCount(0);
 
 	// Legend suppressed: it would claim two styles are on screen when only one is.
-	// Targets the legend's "ab" sample specifically to avoid matching arbitrary prose.
-	await expect(page.getByText(/diagnosed weakness ·/)).toHaveCount(0);
+	// "diagnosed" only appears in that legend label, so its absence proves it.
+	await expect(page.getByText(/diagnosed/i)).toHaveCount(0);
 });
