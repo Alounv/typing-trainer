@@ -1,9 +1,10 @@
-import type {
-	BigramAggregate,
-	BigramClassification,
-	BigramSample,
-	ClassificationThresholds,
-	SessionSummary
+import {
+	BIGRAM_CLASSIFICATION_WINDOW,
+	type BigramAggregate,
+	type BigramClassification,
+	type BigramSample,
+	type ClassificationThresholds,
+	type SessionSummary
 } from '../support/core';
 import type { FrequencyTable } from '../corpus';
 import { classifyBigram } from '../skill';
@@ -52,11 +53,10 @@ function rollingStdDev(values: readonly number[], window: number): (number | nul
 
 /** Smoothing window for WPM trend. Spec §10.6 calls for a 7-session average. */
 const WPM_ROLLING_WINDOW = 7;
-/** Sparkline depth — number of sliding-window points to plot per bigram. */
-const BIGRAM_SPARKLINE_DEPTH = 10;
-/** Window size for the sliding-window sparkline. Matches `BIGRAM_CLASSIFICATION_WINDOW`
- *  so the last point equals the value shown in the table cell. */
-const BIGRAM_SPARKLINE_WINDOW = 10;
+/** Sparkline width matches the classifier window so the rightmost point equals the
+ *  table cell, and the depth shows the same number of windows of history. */
+const BIGRAM_SPARKLINE_WINDOW = BIGRAM_CLASSIFICATION_WINDOW;
+const BIGRAM_SPARKLINE_DEPTH = BIGRAM_CLASSIFICATION_WINDOW;
 
 /**
  * Single point on a per-session trend chart. Shared shape across metrics so one chart
@@ -110,22 +110,10 @@ function localDateKey(timestamp: number): string {
 	return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
-/** Pooled-samples window for per-bigram classification — mirrors `BIGRAM_CLASSIFICATION_WINDOW`
- *  in skill/assessment.ts. Kept in sync because this module reproduces that classifier inline
- *  to avoid an O(D × N × B) re-summarization across kept-day boundaries. */
-const HEALTHY_CLASSIFICATION_WINDOW = 10;
-
 /**
- * Cumulative healthy-bigram count over time, one point per day (last session of the
- * day). The classifier runs on the rolling window of the last
- * `HEALTHY_CLASSIFICATION_WINDOW` samples per bigram as of each kept session, so
- * intra-day sessions still feed the count — they just don't get their own dot. Sets
- * `rolling = value` so the chart connects the dots; the count itself is the signal.
- *
- * Single-pass: we sweep sessions oldest→newest maintaining a rolling buffer of
- * recent samples per bigram, and classify at each kept-day boundary. Earlier
- * versions called `summarizeBigrams` once per kept day, which re-walked the
- * entire history each time (O(D × N × B)).
+ * Cumulative healthy-bigram count, one point per day (last session of the day).
+ * Intra-day sessions still feed the rolling buffer; only the last gets its own dot.
+ * Sets `rolling = value` so the chart connects the dots.
  */
 export function buildHealthyBigramSeries(
 	sessions: readonly SessionSummary[],
@@ -140,7 +128,7 @@ export function buildHealthyBigramSeries(
 	const keep = new Set(lastOfDayIdx.values());
 
 	const buffers = new Map<string, BigramSample[]>();
-	const window = HEALTHY_CLASSIFICATION_WINDOW;
+	const window = BIGRAM_CLASSIFICATION_WINDOW;
 
 	const out: TrendPoint[] = [];
 	for (let i = 0; i < ordered.length; i++) {
@@ -196,13 +184,8 @@ export interface BigramTrendPoint {
 	errorRate: number;
 }
 
-/**
- * Build a `bigram → most-recent-samples` index in one pass over all sessions.
- * Each bucket holds at most `limit` samples, oldest→newest within the window.
- * Use this when computing trends for many bigrams from the same session set —
- * batches the per-bigram session walk that `buildBigramTrend` would otherwise
- * do for each call.
- */
+/** Per-bigram buffer of the most recent `limit` samples (oldest→newest). One pass over
+ *  sessions; used to batch trend computation for many bigrams. */
 export function buildRecentSamplesIndex(
 	sessions: readonly SessionSummary[],
 	limit: number
@@ -224,8 +207,8 @@ export function buildRecentSamplesIndex(
 	return out;
 }
 
-/** Same as `buildBigramTrend` but reads from a pre-built sample index — the form to use
- *  when deriving trends for many bigrams off the same session set. */
+/** Sliding-window trend from a pre-built sample buffer. Use when deriving trends for
+ *  many bigrams; pair with `buildRecentSamplesIndex`. */
 export function buildBigramTrendFromSamples(
 	samples: readonly BigramSample[],
 	window: number = BIGRAM_SPARKLINE_WINDOW
@@ -253,15 +236,9 @@ export function buildBigramTrendFromSamples(
 }
 
 /**
- * Sliding-window trend: pool the most recent `window + depth - 1` occurrences,
- * then slide a `window`-sized window across them, emitting one point per
- * position. The last point's metrics equal those shown in the table cell.
- *
- * Returns `[]` when the pool can't fill a single window — the sparkline then
- * falls back to its empty state.
- *
- * Single-bigram convenience wrapper. For many bigrams off the same session set,
- * call `buildRecentSamplesIndex` once and feed `buildBigramTrendFromSamples`.
+ * Sliding-window trend for one bigram. Returns `[]` when the pool can't fill a single
+ * window. For many bigrams off the same session set, call `buildRecentSamplesIndex`
+ * once and feed `buildBigramTrendFromSamples` instead.
  */
 export function buildBigramTrend(
 	sessions: readonly SessionSummary[],

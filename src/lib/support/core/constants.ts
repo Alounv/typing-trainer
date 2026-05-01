@@ -13,6 +13,10 @@ export const DEFAULT_THRESHOLDS: ClassificationThresholds = {
 /** Minimum occurrences before the four-way classification applies. Below: `unclassified`. */
 export const MIN_OCCURRENCES_FOR_CLASSIFICATION = 10;
 
+/** Per-bigram rolling window over which classification metrics are pooled. Drives the
+ *  classifier, the difficulty tint, the healthy-bigrams chart, and the sparkline view. */
+export const BIGRAM_CLASSIFICATION_WINDOW = 20;
+
 // --- Word budget defaults (user-tunable via profile) ---
 
 export const DEFAULT_BIGRAM_DRILL_WORD_BUDGET = 25;

@@ -1,36 +1,7 @@
 /** Per-bigram difficulty scoring for the optional pending-letter colorizer. */
-import type { BigramAggregate } from '$lib/support/core';
+import type { BigramSummary } from '$lib/skill';
 
 export type DifficultyMode = 'errors' | 'speed';
-
-interface Pooled {
-	occurrences: number;
-	errorCount: number;
-	weightedTimeSum: number;
-	timingWeight: number;
-}
-
-function pool(aggregates: readonly BigramAggregate[]): Map<string, Pooled> {
-	const out = new Map<string, Pooled>();
-	for (const agg of aggregates) {
-		const cur = out.get(agg.bigram) ?? {
-			occurrences: 0,
-			errorCount: 0,
-			weightedTimeSum: 0,
-			timingWeight: 0
-		};
-		cur.occurrences += agg.occurrences;
-		cur.errorCount += agg.errorCount;
-		// meanTime is over clean pairs only; weight by clean-pair count.
-		const cleanWeight = Math.max(0, agg.occurrences - agg.errorCount);
-		if (cleanWeight > 0 && Number.isFinite(agg.meanTime)) {
-			cur.weightedTimeSum += agg.meanTime * cleanWeight;
-			cur.timingWeight += cleanWeight;
-		}
-		out.set(agg.bigram, cur);
-	}
-	return out;
-}
 
 /** Percentile rank in [0, 1]; highest value gets 1, lowest gets 0. */
 function percentileRanks(entries: ReadonlyArray<[string, number]>): Map<string, number> {
@@ -48,34 +19,30 @@ function percentileRanks(entries: ReadonlyArray<[string, number]>): Map<string, 
 	return out;
 }
 
-// Bigrams below the floor get no tint; at or above the ceiling, full warning color.
-const ERROR_RATE_FLOOR = 0.02;
 const ERROR_RATE_CEILING = 0.1;
 
+/** Reads errorRate / meanTime off the rolling-window summary, gated by the same
+ *  classifier (and therefore the same `BIGRAM_CLASSIFICATION_WINDOW` /
+ *  `MIN_OCCURRENCES_FOR_CLASSIFICATION`) that the rest of the app uses. */
 export function buildDifficultyMap(
-	aggregates: readonly BigramAggregate[],
-	mode: DifficultyMode,
-	minOccurrences = 5
+	summaries: readonly BigramSummary[],
+	mode: DifficultyMode
 ): Map<string, number> {
-	const pooled = pool(aggregates);
 	const out = new Map<string, number>();
 
 	if (mode === 'errors') {
-		for (const [bigram, p] of pooled) {
-			if (p.occurrences < minOccurrences) continue;
-			const errorRate = p.errorCount / p.occurrences;
-			const score = (errorRate - ERROR_RATE_FLOOR) / (ERROR_RATE_CEILING - ERROR_RATE_FLOOR);
-			out.set(bigram, clamp01(score));
+		for (const s of summaries) {
+			if (s.classification === 'unclassified') continue;
+			const score = s.errorRate / ERROR_RATE_CEILING;
+			out.set(s.bigram, clamp01(score));
 		}
 		return out;
 	}
 
 	const meanTimes: [string, number][] = [];
-	for (const [bigram, p] of pooled) {
-		if (p.occurrences < minOccurrences) continue;
-		if (p.timingWeight > 0) {
-			meanTimes.push([bigram, p.weightedTimeSum / p.timingWeight]);
-		}
+	for (const s of summaries) {
+		if (s.classification === 'unclassified') continue;
+		meanTimes.push([s.bigram, s.meanTime]);
 	}
 
 	const speedRanks = percentileRanks(meanTimes);

@@ -21,7 +21,9 @@
 	import { keystrokeCapture, type CaptureCallbacks } from '../capture';
 	import type { KeystrokeEvent } from '../../support/core';
 	import { getProfile } from '$lib/settings';
-	import { getAllBigramAggregates } from '$lib/support/storage';
+	import { getRecentSessions } from '$lib/support/storage';
+	import { summarizeBigrams } from '$lib/skill';
+	import { DEFAULT_THRESHOLDS } from '$lib/support/core';
 	import {
 		buildDifficultyMap,
 		highlightVarForMode,
@@ -83,9 +85,17 @@
 			const profile = await getProfile();
 			if (cancelled) return;
 			if (!profile?.colorizeBigramDifficulty) return;
-			const aggregates = await getAllBigramAggregates();
+			// Recent-window pool, not lifetime: keeps reveal cost bounded as history grows
+			// and feeds `summarizeBigrams` so the tint shares `BIGRAM_CLASSIFICATION_WINDOW`
+			// with the rolling-window classifier.
+			const recent = await getRecentSessions();
 			if (cancelled) return;
-			bigramDifficultyMap = buildDifficultyMap(aggregates, mode);
+			const summaries = summarizeBigrams(
+				recent,
+				undefined,
+				profile.thresholds ?? DEFAULT_THRESHOLDS
+			);
+			bigramDifficultyMap = buildDifficultyMap(summaries, mode);
 		})();
 		return () => {
 			cancelled = true;

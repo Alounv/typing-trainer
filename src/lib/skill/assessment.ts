@@ -6,13 +6,13 @@ import type {
 	PriorityBigram,
 	SessionSummary
 } from '../support/core';
-import { DEFAULT_THRESHOLDS, MIN_OCCURRENCES_FOR_CLASSIFICATION } from '../support/core';
+import {
+	BIGRAM_CLASSIFICATION_WINDOW,
+	DEFAULT_THRESHOLDS,
+	MIN_OCCURRENCES_FOR_CLASSIFICATION
+} from '../support/core';
 import type { FrequencyTable } from '../corpus';
 import { classifyBigram } from './classification';
-
-/** Pooled-samples window for per-bigram classification. Resists single-session outliers
- *  while tracking recent behavior. */
-const BIGRAM_CLASSIFICATION_WINDOW = 10;
 
 /** Priority target cap — mirrors the diagnostic engine's `PRIORITY_TARGETS_TOP_N`. */
 const LIVE_PRIORITY_TARGETS_TOP_N = 10;
@@ -28,15 +28,10 @@ export interface BigramSummary {
 }
 
 /**
- * Aggregate all observed bigrams into rows. Class/meanTime/errorRate come from the rolling
- * window of the last `window` samples per bigram so a small recent session can't mask a
- * well-established bigram. `occurrences` is the lifetime sum. Legacy data without samples
- * falls back to the latest aggregate.
- *
- * Single pass with a bigram-keyed inverted index: each bigram walks only the sessions
- * it actually appears in (newest-first), instead of every session. Earlier versions
- * indexed session→bigram and walked all sessions per bigram, which was O(B × N) lookups
- * even when most bigrams appeared in only a handful of sessions.
+ * Aggregate observed bigrams. Class/meanTime/errorRate come from the rolling window of
+ * the last `window` samples so a small recent session can't mask a well-established
+ * bigram; `occurrences` is the lifetime sum. Legacy data without samples falls back to
+ * the latest aggregate.
  */
 export function summarizeBigrams(
 	sessions: readonly SessionSummary[],
@@ -46,12 +41,10 @@ export function summarizeBigrams(
 ): BigramSummary[] {
 	if (window < 1) throw new RangeError('window must be ≥ 1');
 
-	// Walk newest-first so each bigram's per-session list is already in the order
-	// the rolling-window pooler wants — we never sort the inner arrays.
+	// Newest-first so the inverted index ends up in pool order.
 	const orderedNewestFirst = [...sessions].sort((a, b) => b.timestamp - a.timestamp);
 
-	// `latest` is the OLDEST agg seen during a newest-first walk (= the newest snapshot
-	// in time, since we hit the newest session first). Set on first encounter only.
+	// First-seen wins → newest snapshot, since we walk newest-first.
 	const latest = new Map<string, BigramAggregate>();
 	const occurrences = new Map<string, number>();
 	const aggsByBigram = new Map<string, BigramAggregate[]>();
@@ -77,7 +70,6 @@ export function summarizeBigrams(
 		const aggs = aggsByBigram.get(bigram);
 		const pooled: BigramSample[] = [];
 		if (aggs) {
-			// aggs is newest-first by construction. Take session tails to the window cap.
 			for (const agg of aggs) {
 				if (!agg.samples || agg.samples.length === 0) continue;
 				const remaining = window - pooled.length;
@@ -109,7 +101,7 @@ export function summarizeBigrams(
 				thresholds
 			);
 		} else {
-			// Legacy path: pre-sample data has no rolling window to compute from.
+			// Legacy data without samples — no rolling window to compute from.
 			classification = latestAgg.classification;
 			meanTime = latestAgg.meanTime;
 			errorRate = latestAgg.errorRate;
