@@ -3,7 +3,7 @@
 	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
 	import { summarizeBigrams } from '$lib/skill';
-	import { detectWindowedMovements, detectMilestone } from '../celebrations';
+	import { detectWindowedMovements, detectMilestone, movementConcernsFocus } from '../celebrations';
 	import { buildBigramTrend } from '../metrics';
 	import BigramMovements from './BigramMovements.svelte';
 	import MilestoneBanner from './MilestoneBanner.svelte';
@@ -23,7 +23,20 @@
 	// Compare windowed classifications before vs. after this session so movements
 	// reflect the user's overall standing — same view as the bigram table — rather
 	// than a single noisy session's per-session classification.
-	const movements = $derived(detectWindowedMovements(statsSessions, session.id));
+	const allMovements = $derived(detectWindowedMovements(statsSessions, session.id));
+
+	// On accuracy/speed drills, hide movements that don't concern the trained
+	// axis — pure-speed transitions clutter an accuracy summary and vice versa.
+	// Other session types (diagnostic, real-text) show everything.
+	const movements = $derived.by(() => {
+		if (session.drillMode === 'accuracy') {
+			return allMovements.filter((m) => movementConcernsFocus(m, 'accuracy'));
+		}
+		if (session.drillMode === 'speed') {
+			return allMovements.filter((m) => movementConcernsFocus(m, 'speed'));
+		}
+		return allMovements;
+	});
 
 	const movedRows = $derived.by(() => {
 		if (movements.length === 0) return [];

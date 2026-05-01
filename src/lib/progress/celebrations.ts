@@ -21,6 +21,35 @@ interface MovementGroup {
 	bigrams: string[];
 }
 
+/**
+ * Classes split along two independent axes:
+ *  - accuracy: `acquisition`/`hasty` are error-prone; `fluency`/`healthy` are clean.
+ *  - speed:    `fluency`/`acquisition` are slow; `healthy`/`hasty` are fast.
+ *
+ * A movement "concerns" an axis iff the from/to classifications sit on
+ * opposite sides of that axis (or it's a first appearance, which advances
+ * along both at once).
+ */
+const CLEAN: Record<RankedClass, boolean> = {
+	acquisition: false,
+	hasty: false,
+	fluency: true,
+	healthy: true
+};
+const FAST: Record<RankedClass, boolean> = {
+	acquisition: false,
+	hasty: true,
+	fluency: false,
+	healthy: true
+};
+
+export function movementConcernsFocus(event: MovementEvent, focus: 'accuracy' | 'speed'): boolean {
+	if (event.from === null) return true;
+	return focus === 'accuracy'
+		? CLEAN[event.from] !== CLEAN[event.to]
+		: FAST[event.from] !== FAST[event.to];
+}
+
 /** Bucket movement events by `(from, to)` so the UI can render one row per transition. */
 export function groupMovements(events: readonly MovementEvent[]): MovementGroup[] {
 	const byKey = new Map<string, MovementGroup>();
