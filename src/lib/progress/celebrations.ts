@@ -14,7 +14,7 @@ export interface MovementEvent {
 	direction: MovementDirection;
 }
 
-export interface MovementGroup {
+interface MovementGroup {
 	from: MovementEvent['from'];
 	to: MovementEvent['to'];
 	direction: MovementDirection;
