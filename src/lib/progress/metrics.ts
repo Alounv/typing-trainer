@@ -1,4 +1,6 @@
 import type { BigramAggregate, BigramClassification, SessionSummary } from '../support/core';
+import type { FrequencyTable } from '../corpus';
+import { summarizeBigrams } from '../skill';
 
 /**
  * Rolling average with a trailing window. For positions before the window is full, returns
@@ -94,6 +96,48 @@ export function buildWpmSeries(sessions: readonly SessionSummary[]): WpmPoint[] 
 
 export function buildErrorRateSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
 	return buildMetricSeries(sessions, (s) => s.errorRate);
+}
+
+/** Local-date key (YYYY-MM-DD) for grouping sessions into "days". */
+function localDateKey(timestamp: number): string {
+	const d = new Date(timestamp);
+	return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+/**
+ * Cumulative healthy-bigram count over time, one point per day (last session of the
+ * day). The classifier runs on the full history up to and including that session, so
+ * intra-day sessions still feed the count — they just don't get their own dot. Sets
+ * `rolling = value` so the chart connects the dots; the count itself is the signal.
+ */
+export function buildHealthyBigramSeries(
+	sessions: readonly SessionSummary[],
+	corpus?: FrequencyTable
+): TrendPoint[] {
+	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
+	const lastOfDayIdx = new Map<string, number>();
+	for (let i = 0; i < ordered.length; i++) {
+		lastOfDayIdx.set(localDateKey(ordered[i].timestamp), i);
+	}
+	const keep = new Set(lastOfDayIdx.values());
+
+	const out: TrendPoint[] = [];
+	for (let i = 0; i < ordered.length; i++) {
+		if (!keep.has(i)) continue;
+		const prefix = ordered.slice(0, i + 1);
+		const rows = summarizeBigrams(prefix, corpus);
+		let healthy = 0;
+		for (const r of rows) if (r.classification === 'healthy') healthy++;
+		out.push({
+			sessionId: ordered[i].id,
+			timestamp: ordered[i].timestamp,
+			value: healthy,
+			rolling: healthy,
+			plus1Sigma: null,
+			minus1Sigma: null
+		});
+	}
+	return out;
 }
 
 /** One point on a per-bigram sparkline. Each point is a rolling-window summary

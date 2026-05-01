@@ -4,6 +4,7 @@
 	import { summarizeBigrams } from '$lib/skill';
 	import {
 		buildErrorRateSeries,
+		buildHealthyBigramSeries,
 		buildWpmSeries,
 		buildBigramTrend,
 		countGraduations,
@@ -11,6 +12,7 @@
 	} from '../metrics';
 	import WpmChart from './WpmChart.svelte';
 	import ErrorRateChart from './ErrorRateChart.svelte';
+	import SessionTrendChart from './SessionTrendChart.svelte';
 	import BigramTable from './BigramTable.svelte';
 	import ClassificationBar from './ClassificationBar.svelte';
 
@@ -29,6 +31,7 @@
 
 	const wpm = $derived(buildWpmSeries(diagnosticSessions));
 	const errorRate = $derived(buildErrorRateSeries(diagnosticSessions));
+	const healthyOverTime = $derived(buildHealthyBigramSeries(sessions, corpusFrequencies));
 	const bigrams = $derived(summarizeBigrams(sessions, corpusFrequencies));
 	const bigramRows = $derived(
 		bigrams.map((row) => ({ ...row, trend: buildBigramTrend(sessions, row.bigram) }))
@@ -81,6 +84,25 @@
 	<p class="text-xs text-base-content/55">
 		Fraction of keystrokes that were first-input errors, per diagnostic. The line smooths across 7
 		diagnostics.
+	</p>
+</section>
+
+<section class="space-y-3" data-testid="healthy-bigrams-trend">
+	<div class="flex items-baseline justify-between">
+		<h2 class="text-xl font-semibold">Healthy bigrams</h2>
+		<p class="text-sm text-base-content/55">Across all sessions</p>
+	</div>
+	<div class="rounded-lg border border-base-300 bg-base-100 p-4">
+		<SessionTrendChart
+			points={healthyOverTime}
+			ariaLabel="Healthy bigram count across sessions"
+			variant="success"
+			emptyLabel="No sessions yet — complete one to start tracking healthy bigrams."
+		/>
+	</div>
+	<p class="text-xs text-base-content/55">
+		Cumulative count of bigrams classified healthy by the rolling-window classifier as of each
+		session. Counts can dip when newer samples regress a previously healthy bigram.
 	</p>
 </section>
 

@@ -23,7 +23,7 @@
 		 * without hardcoding hex. Keep in sync with `ClassificationBar` if
 		 * you add more variants.
 		 */
-		variant?: 'primary' | 'warning';
+		variant?: 'primary' | 'warning' | 'success';
 		/** Override message shown when there's no data. */
 		emptyLabel?: string;
 	}
@@ -151,8 +151,20 @@
 	// Map variant → Tailwind classes. Done as runtime derived values (not
 	// class-string interpolation) so the Tailwind JIT sees the full class
 	// literals and doesn't tree-shake them.
-	const strokeClass = $derived(variant === 'warning' ? 'stroke-warning' : 'stroke-primary');
-	const fillClass = $derived(variant === 'warning' ? 'fill-warning/10' : 'fill-primary/10');
+	const strokeClass = $derived(
+		variant === 'warning'
+			? 'stroke-warning'
+			: variant === 'success'
+				? 'stroke-success'
+				: 'stroke-primary'
+	);
+	const fillClass = $derived(
+		variant === 'warning'
+			? 'fill-warning/10'
+			: variant === 'success'
+				? 'fill-success/10'
+				: 'fill-primary/10'
+	);
 </script>
 
 <div bind:this={containerEl} class="w-full">
