@@ -58,6 +58,16 @@ describe('registry', () => {
 		expect(Object.keys(c.bigramFrequencies).length).toBeGreaterThanOrEqual(100);
 	});
 
+	it('populates word-boundary bigrams on the same scale as interior bigrams', async () => {
+		const c = await loadBuiltinCorpus('en');
+		// "the" is the top word → " t" and "e " should beat the corpus floor by orders of
+		// magnitude; otherwise priority drills bury them (assessment.ts:127).
+		expect(c.bigramFrequencies[' t']).toBeGreaterThan(0);
+		expect(c.bigramFrequencies['e ']).toBeGreaterThan(0);
+		const interiorTop = c.bigramFrequencies['th'];
+		expect(c.bigramFrequencies[' t']).toBeGreaterThan(interiorTop / 100);
+	});
+
 	it('loads the en quote bank with quotes and length groups', async () => {
 		const bank = await loadQuoteBank('en');
 		expect(bank.quotes.length).toBeGreaterThan(50);
