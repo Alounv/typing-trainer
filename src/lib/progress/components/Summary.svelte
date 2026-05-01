@@ -83,7 +83,12 @@
 	</dl>
 </section>
 
-<BigramMovements events={movements} />
+<BigramMovements
+	events={movements}
+	axisLabel={session.drillMode === 'accuracy' || session.drillMode === 'speed'
+		? session.drillMode
+		: undefined}
+/>
 
 {#if movedRows.length > 0}
 	<section class="space-y-3" data-testid="moved-bigrams-table">

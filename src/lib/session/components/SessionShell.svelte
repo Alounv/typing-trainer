@@ -321,6 +321,18 @@
 						new bigram — not enough data yet
 					</p>
 				{/if}
+				{#if drillMode === 'accuracy' || drillMode === 'speed'}
+					<span></span>
+					<p class="text-[11px] text-base-content/50">
+						<span
+							class="mx-1 inline-block px-0.5 align-middle font-mono"
+							style={`color: var(${drillMode === 'speed' ? '--color-info' : '--color-warning'})`}
+							>ab</span
+						>
+						{drillMode === 'speed' ? 'slowest bigram' : 'most error-prone bigram'} — tinted in the text
+						as you type
+					</p>
+				{/if}
 			</div>
 		{/if}
 	</header>

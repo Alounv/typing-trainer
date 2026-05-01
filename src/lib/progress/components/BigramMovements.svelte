@@ -4,9 +4,11 @@
 
 	interface Props {
 		events: readonly MovementEvent[];
+		/** When set, surface that the list was filtered to one axis only. */
+		axisLabel?: 'accuracy' | 'speed';
 	}
 
-	let { events }: Props = $props();
+	let { events, axisLabel }: Props = $props();
 
 	const groups = $derived(groupMovements(events));
 
@@ -25,7 +27,7 @@
 		data-testid="bigram-movements"
 		aria-labelledby="bigram-movements-heading"
 	>
-		<div class="flex items-baseline justify-between">
+		<div class="flex items-baseline justify-between gap-4">
 			<h2 id="bigram-movements-heading" class="text-xl font-semibold tracking-tight">
 				Bigram movements
 			</h2>
@@ -33,6 +35,13 @@
 				This session
 			</p>
 		</div>
+		{#if axisLabel}
+			<p class="text-xs text-base-content/55">
+				Only movements on the {axisLabel} axis — pure {axisLabel === 'accuracy'
+					? 'speed'
+					: 'accuracy'} transitions are hidden in drill summaries.
+			</p>
+		{/if}
 		<ul class="divide-y divide-base-300 border-y border-base-300">
 			{#each groups as g (`${g.from}→${g.to}`)}
 				<li
