@@ -1,7 +1,7 @@
 /** Per-bigram difficulty scoring for the optional pending-letter colorizer. */
 import type { BigramAggregate } from '$lib/support/core';
 
-export type DifficultyMode = 'errors' | 'speed' | 'blended';
+export type DifficultyMode = 'errors' | 'speed';
 
 interface Pooled {
 	occurrences: number;
@@ -48,6 +48,10 @@ function percentileRanks(entries: ReadonlyArray<[string, number]>): Map<string, 
 	return out;
 }
 
+// Bigrams below the floor get no tint; at or above the ceiling, full warning color.
+const ERROR_RATE_FLOOR = 0.02;
+const ERROR_RATE_CEILING = 0.1;
+
 export function buildDifficultyMap(
 	aggregates: readonly BigramAggregate[],
 	mode: DifficultyMode,
@@ -56,33 +60,28 @@ export function buildDifficultyMap(
 	const pooled = pool(aggregates);
 	const out = new Map<string, number>();
 
-	// Percentile-rank both metrics: raw error rates cluster in 1–5% so a
-	// linear mapping collapses the gradient to one visible color.
-	const errorRateEntries: [string, number][] = [];
-	const meanTimes: [string, number][] = [];
+	if (mode === 'errors') {
+		for (const [bigram, p] of pooled) {
+			if (p.occurrences < minOccurrences) continue;
+			const errorRate = p.errorCount / p.occurrences;
+			const score = (errorRate - ERROR_RATE_FLOOR) / (ERROR_RATE_CEILING - ERROR_RATE_FLOOR);
+			out.set(bigram, clamp01(score));
+		}
+		return out;
+	}
 
+	const meanTimes: [string, number][] = [];
 	for (const [bigram, p] of pooled) {
 		if (p.occurrences < minOccurrences) continue;
-		errorRateEntries.push([bigram, p.errorCount / p.occurrences]);
 		if (p.timingWeight > 0) {
 			meanTimes.push([bigram, p.weightedTimeSum / p.timingWeight]);
 		}
 	}
 
-	const errorRanks =
-		mode === 'speed' ? new Map<string, number>() : percentileRanks(errorRateEntries);
-	const speedRanks = mode === 'errors' ? new Map<string, number>() : percentileRanks(meanTimes);
-
-	for (const [bigram] of errorRateEntries) {
-		const rank: number | null = (() => {
-			if (mode === 'errors') return errorRanks.get(bigram) ?? null;
-			if (mode === 'speed') return speedRanks.get(bigram) ?? null;
-			const er = errorRanks.get(bigram);
-			const sr = speedRanks.get(bigram);
-			if (er !== undefined && sr !== undefined) return 0.5 * er + 0.5 * sr;
-			return er ?? sr ?? null;
-		})();
-		if (rank === null) continue;
+	const speedRanks = percentileRanks(meanTimes);
+	for (const [bigram] of meanTimes) {
+		const rank = speedRanks.get(bigram);
+		if (rank === undefined) continue;
 		// Cubic curve so only the top decile pops; rank² spread tint too widely.
 		out.set(bigram, clamp01(rank * rank * rank * rank));
 	}
