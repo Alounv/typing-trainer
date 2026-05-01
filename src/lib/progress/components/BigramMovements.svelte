@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { groupMovements, type MovementEvent } from '../celebrations';
+	import BigramMovementTrack from './BigramMovementTrack.svelte';
 
 	interface Props {
 		events: readonly MovementEvent[];
@@ -35,21 +36,17 @@
 		<ul class="divide-y divide-base-300 border-y border-base-300">
 			{#each groups as g (`${g.from}→${g.to}`)}
 				<li
-					class="flex flex-wrap items-baseline gap-x-6 gap-y-2 py-3"
+					class="flex flex-wrap items-center gap-x-6 gap-y-2 py-3"
 					data-testid="movement-group"
 					data-direction={g.direction}
 					data-from={g.from ?? 'new'}
 					data-to={g.to}
 				>
-					<span
-						class={`text-xs font-medium tracking-[0.18em] uppercase ${
-							g.direction === 'up' ? 'text-success' : 'text-warning'
-						}`}
-					>
-						{g.direction === 'up' ? '↑ Improved' : '↓ Regressed'}
-					</span>
-					<span class="font-mono text-sm tracking-wide text-base-content/70">
-						{classLabel(g.from)} → {classLabel(g.to)}
+					<BigramMovementTrack from={g.from} to={g.to} direction={g.direction} />
+					<span class="sr-only">
+						{g.direction === 'up' ? 'Improved' : 'Regressed'}: {classLabel(g.from)} to {classLabel(
+							g.to
+						)}
 					</span>
 					<ul class="flex flex-wrap gap-1.5">
 						{#each g.bigrams as bigram (bigram)}

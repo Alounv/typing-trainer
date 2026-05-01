@@ -4,7 +4,11 @@
 	glance — the single most important question the analytics page should answer.
 -->
 <script lang="ts">
-	import type { BigramClassification } from '../../support/core';
+	import {
+		CLASSIFICATION_COLOR as COLOR,
+		CLASSIFICATION_ORDER as ORDER,
+		type DisplayedClassification
+	} from '../classificationDisplay';
 
 	/** `label` and optional `meta` (shown right-aligned, e.g. a date) caption the bar. */
 	export interface ClassificationBarRow {
@@ -25,26 +29,8 @@
 
 	let { current }: Props = $props();
 
-	// Display order: worst → best. Mirrors the drill prescription severity
-	// ladder so "moving right" always reads as "getting better".
-	const ORDER: Exclude<BigramClassification, 'unclassified'>[] = [
-		'acquisition',
-		'hasty',
-		'fluency',
-		'healthy'
-	];
-
-	/** DaisyUI-compatible semantic colors — same palette as the bigram table's
-	 * classification badges. Consistency across views is worth the coupling. */
-	const COLOR: Record<(typeof ORDER)[number], string> = {
-		acquisition: 'bg-error',
-		hasty: 'bg-warning',
-		fluency: 'bg-info',
-		healthy: 'bg-success'
-	};
-
 	interface Segment {
-		label: (typeof ORDER)[number];
+		label: DisplayedClassification;
 		count: number;
 		percent: number;
 	}

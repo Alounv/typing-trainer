@@ -20,20 +20,19 @@
 
 	const milestone = $derived(detectMilestone(session, statsSessions));
 
-	const drilledBigrams = $derived(session.bigramsTargeted ?? []);
-	const drilledRows = $derived.by(() => {
-		if (drilledBigrams.length === 0) return [];
-		const targeted = new Set(drilledBigrams);
-		const summaries = summarizeBigrams(statsSessions, corpusFrequencies);
-		return summaries
-			.filter((row) => targeted.has(row.bigram))
-			.map((row) => ({ ...row, trend: buildBigramTrend(statsSessions, row.bigram) }));
-	});
-
 	// Compare windowed classifications before vs. after this session so movements
 	// reflect the user's overall standing — same view as the bigram table — rather
 	// than a single noisy session's per-session classification.
 	const movements = $derived(detectWindowedMovements(statsSessions, session.id));
+
+	const movedRows = $derived.by(() => {
+		if (movements.length === 0) return [];
+		const moved = new Set(movements.map((m) => m.bigram));
+		const summaries = summarizeBigrams(statsSessions, corpusFrequencies);
+		return summaries
+			.filter((row) => moved.has(row.bigram))
+			.map((row) => ({ ...row, trend: buildBigramTrend(statsSessions, row.bigram) }));
+	});
 
 	const ERROR_WARN_THRESHOLD = DEFAULT_HIGH_ERROR_THRESHOLD / 2;
 	function errorRateColour(rate: number): string {
@@ -72,16 +71,16 @@
 
 <BigramMovements events={movements} />
 
-{#if drilledRows.length > 0}
-	<section class="space-y-3" data-testid="drilled-bigrams-table">
+{#if movedRows.length > 0}
+	<section class="space-y-3" data-testid="moved-bigrams-table">
 		<div class="flex items-baseline justify-between">
-			<h2 class="text-xl font-semibold">Drilled bigrams</h2>
+			<h2 class="text-xl font-semibold">Moved bigrams</h2>
 			<p class="text-sm text-base-content/55">
-				{drilledRows.length}
-				{drilledRows.length === 1 ? 'bigram' : 'bigrams'} targeted
+				{movedRows.length}
+				{movedRows.length === 1 ? 'bigram' : 'bigrams'} moved
 			</p>
 		</div>
-		<BigramTable rows={drilledRows} focus={session.drillMode} />
+		<BigramTable rows={movedRows} focus={session.drillMode} />
 		<p class="text-xs text-base-content/55">
 			Stats span the last 10 occurrences across all sessions — same as the Analytics page.
 		</p>
