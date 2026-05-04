@@ -12,7 +12,7 @@ import {
 	MIN_OCCURRENCES_FOR_CLASSIFICATION
 } from '../support/core';
 import type { FrequencyTable } from '../corpus';
-import { classifyBigram } from './classification';
+import { classifyBigram, summarizeSamples } from './classification';
 
 /** Priority target cap — mirrors the diagnostic engine's `PRIORITY_TARGETS_TOP_N`. */
 const LIVE_PRIORITY_TARGETS_TOP_N = 10;
@@ -84,18 +84,7 @@ export function summarizeBigrams(
 		let meanTime: number;
 		let errorRate: number;
 		if (pooled.length > 0) {
-			let timingSum = 0;
-			let timingCount = 0;
-			let errorCount = 0;
-			for (const s of pooled) {
-				if (s.timing !== null) {
-					timingSum += s.timing;
-					timingCount++;
-				}
-				if (!s.correct) errorCount++;
-			}
-			meanTime = timingCount === 0 ? NaN : timingSum / timingCount;
-			errorRate = errorCount / pooled.length;
+			({ meanTime, errorRate } = summarizeSamples(pooled));
 			classification = classifyBigram(
 				{ occurrences: pooled.length, meanTime, errorRate },
 				thresholds

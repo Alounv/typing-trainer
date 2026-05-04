@@ -58,6 +58,27 @@ function session(
 	};
 }
 
+// Single session with one struggling acquisition bigram ('th') and one healthy
+// one ('er'). Used by priority-ordering tests that need a clear winner.
+function acquisitionVsHealthyFixture(): SessionSummary[] {
+	return [
+		session('s1', 100, [
+			agg('th', 's1', {
+				meanTime: 400,
+				errorRate: 0.2,
+				classification: 'acquisition',
+				samples: Array.from({ length: 20 }, () => ({ correct: false, timing: 400 }))
+			}),
+			agg('er', 's1', {
+				meanTime: 120,
+				errorRate: 0,
+				classification: 'healthy',
+				samples: cleanSamples(20, 120)
+			})
+		])
+	];
+}
+
 describe('extractBigramAggregates', () => {
 	it('returns empty for < 2 events', () => {
 		expect(extractBigramAggregates([], 's1')).toEqual([]);
@@ -179,46 +200,18 @@ describe('summarizeBigrams', () => {
 	});
 
 	it('sorts by priority score (badness × corpus frequency) descending', () => {
-		const sessions = [
-			session('s1', 100, [
-				agg('th', 's1', {
-					meanTime: 400,
-					errorRate: 0.2,
-					classification: 'acquisition',
-					samples: Array.from({ length: 20 }, () => ({ correct: false, timing: 400 }))
-				}),
-				agg('er', 's1', {
-					meanTime: 120,
-					errorRate: 0,
-					classification: 'healthy',
-					samples: cleanSamples(20, 120)
-				})
-			])
-		];
-		const rows = summarizeBigrams(sessions, { th: 10, er: 10 }, DEFAULT_THRESHOLDS);
+		const rows = summarizeBigrams(
+			acquisitionVsHealthyFixture(),
+			{ th: 10, er: 10 },
+			DEFAULT_THRESHOLDS
+		);
 		expect(rows[0].bigram).toBe('th');
 	});
 });
 
 describe('buildLivePriorityTargets', () => {
 	it('excludes healthy and unclassified bigrams', () => {
-		const sessions = [
-			session('s1', 100, [
-				agg('th', 's1', {
-					meanTime: 400,
-					errorRate: 0.2,
-					classification: 'acquisition',
-					samples: Array.from({ length: 20 }, () => ({ correct: false, timing: 400 }))
-				}),
-				agg('er', 's1', {
-					meanTime: 120,
-					errorRate: 0,
-					classification: 'healthy',
-					samples: cleanSamples(20, 120)
-				})
-			])
-		];
-		const targets = buildLivePriorityTargets(sessions, { th: 10, er: 10 });
+		const targets = buildLivePriorityTargets(acquisitionVsHealthyFixture(), { th: 10, er: 10 });
 		expect(targets.map((t) => t.bigram)).toEqual(['th']);
 	});
 

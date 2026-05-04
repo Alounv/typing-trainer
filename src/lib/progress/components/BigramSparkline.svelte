@@ -40,13 +40,19 @@
 		return INSET + projected * innerH;
 	}
 
-	const path = $derived.by(() => {
-		if (points.length < 2) return '';
+	const projection = $derived.by(() => {
+		if (points.length < 2) return null;
 		const yMin = Math.min(...values);
 		const yMax = Math.max(...values);
 		const yRange = yMax === yMin ? null : yMax - yMin;
 		const innerW = width - INSET * 2;
 		const innerH = height - INSET * 2;
+		return { yMin, yRange, innerW, innerH };
+	});
+
+	const path = $derived.by(() => {
+		if (!projection) return '';
+		const { yMin, yRange, innerW, innerH } = projection;
 		return points
 			.map((_, i) => {
 				const x = INSET + (i / (points.length - 1)) * innerW;
@@ -59,12 +65,8 @@
 	// Last dot highlights the current value. Skip drawing when we have <2 points
 	// since there's no meaningful "trend" to anchor.
 	const lastDot = $derived.by(() => {
-		if (points.length < 2) return null;
-		const yMin = Math.min(...values);
-		const yMax = Math.max(...values);
-		const yRange = yMax === yMin ? null : yMax - yMin;
-		const innerW = width - INSET * 2;
-		const innerH = height - INSET * 2;
+		if (!projection) return null;
+		const { yMin, yRange, innerW, innerH } = projection;
 		return { x: INSET + innerW, y: projectY(values.at(-1)!, yMin, yRange, innerH) };
 	});
 

@@ -7,7 +7,7 @@ import {
 	type SessionSummary
 } from '../support/core';
 import type { FrequencyTable } from '../corpus';
-import { classifyBigram } from '../skill';
+import { classifyBigram, summarizeSamples } from '../skill';
 
 /**
  * Rolling average with a trailing window. For positions before the window is full, returns
@@ -208,18 +208,7 @@ export function buildHealthyBigramSeries(
 		let healthy = 0;
 		for (const buf of buffers.values()) {
 			if (buf.length === 0) continue;
-			let timingSum = 0;
-			let timingCount = 0;
-			let errorCount = 0;
-			for (const sample of buf) {
-				if (sample.timing !== null) {
-					timingSum += sample.timing;
-					timingCount++;
-				}
-				if (!sample.correct) errorCount++;
-			}
-			const meanTime = timingCount === 0 ? NaN : timingSum / timingCount;
-			const errorRate = errorCount / buf.length;
+			const { meanTime, errorRate } = summarizeSamples(buf);
 			const cls = classifyBigram({ occurrences: buf.length, meanTime, errorRate }, thresholds);
 			if (cls === 'healthy') healthy++;
 		}
