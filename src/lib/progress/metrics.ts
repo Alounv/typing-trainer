@@ -71,6 +71,12 @@ export interface TrendPoint {
 	rolling: number | null;
 	plus1Sigma: number | null;
 	minus1Sigma: number | null;
+	/**
+	 * Intra-bucket spread (e.g. min/max across a day's diagnostics). Both `null`
+	 * for buckets with a single sample, since a whisker over one point is noise.
+	 */
+	low: number | null;
+	high: number | null;
 }
 
 function buildMetricSeries(
@@ -90,7 +96,9 @@ function buildMetricSeries(
 			value: values[i],
 			rolling: mean,
 			plus1Sigma: mean !== null && sd !== null ? mean + sd : null,
-			minus1Sigma: mean !== null && sd !== null ? mean - sd : null
+			minus1Sigma: mean !== null && sd !== null ? mean - sd : null,
+			low: null,
+			high: null
 		};
 	});
 }
@@ -130,20 +138,25 @@ function buildDailyMedianSeries(
 		else byDay.set(key, [s]);
 	}
 	const days = [...byDay.values()];
-	const values = days.map((bucket) => median(bucket.map(accessor)));
+	const dayValues = days.map((bucket) => bucket.map(accessor));
+	const values = dayValues.map((vs) => median(vs));
 	const rolling = rollingAverage(values, WPM_ROLLING_WINDOW);
 	const sigmas = rollingStdDev(values, WPM_ROLLING_WINDOW);
 	return days.map((bucket, i) => {
 		const last = bucket[bucket.length - 1];
 		const mean = rolling[i];
 		const sd = sigmas[i];
+		const vs = dayValues[i];
+		const multi = vs.length > 1;
 		return {
 			sessionId: last.id,
 			timestamp: last.timestamp,
 			value: values[i],
 			rolling: mean,
 			plus1Sigma: mean !== null && sd !== null ? mean + sd : null,
-			minus1Sigma: mean !== null && sd !== null ? mean - sd : null
+			minus1Sigma: mean !== null && sd !== null ? mean - sd : null,
+			low: multi ? Math.min(...vs) : null,
+			high: multi ? Math.max(...vs) : null
 		};
 	});
 }
@@ -217,7 +230,9 @@ export function buildHealthyBigramSeries(
 			value: healthy,
 			rolling: healthy,
 			plus1Sigma: null,
-			minus1Sigma: null
+			minus1Sigma: null,
+			low: null,
+			high: null
 		});
 	}
 	return out;

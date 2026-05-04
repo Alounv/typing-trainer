@@ -79,8 +79,9 @@
 		<WpmChart points={wpm} />
 	</div>
 	<p class="text-xs text-base-content/55">
-		Dots are the daily median across diagnostics. The line is a 7-day rolling average; the shaded
-		band is ±1σ around that average.
+		Dots are the daily median across diagnostics. On days with several diagnostics, a vertical
+		whisker shows the day's full range. The line is a 7-day rolling average; the shaded band is ±1σ
+		around that average.
 	</p>
 </section>
 
@@ -94,7 +95,8 @@
 	</div>
 	<p class="text-xs text-base-content/55">
 		Daily median of the per-diagnostic error rate (fraction of keystrokes that were first-input
-		errors). The line smooths across 7 days.
+		errors), with the day's full range shown as a vertical whisker on multi-diagnostic days. The
+		line smooths across 7 days.
 	</p>
 </section>
 

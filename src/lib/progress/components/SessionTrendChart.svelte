@@ -68,6 +68,8 @@
 			ys.push(p.value);
 			if (p.plus1Sigma !== null) ys.push(p.plus1Sigma);
 			if (p.minus1Sigma !== null) ys.push(p.minus1Sigma);
+			if (p.low !== null) ys.push(p.low);
+			if (p.high !== null) ys.push(p.high);
 		}
 		let yMin = Math.min(...ys);
 		let yMax = Math.max(...ys);
@@ -201,6 +203,17 @@
 			{/if}
 
 			{#each points as p (p.sessionId)}
+				{#if p.low !== null && p.high !== null}
+					<line
+						x1={scaleX(p.timestamp)}
+						x2={scaleX(p.timestamp)}
+						y1={scaleY(p.high)}
+						y2={scaleY(p.low)}
+						class="stroke-base-content/20"
+						stroke-width="1"
+						stroke-linecap="round"
+					/>
+				{/if}
 				<circle cx={scaleX(p.timestamp)} cy={scaleY(p.value)} r="3" class="fill-base-content/60" />
 			{/each}
 
