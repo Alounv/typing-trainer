@@ -3,9 +3,9 @@
 	import type { FrequencyTable } from '$lib/corpus';
 	import { summarizeBigrams } from '$lib/skill';
 	import {
-		buildErrorRateSeries,
+		buildDailyErrorRateSeries,
 		buildHealthyBigramSeries,
-		buildWpmSeries,
+		buildDailyWpmSeries,
 		buildBigramTrendFromSamples,
 		buildRecentSamplesIndex,
 		BIGRAM_SPARKLINE_SAMPLE_LIMIT,
@@ -32,8 +32,8 @@
 		return list.filter((s) => s.diagnosticReport).slice(0, 2);
 	}
 
-	const wpm = $derived(buildWpmSeries(diagnosticSessions));
-	const errorRate = $derived(buildErrorRateSeries(diagnosticSessions));
+	const wpm = $derived(buildDailyWpmSeries(diagnosticSessions));
+	const errorRate = $derived(buildDailyErrorRateSeries(diagnosticSessions));
 	const healthyOverTime = $derived(
 		buildHealthyBigramSeries(sessions, corpusFrequencies, thresholds)
 	);
@@ -79,7 +79,7 @@
 		<WpmChart points={wpm} />
 	</div>
 	<p class="text-xs text-base-content/55">
-		Dots are individual diagnostic sessions. The line is a 7-diagnostic rolling average; the shaded
+		Dots are the daily median across diagnostics. The line is a 7-day rolling average; the shaded
 		band is ±1σ around that average.
 	</p>
 </section>
@@ -87,14 +87,14 @@
 <section class="space-y-3" data-testid="error-rate-trend">
 	<div class="flex items-baseline justify-between">
 		<h2 class="text-xl font-semibold">Error rate</h2>
-		<p class="text-sm text-base-content/55">Per diagnostic</p>
+		<p class="text-sm text-base-content/55">Per day (median)</p>
 	</div>
 	<div class="rounded-lg border border-base-300 bg-base-100 p-4">
 		<ErrorRateChart points={errorRate} />
 	</div>
 	<p class="text-xs text-base-content/55">
-		Fraction of keystrokes that were first-input errors, per diagnostic. The line smooths across 7
-		diagnostics.
+		Daily median of the per-diagnostic error rate (fraction of keystrokes that were first-input
+		errors). The line smooths across 7 days.
 	</p>
 </section>
 

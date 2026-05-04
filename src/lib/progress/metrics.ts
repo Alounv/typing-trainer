@@ -73,9 +73,6 @@ export interface TrendPoint {
 	minus1Sigma: number | null;
 }
 
-/** Back-compat alias — `wpm` field kept so the chart component keeps compiling. */
-export type WpmPoint = TrendPoint & { wpm: number };
-
 function buildMetricSeries(
 	sessions: readonly SessionSummary[],
 	accessor: (s: SessionSummary) => number
@@ -98,18 +95,65 @@ function buildMetricSeries(
 	});
 }
 
-export function buildWpmSeries(sessions: readonly SessionSummary[]): WpmPoint[] {
-	return buildMetricSeries(sessions, (s) => s.wpm).map((p) => ({ ...p, wpm: p.value }));
-}
-
-export function buildErrorRateSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
-	return buildMetricSeries(sessions, (s) => s.errorRate);
+export function buildWpmSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
+	return buildMetricSeries(sessions, (s) => s.wpm);
 }
 
 /** Local-date key (YYYY-MM-DD) for grouping sessions into "days". */
 function localDateKey(timestamp: number): string {
 	const d = new Date(timestamp);
 	return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function median(values: readonly number[]): number {
+	const sorted = [...values].sort((a, b) => a - b);
+	const n = sorted.length;
+	return n % 2 === 1 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+}
+
+/**
+ * Collapse sessions into one point per local day, taking the median of the chosen
+ * scalar across the day's sessions. The day's last session supplies the timestamp
+ * and id (stable key, chronological position). Used by the analytics charts to
+ * suppress intra-day noise without flattening real progress.
+ */
+function buildDailyMedianSeries(
+	sessions: readonly SessionSummary[],
+	accessor: (s: SessionSummary) => number
+): TrendPoint[] {
+	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
+	const byDay = new Map<string, SessionSummary[]>();
+	for (const s of ordered) {
+		const key = localDateKey(s.timestamp);
+		const bucket = byDay.get(key);
+		if (bucket) bucket.push(s);
+		else byDay.set(key, [s]);
+	}
+	const days = [...byDay.values()];
+	const values = days.map((bucket) => median(bucket.map(accessor)));
+	const rolling = rollingAverage(values, WPM_ROLLING_WINDOW);
+	const sigmas = rollingStdDev(values, WPM_ROLLING_WINDOW);
+	return days.map((bucket, i) => {
+		const last = bucket[bucket.length - 1];
+		const mean = rolling[i];
+		const sd = sigmas[i];
+		return {
+			sessionId: last.id,
+			timestamp: last.timestamp,
+			value: values[i],
+			rolling: mean,
+			plus1Sigma: mean !== null && sd !== null ? mean + sd : null,
+			minus1Sigma: mean !== null && sd !== null ? mean - sd : null
+		};
+	});
+}
+
+export function buildDailyWpmSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
+	return buildDailyMedianSeries(sessions, (s) => s.wpm);
+}
+
+export function buildDailyErrorRateSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
+	return buildDailyMedianSeries(sessions, (s) => s.errorRate);
 }
 
 /**

@@ -5,11 +5,11 @@
 	trend chart.
 -->
 <script lang="ts">
-	import type { WpmPoint } from '../metrics';
+	import type { TrendPoint } from '../metrics';
 	import SessionTrendChart from './SessionTrendChart.svelte';
 
 	interface Props {
-		points: WpmPoint[];
+		points: TrendPoint[];
 		height?: number;
 	}
 
