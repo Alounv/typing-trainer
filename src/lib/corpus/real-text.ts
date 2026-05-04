@@ -13,6 +13,12 @@ const QUOTE_SEPARATOR = ' ';
 /** 1400 chars ≈ 5 min at 60 WPM. */
 const DEFAULT_TARGET_LENGTH_CHARS = 1400;
 
+/** Stop adding quotes once we're within 15% of target — close enough beats overshoot. */
+const CLOSE_ENOUGH_RATIO = 0.85;
+
+/** Prefer quotes that fit the remaining gap to within +50%. Soft cap; falls through if no fit. */
+const MAX_OVERSHOOT_RATIO = 1.5;
+
 interface RealTextInput {
 	/** Preferred source: a quote bank for the session's language. */
 	quoteBank?: QuoteBank;
@@ -103,14 +109,16 @@ function buildFromQuotes(
 	const segments: RealTextSegment[] = [];
 	const usedIds = new Set<number>();
 	let charCount = 0;
+	const closeEnough = opts.targetLen * CLOSE_ENOUGH_RATIO;
 
-	while (charCount < opts.targetLen && segments.length < opts.maxChunks) {
+	while (charCount < closeEnough && segments.length < opts.maxChunks) {
 		// Bail when the bank is exhausted instead of looping forever looking
 		// for unused ids.
 		if (usedIds.size >= bank.quotes.length) break;
 
 		// Rejection sampling — fine at ~10 quotes out of thousands per session.
-		const quote = pickUnusedQuote(bank, usedIds, opts);
+		const remainingGap = opts.targetLen - charCount;
+		const quote = pickUnusedQuote(bank, usedIds, { ...opts, remainingGap });
 		if (!quote) break;
 		usedIds.add(quote.id);
 		segments.push({ kind: 'quote', text: quote.text, quote });
@@ -119,9 +127,9 @@ function buildFromQuotes(
 
 	// Quote bank short of target → pad with synth if fallback corpus present.
 	let source: RealTextSequence['stats']['source'] = 'quote-bank';
-	if (charCount < opts.targetLen && opts.synthFallback) {
+	if (charCount < closeEnough && opts.synthFallback) {
 		source = 'quote-bank-exhausted';
-		while (charCount < opts.targetLen && segments.length < opts.maxChunks) {
+		while (charCount < closeEnough && segments.length < opts.maxChunks) {
 			const sentence = selectRealTextSentence(opts.synthFallback, {
 				wordCount: opts.synthWordsPerSentence,
 				targetBigrams: opts.targetBigrams,
@@ -139,7 +147,8 @@ function buildFromQuotes(
 	};
 }
 
-// Up to 30 samples for a fresh id, then linear scan as a last resort.
+// Up to 30 samples for a fresh id that fits the remaining gap, then relax the
+// length cap, then linear scan as a last resort.
 function pickUnusedQuote(
 	bank: QuoteBank,
 	used: Set<number>,
@@ -147,18 +156,25 @@ function pickUnusedQuote(
 		targetBigrams: readonly string[];
 		lengthGroup?: QuoteLengthGroup;
 		rng: () => number;
+		remainingGap: number;
 	}
 ): Quote | null {
 	const maxAttempts = 30;
+	const maxLen = opts.remainingGap * MAX_OVERSHOOT_RATIO;
+	let fallback: Quote | null = null;
 	for (let i = 0; i < maxAttempts; i++) {
 		const q = selectQuote(bank, {
 			targetBigrams: opts.targetBigrams,
 			lengthGroup: opts.lengthGroup,
 			rng: opts.rng
 		});
-		if (!used.has(q.id)) return q;
+		if (used.has(q.id)) continue;
+		if (q.text.length <= maxLen) return q;
+		if (!fallback) fallback = q;
 	}
-	// Fallback: strong targetBigrams bias may keep returning the same matches.
+	// No fit found — accept a sampled-but-too-long quote rather than starve.
+	if (fallback) return fallback;
+	// Strong targetBigrams bias may keep returning the same matches.
 	for (const q of bank.quotes) if (!used.has(q.id)) return q;
 	return null;
 }
