@@ -39,12 +39,15 @@
 		return allMovements;
 	});
 
-	const movedRows = $derived.by(() => {
-		if (movements.length === 0) return [];
-		const moved = new Set(movements.map((m) => m.bigram));
+	const sessionRows = $derived.by(() => {
+		const include = new Set<string>([
+			...movements.map((m) => m.bigram),
+			...(session.bigramsTargeted ?? [])
+		]);
+		if (include.size === 0) return [];
 		const summaries = summarizeBigrams(statsSessions, corpusFrequencies, thresholds);
 		return summaries
-			.filter((row) => moved.has(row.bigram))
+			.filter((row) => include.has(row.bigram))
 			.map((row) => ({ ...row, trend: buildBigramTrend(statsSessions, row.bigram) }));
 	});
 
@@ -90,16 +93,16 @@
 		: undefined}
 />
 
-{#if movedRows.length > 0}
+{#if sessionRows.length > 0}
 	<section class="space-y-3" data-testid="moved-bigrams-table">
 		<div class="flex items-baseline justify-between">
-			<h2 class="text-xl font-semibold">Moved bigrams</h2>
+			<h2 class="text-xl font-semibold">This session's bigrams</h2>
 			<p class="text-sm text-base-content/55">
-				{movedRows.length}
-				{movedRows.length === 1 ? 'bigram' : 'bigrams'} moved
+				{sessionRows.length}
+				{sessionRows.length === 1 ? 'bigram' : 'bigrams'}
 			</p>
 		</div>
-		<BigramTable rows={movedRows} focus={session.drillMode} />
+		<BigramTable rows={sessionRows} focus={session.drillMode} />
 		<p class="text-xs text-base-content/55">
 			Stats span the last 10 occurrences across all sessions — same as the Analytics page.
 		</p>
