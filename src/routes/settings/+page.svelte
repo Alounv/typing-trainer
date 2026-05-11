@@ -248,7 +248,7 @@
 					<dt class="text-sm">
 						<label for="threshold-speed" class="cursor-pointer">Speed</label>
 						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
-							>default {DEFAULT_SPEED_THRESHOLD_MS}</span
+							>default {Math.round(12000 / DEFAULT_SPEED_THRESHOLD_MS)}</span
 						>
 					</dt>
 					<dd class="flex items-baseline gap-2">
@@ -257,10 +257,16 @@
 							type="number"
 							min="1"
 							class="w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
-							bind:value={form.thresholds!.speedMs}
+							value={Math.round(12000 / form.thresholds!.speedMs)}
+							oninput={(e) => {
+								const wpm = Number((e.target as HTMLInputElement).value);
+								if (Number.isFinite(wpm) && wpm > 0) {
+									form.thresholds!.speedMs = Math.round(12000 / wpm);
+								}
+							}}
 							data-testid="threshold-speed"
 						/>
-						<span class="font-mono text-xs text-base-content/40">ms</span>
+						<span class="font-mono text-xs text-base-content/40">WPM</span>
 					</dd>
 				</div>
 				<div class="flex items-center justify-between gap-6 py-4">
