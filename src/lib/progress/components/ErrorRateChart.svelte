@@ -14,9 +14,13 @@
 
 	let { points, height = 220 }: Props = $props();
 
-	// Pct formatter. One decimal is enough — error rate usually sits in the
-	// single-digit percents, and more precision would crowd the axis.
-	const formatY = (v: number) => `${(v * 100).toFixed(1)}%`;
+	// Nice-tick axis lands on whole-percent steps in the common case, so drop
+	// the decimal when it would be `.0`. Sub-percent ranges (e.g. an expert at
+	// <1%) still get one decimal so the ticks stay distinct.
+	const formatY = (v: number) => {
+		const pct = Math.round(v * 1000) / 10;
+		return Number.isInteger(pct) ? `${pct}%` : `${pct.toFixed(1)}%`;
+	};
 </script>
 
 <SessionTrendChart
@@ -25,4 +29,5 @@
 	{formatY}
 	ariaLabel="Error-rate trend across sessions"
 	variant="warning"
+	yFloor={0}
 />

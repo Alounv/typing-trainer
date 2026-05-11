@@ -4,7 +4,7 @@
 	import { summarizeBigrams } from '$lib/skill';
 	import {
 		buildDailyErrorRateSeries,
-		buildHealthyBigramSeries,
+		buildBigramProgressSeries,
 		buildDailyWpmSeries,
 		buildBigramTrendFromSamples,
 		buildRecentSamplesIndex,
@@ -34,8 +34,8 @@
 
 	const wpm = $derived(buildDailyWpmSeries(diagnosticSessions));
 	const errorRate = $derived(buildDailyErrorRateSeries(diagnosticSessions));
-	const healthyOverTime = $derived(
-		buildHealthyBigramSeries(sessions, corpusFrequencies, thresholds)
+	const bigramProgress = $derived(
+		buildBigramProgressSeries(sessions, corpusFrequencies, thresholds)
 	);
 	const bigrams = $derived(summarizeBigrams(sessions, corpusFrequencies, thresholds));
 	const trendSamplesIdx = $derived(
@@ -102,20 +102,38 @@
 
 <section class="space-y-3" data-testid="healthy-bigrams-trend">
 	<div class="flex items-baseline justify-between">
-		<h2 class="text-xl font-semibold">Healthy bigrams</h2>
+		<h2 class="text-xl font-semibold">Bigram progress</h2>
 		<p class="text-sm text-base-content/55">Across all sessions</p>
 	</div>
 	<div class="rounded-lg border border-base-300 bg-base-100 p-4">
 		<SessionTrendChart
-			points={healthyOverTime}
-			ariaLabel="Healthy bigram count across sessions"
+			points={bigramProgress.healthy}
+			secondary={bigramProgress.beyondAcquisition}
+			yFloor={0}
+			ariaLabel="Bigram progress across sessions"
 			variant="success"
-			emptyLabel="No sessions yet — complete one to start tracking healthy bigrams."
+			emptyLabel="No sessions yet — complete one to start tracking bigram progress."
 		/>
+		<div
+			class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/60"
+			aria-hidden="true"
+		>
+			<span class="inline-flex items-center gap-1.5">
+				<span class="inline-block h-0.5 w-4 bg-success"></span>
+				Healthy
+			</span>
+			<span class="inline-flex items-center gap-1.5">
+				<span
+					class="inline-block h-0.5 w-4 bg-base-content/35"
+					style="background-image: linear-gradient(to right, currentColor 50%, transparent 50%); background-size: 6px 100%;"
+				></span>
+				Beyond acquisition (healthy + fluency + hasty)
+			</span>
+		</div>
 	</div>
 	<p class="text-xs text-base-content/55">
-		Cumulative count of bigrams classified healthy by the rolling-window classifier as of each
-		session. Counts can dip when newer samples regress a previously healthy bigram.
+		Solid: bigrams classified healthy. Dashed: total past the acquisition phase (healthy + fluency +
+		hasty). The gap is your in-progress practice.
 	</p>
 </section>
 

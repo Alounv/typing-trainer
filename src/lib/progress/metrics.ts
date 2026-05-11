@@ -170,15 +170,16 @@ export function buildDailyErrorRateSeries(sessions: readonly SessionSummary[]): 
 }
 
 /**
- * Cumulative healthy-bigram count, one point per day (last session of the day).
- * Intra-day sessions still feed the rolling buffer; only the last gets its own dot.
- * Sets `rolling = value` so the chart connects the dots.
+ * Sibling pair to `buildHealthyBigramSeries`: in one pass, also emits a "beyond
+ * acquisition" series counting healthy + fluency + hasty — every classified
+ * bigram that's past the initial-learning phase. Lets the chart show both as
+ * an envelope so the gap (in-progress practice) is visible.
  */
-export function buildHealthyBigramSeries(
+export function buildBigramProgressSeries(
 	sessions: readonly SessionSummary[],
 	_corpus: FrequencyTable | undefined,
 	thresholds: ClassificationThresholds
-): TrendPoint[] {
+): { healthy: TrendPoint[]; beyondAcquisition: TrendPoint[] } {
 	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
 	const lastOfDayIdx = new Map<string, number>();
 	for (let i = 0; i < ordered.length; i++) {
@@ -189,7 +190,22 @@ export function buildHealthyBigramSeries(
 	const buffers = new Map<string, BigramSample[]>();
 	const window = BIGRAM_CLASSIFICATION_WINDOW;
 
-	const out: TrendPoint[] = [];
+	const healthy: TrendPoint[] = [];
+	const beyondAcquisition: TrendPoint[] = [];
+
+	function emit(series: TrendPoint[], sessionId: string, timestamp: number, value: number) {
+		series.push({
+			sessionId,
+			timestamp,
+			value,
+			rolling: value,
+			plus1Sigma: null,
+			minus1Sigma: null,
+			low: null,
+			high: null
+		});
+	}
+
 	for (let i = 0; i < ordered.length; i++) {
 		const s = ordered[i];
 		for (const agg of s.bigramAggregates) {
@@ -205,26 +221,24 @@ export function buildHealthyBigramSeries(
 
 		if (!keep.has(i)) continue;
 
-		let healthy = 0;
+		let healthyCount = 0;
+		let beyondCount = 0;
 		for (const buf of buffers.values()) {
 			if (buf.length === 0) continue;
 			const { meanTime, errorRate } = summarizeSamples(buf);
 			const cls = classifyBigram({ occurrences: buf.length, meanTime, errorRate }, thresholds);
-			if (cls === 'healthy') healthy++;
+			if (cls === 'healthy') {
+				healthyCount++;
+				beyondCount++;
+			} else if (cls === 'fluency' || cls === 'hasty') {
+				beyondCount++;
+			}
 		}
 
-		out.push({
-			sessionId: ordered[i].id,
-			timestamp: ordered[i].timestamp,
-			value: healthy,
-			rolling: healthy,
-			plus1Sigma: null,
-			minus1Sigma: null,
-			low: null,
-			high: null
-		});
+		emit(healthy, ordered[i].id, ordered[i].timestamp, healthyCount);
+		emit(beyondAcquisition, ordered[i].id, ordered[i].timestamp, beyondCount);
 	}
-	return out;
+	return { healthy, beyondAcquisition };
 }
 
 /** One point on a per-bigram sparkline. Each point is a rolling-window summary
