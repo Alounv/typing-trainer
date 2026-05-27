@@ -15,15 +15,25 @@ export async function prepareRealTextSession(): Promise<RealTextSessionInputs> {
 		planned?.config.wordBudget ?? profile?.wordBudgets?.realText ?? DEFAULT_REAL_TEXT_WORD_BUDGET;
 	const targetChars = wordBudget * CHARS_PER_WORD;
 	const language = profile?.language ?? 'en';
+	const secondaryMix = profile?.secondaryMix ?? 0;
+	const secondaryLanguage =
+		profile?.secondaryLanguage && profile.secondaryLanguage !== language && secondaryMix > 0
+			? profile.secondaryLanguage
+			: undefined;
 
-	const [bank, corpus] = await Promise.all([
+	const [bank, corpus, secondaryBank] = await Promise.all([
 		hasQuoteBank(language) ? loadQuoteBank(language) : Promise.resolve(undefined),
-		loadBuiltinCorpus(language)
+		loadBuiltinCorpus(language),
+		secondaryLanguage && hasQuoteBank(secondaryLanguage)
+			? loadQuoteBank(secondaryLanguage)
+			: Promise.resolve(undefined)
 	]);
 	const seq = generateText({
 		kind: 'real-text',
 		corpus,
 		quoteBank: bank,
+		secondaryQuoteBank: secondaryBank,
+		secondaryMix,
 		targetLengthChars: targetChars
 	});
 	return { text: seq.text };

@@ -131,6 +131,10 @@ export type Language = 'en' | 'fr';
 export interface UserSettings {
 	/** Drives corpus selection — the corpus id is the language code itself. */
 	language: Language;
+	/** Optional second language mixed into draws. Bigram targeting stays primary. */
+	secondaryLanguage?: Language;
+	/** 0..100 — share of draws taken from `secondaryLanguage`. 0 = pure primary. */
+	secondaryMix?: number;
 	/** Per-user override of `DEFAULT_THRESHOLDS`. Advanced users only. */
 	thresholds?: ClassificationThresholds;
 	/** Per-user override of `DEFAULT_*_WORD_BUDGET`. Absent keys fall back to defaults. */

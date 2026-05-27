@@ -22,6 +22,10 @@ const MAX_OVERSHOOT_RATIO = 1.5;
 interface RealTextInput {
 	/** Preferred source: a quote bank for the session's language. */
 	quoteBank?: QuoteBank;
+	/** Second-language bank; with `secondaryMix > 0`, each draw rolls to pick a bank. */
+	secondaryQuoteBank?: QuoteBank;
+	/** 0..100 share of draws taken from `secondaryQuoteBank`. */
+	secondaryMix?: number;
 	/** Fallback when no quote bank. Both omitted → throws. */
 	fallbackCorpus?: CorpusData;
 	/** Target-bigram bias for both paths. */
@@ -80,7 +84,9 @@ export function generateRealTextSequence(input: RealTextInput): RealTextSequence
 			lengthGroup: options.quoteLengthGroup,
 			rng,
 			synthFallback: input.fallbackCorpus,
-			synthWordsPerSentence: options.synthWordsPerSentence
+			synthWordsPerSentence: options.synthWordsPerSentence,
+			secondaryBank: input.secondaryQuoteBank,
+			secondaryMix: input.secondaryMix ?? 0
 		});
 	}
 
@@ -104,23 +110,38 @@ function buildFromQuotes(
 		rng: () => number;
 		synthFallback?: CorpusData;
 		synthWordsPerSentence?: number;
+		secondaryBank?: QuoteBank;
+		secondaryMix: number;
 	}
 ): RealTextSequence {
 	const segments: RealTextSegment[] = [];
-	const usedIds = new Set<number>();
+	const usedPrimary = new Set<number>();
+	const usedSecondary = new Set<number>();
 	let charCount = 0;
 	const closeEnough = opts.targetLen * CLOSE_ENOUGH_RATIO;
+	const mixActive = !!opts.secondaryBank && opts.secondaryMix > 0;
 
 	while (charCount < closeEnough && segments.length < opts.maxChunks) {
-		// Bail when the bank is exhausted instead of looping forever looking
-		// for unused ids.
-		if (usedIds.size >= bank.quotes.length) break;
+		const useSecondary = mixActive && opts.rng() * 100 < opts.secondaryMix;
+		const activeBank = useSecondary ? opts.secondaryBank! : bank;
+		const activeUsed = useSecondary ? usedSecondary : usedPrimary;
+
+		// Stop when both banks are exhausted.
+		const primaryExhausted = usedPrimary.size >= bank.quotes.length;
+		const secondaryExhausted =
+			!opts.secondaryBank || usedSecondary.size >= opts.secondaryBank.quotes.length;
+		if (primaryExhausted && (!mixActive || secondaryExhausted)) break;
+
+		// Picked bank exhausted → swap to the other.
+		const swappedBank = activeUsed.size >= activeBank.quotes.length;
+		const finalBank = swappedBank ? (useSecondary ? bank : opts.secondaryBank!) : activeBank;
+		const finalUsed = swappedBank ? (useSecondary ? usedPrimary : usedSecondary) : activeUsed;
 
 		// Rejection sampling — fine at ~10 quotes out of thousands per session.
 		const remainingGap = opts.targetLen - charCount;
-		const quote = pickUnusedQuote(bank, usedIds, { ...opts, remainingGap });
+		const quote = pickUnusedQuote(finalBank, finalUsed, { ...opts, remainingGap });
 		if (!quote) break;
-		usedIds.add(quote.id);
+		finalUsed.add(quote.id);
 		segments.push({ kind: 'quote', text: quote.text, quote });
 		charCount += quote.text.length;
 	}

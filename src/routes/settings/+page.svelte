@@ -102,6 +102,33 @@
 		// other edit, so there's one save code path, not two.
 		form = buildDefaultProfile();
 	}
+
+	/** Default secondary share when the user first picks a second language. */
+	const DEFAULT_SECONDARY_MIX = 30;
+
+	function setPrimary(value: Language) {
+		form.language = value;
+		// Collision: silently demote the secondary so the two never agree.
+		if (form.secondaryLanguage === value) {
+			form.secondaryLanguage = undefined;
+			form.secondaryMix = 0;
+		}
+	}
+
+	type SecondaryChoice = 'off' | Language;
+	function currentSecondary(): SecondaryChoice {
+		return form.secondaryLanguage ?? 'off';
+	}
+	let mixActive = $derived(!!form.secondaryLanguage);
+	function setSecondary(value: SecondaryChoice) {
+		if (value === 'off') {
+			form.secondaryLanguage = undefined;
+			form.secondaryMix = 0;
+		} else {
+			form.secondaryLanguage = value;
+			if (!form.secondaryMix) form.secondaryMix = DEFAULT_SECONDARY_MIX;
+		}
+	}
 </script>
 
 <div class="mx-auto max-w-3xl space-y-14">
@@ -142,7 +169,7 @@
 									class="peer sr-only"
 									value={typedLang}
 									checked={selected}
-									onchange={() => (form.language = typedLang)}
+									onchange={() => setPrimary(typedLang)}
 									data-testid={`lang-${typedLang}`}
 								/>
 								<!-- Custom square pip; tonal match with the drill surface. -->
@@ -160,6 +187,86 @@
 						</dd>
 					</div>
 				{/each}
+			</dl>
+
+			<div class="space-y-3 pt-2">
+				<h3 class="text-sm font-semibold tracking-tight">Mix in a second language</h3>
+				<p class="max-w-xl text-sm text-base-content/65">
+					Optionally drop quotes from a second language into real-text sessions. Bigram drills
+					always use the primary language.
+				</p>
+			</div>
+
+			<dl class="divide-y divide-base-300 border-y border-base-300">
+				{#each ['off', 'en', 'fr'] as choice (choice)}
+					{@const typedChoice = choice as SecondaryChoice}
+					{@const isPrimary = typedChoice !== 'off' && typedChoice === form.language}
+					{@const selected = !isPrimary && currentSecondary() === typedChoice}
+					{@const label =
+						typedChoice === 'off' ? 'Off' : typedChoice === 'en' ? 'English' : 'French'}
+					<div class="flex items-center justify-between gap-6 py-4" class:opacity-40={isPrimary}>
+						<dt>
+							<label
+								class="flex items-center gap-3"
+								class:cursor-pointer={!isPrimary}
+								class:cursor-not-allowed={isPrimary}
+							>
+								<input
+									type="radio"
+									name="secondary-language"
+									class="peer sr-only"
+									value={typedChoice}
+									checked={selected}
+									disabled={isPrimary}
+									onchange={() => setSecondary(typedChoice)}
+									data-testid={`secondary-${typedChoice}`}
+								/>
+								<span
+									class="inline-block h-3.5 w-3.5 rounded-[2px] border border-base-content/35 transition-colors peer-checked:border-primary peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-base-100"
+									aria-hidden="true"
+								></span>
+								<span class="text-sm font-medium">{label}</span>
+								{#if isPrimary}
+									<span class="font-mono text-xs text-base-content/40">primary</span>
+								{/if}
+							</label>
+						</dt>
+						<dd>
+							<span class="font-mono text-xs text-base-content/30">
+								{selected ? 'on' : 'off'}
+							</span>
+						</dd>
+					</div>
+				{/each}
+
+				<div class="flex items-center justify-between gap-6 py-4" class:opacity-40={!mixActive}>
+					<dt class="text-sm">
+						<label for="secondary-mix" class:cursor-pointer={mixActive}>Secondary share</label>
+						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
+							>default {DEFAULT_SECONDARY_MIX}%</span
+						>
+					</dt>
+					<dd class="flex flex-1 items-center gap-4 pl-8">
+						<input
+							id="secondary-mix"
+							type="range"
+							min="0"
+							max="100"
+							step="5"
+							class="flex-1 accent-primary disabled:cursor-not-allowed"
+							value={form.secondaryMix ?? 0}
+							disabled={!mixActive}
+							oninput={(e) => {
+								const v = Number((e.target as HTMLInputElement).value);
+								if (Number.isFinite(v)) form.secondaryMix = v;
+							}}
+							data-testid="secondary-mix"
+						/>
+						<span class="w-12 text-right font-mono text-sm tabular-nums">
+							{form.secondaryMix ?? 0}%
+						</span>
+					</dd>
+				</div>
 			</dl>
 		</section>
 

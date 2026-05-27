@@ -50,7 +50,8 @@ export function buildDefaultProfile(): UserSettings {
 			accuracyDrillsPerCycle: DEFAULT_ACCURACY_DRILLS_PER_CYCLE,
 			speedDrillsPerCycle: DEFAULT_SPEED_DRILLS_PER_CYCLE
 		},
-		colorizeBigramDifficulty: true
+		colorizeBigramDifficulty: true,
+		secondaryMix: 0
 	};
 }
 

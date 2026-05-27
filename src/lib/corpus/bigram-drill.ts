@@ -15,6 +15,13 @@ interface BigramDrillInput {
 	/** Bigrams to drill. Caller has already ranked/filtered; empty array throws. */
 	targetBigrams: readonly string[];
 	corpus: CorpusData;
+	/**
+	 * Second-language corpus, filtered against the same primary targets. Falls
+	 * back to primary per-word when the secondary has no target-bearing match.
+	 */
+	secondaryCorpus?: CorpusData;
+	/** 0..100 share of draws taken from `secondaryCorpus`. */
+	secondaryMix?: number;
 	options?: BigramDrillOptions;
 }
 
@@ -54,12 +61,20 @@ export function generateBigramDrillSequence(input: BigramDrillInput): BigramDril
 		throw new Error('generateBigramDrillSequence: corpus produced no usable words');
 	}
 
+	// Secondary pool filtered against primary targets. Empty → fall back to primary.
+	const secondaryTargets =
+		input.secondaryCorpus && (input.secondaryMix ?? 0) > 0
+			? partitionCorpus(input.secondaryCorpus, input.targetBigrams).targets
+			: [];
+	const secondaryMix = input.secondaryMix ?? 0;
+	const mixActive = secondaryTargets.length > 0 && secondaryMix > 0;
+
 	// 100% target-bearing by construction: the target pool wins whenever it
 	// has anything in it. Filler only fills the whole sequence when the
 	// corpus has no target-bearing words at all (e.g. target "zz"), which
 	// is a degraded state preserved only to avoid an empty drill.
 	const useTargetPool = targets.length > 0;
-	const pool = useTargetPool ? targets : fillers;
+	const primaryPool = useTargetPool ? targets : fillers;
 
 	const words: string[] = [];
 	let targetWordCount = 0;
@@ -67,9 +82,12 @@ export function generateBigramDrillSequence(input: BigramDrillInput): BigramDril
 	const distinctTargets = new Set<string>();
 
 	for (let i = 0; i < wordCount; i++) {
+		const useSecondary = mixActive && rng() * 100 < secondaryMix;
+		const pool = useSecondary ? secondaryTargets : primaryPool;
 		const picked = pickWeighted(pool, rng);
 		words.push(picked);
-		if (useTargetPool) {
+		// `useSecondary` ⇒ secondaryTargets non-empty ⇒ target-bearing.
+		if (useSecondary || useTargetPool) {
 			targetWordCount++;
 			for (const t of input.targetBigrams) {
 				if (wordMatchesTarget(picked, t)) distinctTargets.add(t);

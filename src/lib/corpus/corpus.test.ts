@@ -39,6 +39,27 @@ function fixtureQuoteBank(): QuoteBank {
 	};
 }
 
+function fixtureSecondaryBank(): QuoteBank {
+	return {
+		language: 'fr',
+		groups: [[0, 1000]],
+		quotes: [
+			{
+				id: 1,
+				text: 'Un voyage commence toujours par un premier pas vers ailleurs.',
+				source: 's',
+				length: 61
+			},
+			{
+				id: 2,
+				text: 'Petit oiseau fait nid avec patience et constance chaque matin.',
+				source: 's',
+				length: 62
+			}
+		]
+	};
+}
+
 describe('registry', () => {
 	it('narrows ids that ship as built-in corpora', () => {
 		expect(isBuiltinCorpusId('en')).toBe(true);
@@ -147,5 +168,92 @@ describe('generateText', () => {
 			targetChars: 100
 		});
 		expect(bank.quotes.some((q) => text.includes(q.text))).toBe(true);
+	});
+
+	// `rng() * 100 < secondaryMix` is deterministic at 0 (always primary) and at
+	// 100 (always secondary, since Math.random < 1) — no RNG injection needed.
+	describe('real-text language mix', () => {
+		it.each([
+			{ mix: 100, expected: 'secondary', forbidden: 'primary' },
+			{ mix: 0, expected: 'primary', forbidden: 'secondary' }
+		] as const)('mix=$mix draws from the $expected bank', ({ mix, expected, forbidden }) => {
+			const primary = fixtureQuoteBank();
+			const secondary = fixtureSecondaryBank();
+			const { text } = generateText({
+				kind: 'real-text',
+				corpus: fixtureCorpus(),
+				quoteBank: primary,
+				secondaryQuoteBank: secondary,
+				secondaryMix: mix,
+				targetLengthChars: 40
+			});
+			const wanted = expected === 'primary' ? primary : secondary;
+			const unwanted = forbidden === 'primary' ? primary : secondary;
+			expect(wanted.quotes.some((q) => text.includes(q.text))).toBe(true);
+			expect(unwanted.quotes.some((q) => text.includes(q.text))).toBe(false);
+		});
+
+		it('ignores secondary bank when secondaryMix is omitted', () => {
+			const primary = fixtureQuoteBank();
+			const secondary = fixtureSecondaryBank();
+			const { text } = generateText({
+				kind: 'real-text',
+				corpus: fixtureCorpus(),
+				quoteBank: primary,
+				secondaryQuoteBank: secondary,
+				targetLengthChars: 40
+			});
+			expect(primary.quotes.some((q) => text.includes(q.text))).toBe(true);
+			expect(secondary.quotes.some((q) => text.includes(q.text))).toBe(false);
+		});
+	});
+
+	// Targets always come from primary; only the word pool swaps per draw.
+	describe('bigram-drill language mix', () => {
+		const secondaryCorpus: CorpusData = {
+			config: { id: 'fr', language: 'fr', wordlistId: 'fr' },
+			wordFrequencies: {
+				methode: 100, // "th" — target-bearing
+				ethique: 80, // "th" — target-bearing
+				bonjour: 50,
+				maison: 40,
+				travail: 30
+			},
+			bigramFrequencies: { th: 30, et: 80, ai: 100 }
+		};
+
+		it('mix=100 draws drill words from the secondary corpus when it has target-bearing words', () => {
+			const { text } = generateText({
+				kind: 'bigram-drill',
+				corpus: fixtureCorpus(),
+				secondaryCorpus,
+				secondaryMix: 100,
+				targetBigrams: ['th'],
+				wordCount: 10
+			});
+			const words = text.split(' ');
+			const secondaryWords = new Set(Object.keys(secondaryCorpus.wordFrequencies));
+			expect(words.every((w) => w.includes('th'))).toBe(true);
+			expect(words.every((w) => secondaryWords.has(w))).toBe(true);
+		});
+
+		it('falls back to primary when secondary has no target-bearing words for the target', () => {
+			// "zz" matches neither corpus → mix inactive → primary-only.
+			const primary: CorpusData = {
+				...fixtureCorpus(),
+				wordFrequencies: { ...fixtureCorpus().wordFrequencies, buzz: 5 }
+			};
+			const { text } = generateText({
+				kind: 'bigram-drill',
+				corpus: primary,
+				secondaryCorpus,
+				secondaryMix: 100,
+				targetBigrams: ['zz'],
+				wordCount: 10
+			});
+			const words = text.split(' ');
+			const primaryWords = new Set(Object.keys(primary.wordFrequencies));
+			expect(words.every((w) => primaryWords.has(w))).toBe(true);
+		});
 	});
 });

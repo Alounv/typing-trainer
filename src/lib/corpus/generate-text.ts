@@ -9,11 +9,17 @@ type TextSpec =
 			corpus: CorpusData;
 			targetBigrams: readonly string[];
 			wordCount: number;
+			/** Second-language corpus for mixed drills; 0..100 share via `secondaryMix`. */
+			secondaryCorpus?: CorpusData;
+			secondaryMix?: number;
 	  }
 	| {
 			kind: 'real-text';
 			corpus: CorpusData;
 			quoteBank: QuoteBank | undefined;
+			/** Second-language bank for mixed sessions; 0..100 share via `secondaryMix`. */
+			secondaryQuoteBank?: QuoteBank;
+			secondaryMix?: number;
 			targetLengthChars: number;
 	  }
 	| {
@@ -30,11 +36,15 @@ export function generateText(spec: TextSpec): { text: string } {
 			return generateBigramDrillSequence({
 				corpus: spec.corpus,
 				targetBigrams: spec.targetBigrams,
+				secondaryCorpus: spec.secondaryCorpus,
+				secondaryMix: spec.secondaryMix,
 				options: { wordCount: spec.wordCount }
 			});
 		case 'real-text':
 			return generateRealTextSequence({
 				quoteBank: spec.quoteBank,
+				secondaryQuoteBank: spec.secondaryQuoteBank,
+				secondaryMix: spec.secondaryMix,
 				fallbackCorpus: spec.corpus,
 				options: { targetLengthChars: spec.targetLengthChars }
 			});

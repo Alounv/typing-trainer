@@ -24,7 +24,17 @@ export async function prepareDrillSession(routeMode: DrillMode): Promise<BigramD
 		planned?.config.wordBudget ??
 		profile?.wordBudgets?.bigramDrill ??
 		DEFAULT_BIGRAM_DRILL_WORD_BUDGET;
-	const corpus = await loadBuiltinCorpus(profile?.language ?? 'en');
+	const language = profile?.language ?? 'en';
+	const secondaryMix = profile?.secondaryMix ?? 0;
+	const secondaryLanguage =
+		profile?.secondaryLanguage && profile.secondaryLanguage !== language && secondaryMix > 0
+			? profile.secondaryLanguage
+			: undefined;
+
+	const [corpus, secondaryCorpus] = await Promise.all([
+		loadBuiltinCorpus(language),
+		secondaryLanguage ? loadBuiltinCorpus(secondaryLanguage) : Promise.resolve(undefined)
+	]);
 
 	const fromPlan =
 		planned?.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0
@@ -35,6 +45,8 @@ export async function prepareDrillSession(routeMode: DrillMode): Promise<BigramD
 	const seq = generateText({
 		kind: 'bigram-drill',
 		corpus,
+		secondaryCorpus,
+		secondaryMix,
 		targetBigrams: resolved.targets,
 		wordCount: wordBudget
 	});
