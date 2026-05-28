@@ -17,10 +17,14 @@ interface BigramDrillInput {
 	corpus: CorpusData;
 	/**
 	 * Second-language corpus, filtered against the same primary targets. Falls
-	 * back to primary per-word when the secondary has no target-bearing match.
+	 * back to primary-only when the secondary has no target-bearing match.
 	 */
 	secondaryCorpus?: CorpusData;
-	/** 0..100 share of draws taken from `secondaryCorpus`. */
+	/**
+	 * 0..100 share of words taken from `secondaryCorpus`, appended as a
+	 * contiguous block *after* the primary block — interleaving languages
+	 * word-by-word produces unhelpful context-switching difficulty.
+	 */
 	secondaryMix?: number;
 	options?: BigramDrillOptions;
 }
@@ -76,25 +80,39 @@ export function generateBigramDrillSequence(input: BigramDrillInput): BigramDril
 	const useTargetPool = targets.length > 0;
 	const primaryPool = useTargetPool ? targets : fillers;
 
+	// Blocks, not interleave: primary first, then a contiguous secondary
+	// block. Rationale: word-by-word language switching adds context-switch
+	// difficulty unrelated to the diagnosed weakness.
+	const secondaryCount = mixActive ? Math.round((wordCount * secondaryMix) / 100) : 0;
+	const primaryCount = wordCount - secondaryCount;
+
 	const words: string[] = [];
 	let targetWordCount = 0;
 	let fillerWordCount = 0;
 	const distinctTargets = new Set<string>();
 
-	for (let i = 0; i < wordCount; i++) {
-		const useSecondary = mixActive && rng() * 100 < secondaryMix;
-		const pool = useSecondary ? secondaryTargets : primaryPool;
-		const picked = pickWeighted(pool, rng);
+	const recordTargetHits = (word: string) => {
+		for (const t of input.targetBigrams) {
+			if (wordMatchesTarget(word, t)) distinctTargets.add(t);
+		}
+	};
+
+	for (let i = 0; i < primaryCount; i++) {
+		const picked = pickWeighted(primaryPool, rng);
 		words.push(picked);
-		// `useSecondary` ⇒ secondaryTargets non-empty ⇒ target-bearing.
-		if (useSecondary || useTargetPool) {
+		if (useTargetPool) {
 			targetWordCount++;
-			for (const t of input.targetBigrams) {
-				if (wordMatchesTarget(picked, t)) distinctTargets.add(t);
-			}
+			recordTargetHits(picked);
 		} else {
 			fillerWordCount++;
 		}
+	}
+
+	for (let i = 0; i < secondaryCount; i++) {
+		const picked = pickWeighted(secondaryTargets, rng);
+		words.push(picked);
+		targetWordCount++;
+		recordTargetHits(picked);
 	}
 
 	return {

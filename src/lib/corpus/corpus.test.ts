@@ -237,6 +237,23 @@ describe('generateText', () => {
 			expect(words.every((w) => secondaryWords.has(w))).toBe(true);
 		});
 
+		it('partial mix lays out primary first, then secondary as a contiguous block', () => {
+			// mix=30 of 10 words → 7 primary, 3 secondary, in that order.
+			const { text } = generateText({
+				kind: 'bigram-drill',
+				corpus: fixtureCorpus(),
+				secondaryCorpus,
+				secondaryMix: 30,
+				targetBigrams: ['th'],
+				wordCount: 10
+			});
+			const words = text.split(' ');
+			const primaryWords = new Set(Object.keys(fixtureCorpus().wordFrequencies));
+			const secondaryWords = new Set(Object.keys(secondaryCorpus.wordFrequencies));
+			expect(words.slice(0, 7).every((w) => primaryWords.has(w))).toBe(true);
+			expect(words.slice(7).every((w) => secondaryWords.has(w))).toBe(true);
+		});
+
 		it('falls back to primary when secondary has no target-bearing words for the target', () => {
 			// "zz" matches neither corpus → mix inactive → primary-only.
 			const primary: CorpusData = {
