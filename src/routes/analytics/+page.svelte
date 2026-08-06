@@ -33,7 +33,7 @@
 	});
 </script>
 
-<div class="mx-auto max-w-3xl space-y-10">
+<div class="mx-auto max-w-4xl space-y-10">
 	<header class="space-y-3">
 		<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
 			Progress · {VERSION}
