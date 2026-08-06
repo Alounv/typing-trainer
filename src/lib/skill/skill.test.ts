@@ -7,7 +7,7 @@ import {
 	summarizeBigrams
 } from './index';
 import { annotateFirstInputs } from '../session/postprocess';
-import { DEFAULT_THRESHOLDS } from '../support/core';
+import { DEFAULT_THRESHOLDS, ERROR_TIME_BUDGET_MS } from '../support/core';
 import type {
 	BigramAggregate,
 	BigramClassification,
@@ -199,13 +199,123 @@ describe('summarizeBigrams', () => {
 		expect(th.occurrences).toBe(32);
 	});
 
-	it('sorts by priority score (badness × corpus frequency) descending', () => {
+	it('sorts by priority score (time lost × corpus frequency) descending', () => {
 		const rows = summarizeBigrams(
 			acquisitionVsHealthyFixture(),
 			{ th: 10, er: 10 },
 			DEFAULT_THRESHOLDS
 		);
 		expect(rows[0].bigram).toBe('th');
+	});
+
+	it('charges errors at the declared time budget when nothing was timed', () => {
+		// All samples wrong → no timings at all → loss is purely the error budget,
+		// scaled by the confidence factor n/(n+10) = 20/30.
+		const sessions = [
+			session('s1', 100, [
+				agg('th', 's1', {
+					errorRate: 1,
+					samples: Array.from({ length: 20 }, () => ({ correct: false, timing: null }))
+				})
+			])
+		];
+		const th = summarizeBigrams(sessions, undefined, DEFAULT_THRESHOLDS)[0];
+		expect(th.timeLossMs).toBeCloseTo(ERROR_TIME_BUDGET_MS * (20 / 30), 5);
+	});
+
+	/** Three filler bigrams at a steady pace, so the pooled median (the baseline)
+	 *  stays put no matter how many samples the bigram under test contributes. */
+	function withBaseline(...extra: BigramAggregate[]): SessionSummary[] {
+		return [
+			session('s1', 100, [
+				agg('b1', 's1', { occurrences: 20, samples: cleanSamples(20, 100) }),
+				agg('b2', 's1', { occurrences: 20, samples: cleanSamples(20, 100) }),
+				agg('b3', 's1', { occurrences: 20, samples: cleanSamples(20, 100) }),
+				...extra
+			])
+		];
+	}
+
+	it.each([{ n: 2 }, { n: 6 }, { n: 20 }])(
+		'scales the reported cost with confidence at $n samples',
+		({ n }) => {
+			const rows = summarizeBigrams(
+				withBaseline(agg('xx', 's1', { occurrences: n, samples: cleanSamples(n, 800) })),
+				undefined,
+				DEFAULT_THRESHOLDS
+			);
+			const xx = rows.find((r) => r.bigram === 'xx')!;
+			// Identical 800ms timings throughout; only the evidence differs.
+			expect(xx.timeLossMs).toBeCloseTo(700 * (n / (n + 10)), 5);
+		}
+	);
+
+	it('keeps a two-sample outlier below a well-observed weakness', () => {
+		// The accuracy drill deliberately requests `unclassified` targets, so a pair
+		// seen twice must not outrank a bigram that is reliably mediocre.
+		const rows = summarizeBigrams(
+			withBaseline(
+				agg('xx', 's1', { occurrences: 2, samples: cleanSamples(2, 800) }),
+				agg('yy', 's1', { occurrences: 20, samples: cleanSamples(20, 300) })
+			),
+			{ xx: 0.01, yy: 0.01 },
+			DEFAULT_THRESHOLDS
+		);
+		const xx = rows.find((r) => r.bigram === 'xx')!;
+		const yy = rows.find((r) => r.bigram === 'yy')!;
+		expect(yy.priorityScore).toBeGreaterThan(xx.priorityScore);
+	});
+
+	it('prices a slow tail that the mean hides', () => {
+		// 'sp' is fast 18 times out of 20 and very slow twice. Its mean (137ms) sits
+		// below the pooled median, so `max(0, mean - baseline)` would score it zero —
+		// averaging the per-sample excess must not.
+		const sessions = [
+			session('s1', 100, [
+				agg('sp', 's1', {
+					samples: [...cleanSamples(18, 80), ...cleanSamples(2, 650)]
+				}),
+				agg('ok', 's1', { samples: cleanSamples(20, 120) })
+			])
+		];
+		const rows = summarizeBigrams(sessions, undefined, DEFAULT_THRESHOLDS);
+		const sp = rows.find((r) => r.bigram === 'sp')!;
+		const ok = rows.find((r) => r.bigram === 'ok')!;
+		expect(sp.meanTime).toBeLessThan(150);
+		expect(sp.timeLossMs).toBeGreaterThan(0);
+		expect(sp.timeLossMs).toBeGreaterThan(ok.timeLossMs);
+	});
+
+	it('dampens frequency so severity is not drowned out by volume', () => {
+		// 'rare' loses ~10x more time per occurrence; 'common' is 25x more frequent.
+		// Under linear frequency volume wins; under the square root severity does.
+		const sessions = [
+			session('s1', 100, [
+				agg('xq', 's1', { samples: cleanSamples(20, 700) }),
+				agg('es', 's1', { samples: cleanSamples(20, 130) })
+			])
+		];
+		const rows = summarizeBigrams(sessions, { xq: 0.001, es: 0.025 }, DEFAULT_THRESHOLDS);
+		expect(rows[0].bigram).toBe('xq');
+		// Frequency is reported untransformed so the table can show the real share.
+		expect(rows.find((r) => r.bigram === 'es')!.frequency).toBe(0.025);
+	});
+
+	it('keeps a measured cost on healthy bigrams instead of zeroing it', () => {
+		const rows = summarizeBigrams(
+			acquisitionVsHealthyFixture(),
+			{ th: 10, er: 10 },
+			DEFAULT_THRESHOLDS
+		);
+		const er = rows.find((r) => r.bigram === 'er')!;
+		expect(er.classification).toBe('healthy');
+		expect(er.timeLossMs).toBeGreaterThanOrEqual(0);
+		// ...but drill selection still filters it out.
+		expect(
+			buildLivePriorityTargets(acquisitionVsHealthyFixture(), { th: 10, er: 10 }).map(
+				(t) => t.bigram
+			)
+		).toEqual(['th']);
 	});
 });
 

@@ -30,6 +30,8 @@
 		| 'meanTime'
 		| 'errorRate'
 		| 'occurrences'
+		| 'timeLoss'
+		| 'frequency'
 		| 'priority';
 	type SortDir = 'asc' | 'desc';
 
@@ -68,6 +70,10 @@
 					return (a.errorRate - b.errorRate) * dir;
 				case 'occurrences':
 					return (a.occurrences - b.occurrences) * dir;
+				case 'timeLoss':
+					return (a.timeLossMs - b.timeLossMs) * dir;
+				case 'frequency':
+					return (a.frequency - b.frequency) * dir;
 				case 'priority':
 					return (a.priorityScore - b.priorityScore) * dir;
 			}
@@ -131,6 +137,18 @@
 	function fmtOccurrences(n: number): string {
 		return n >= 10 ? '—' : String(n);
 	}
+	/** Time loss is the interpretable half of the priority score — show it in real ms.
+	 *  Sub-millisecond losses round to a dash so clean rows stay visually quiet. */
+	function fmtTimeLoss(ms: number): string {
+		if (!Number.isFinite(ms) || ms < 0.5) return '—';
+		return `${ms.toFixed(0)} ms`;
+	}
+	/** Corpus frequency, as a share of all transitions. Two decimals: the common
+	 *  bigrams sit near 1–3% and the rare ones near 0.01%, so one decimal flattens them. */
+	function fmtFrequency(f: number): string {
+		if (!Number.isFinite(f) || f <= 0) return '—';
+		return `${(f * 100).toFixed(2)}%`;
+	}
 </script>
 
 {#if rows.length === 0}
@@ -182,6 +200,22 @@
 						</th>
 						<th></th>
 					{/if}
+					<!--
+						Time loss and frequency are the two factors the priority score
+						multiplies. Shown as their own columns because the product alone
+						hides which one is driving a row: a very common bigram can outrank
+						a much worse rare one on volume, and that should be visible.
+					-->
+					<th class="text-right">
+						<button type="button" class="table-sort-btn" onclick={() => toggleSort('timeLoss')}>
+							Time lost{sortIndicator('timeLoss')}
+						</button>
+					</th>
+					<th class="text-right">
+						<button type="button" class="table-sort-btn" onclick={() => toggleSort('frequency')}>
+							Freq.{sortIndicator('frequency')}
+						</button>
+					</th>
 					<th class="text-right">
 						<button type="button" class="table-sort-btn" onclick={() => toggleSort('priority')}>
 							Priority{sortIndicator('priority')}
@@ -209,6 +243,8 @@
 							<td class="text-right font-mono tabular-nums">{fmtPct(row.errorRate)}</td>
 							<td><BigramSparkline points={row.trend} metric="errorRate" /></td>
 						{/if}
+						<td class="text-right font-mono tabular-nums">{fmtTimeLoss(row.timeLossMs)}</td>
+						<td class="text-right font-mono tabular-nums">{fmtFrequency(row.frequency)}</td>
 						<td class="text-right font-mono tabular-nums">{row.priorityScore.toFixed(2)}</td>
 					</tr>
 				{/each}
