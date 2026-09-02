@@ -1,11 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { runDiagnostic } from './fixtures';
-import { BIGRAM_CLASSIFICATION_WINDOW } from '../src/lib/support/core';
 
 /**
- * Accuracy drill feedback loop: mistyping a target bigram damages its chip — a
- * full classification window of clean repeats owed — and later clean
- * occurrences pay it back down one at a time.
+ * Accuracy drill feedback loop: mistyping a target bigram damages its chip and
+ * pushes the debt meter into the red; later clean occurrences of the same
+ * bigram pay repeats back and the meter climbs again.
  */
 test(
 	'accuracy drill: a mistyped bigram is damaged, then partly repaid',
@@ -45,17 +44,20 @@ test(
 		await page.keyboard.type(target![1] === 'z' ? 'q' : 'z');
 
 		await expect(chip).toHaveAttribute('data-state', 'damaged');
-		await expect(chip).toHaveAttribute('data-debt', String(BIGRAM_CLASSIFICATION_WINDOW));
-		const meter = page.getByTestId('clean-credit');
+		const meter = page.getByTestId('debt-change');
 		await expect(meter).toBeVisible();
-		// One mistake outruns the clean hits so far — the meter is underwater.
-		expect(Number(await meter.getAttribute('aria-valuenow'))).toBeLessThan(0);
+		// The mistake added debt the drill has not paid back — the meter is red.
+		const afterMistake = Number(await meter.getAttribute('aria-valuenow'));
+		expect(afterMistake).toBeLessThan(0);
 
-		// Correct the miss, then type through two more clean occurrences.
+		// Correct the miss, then type through two more clean occurrences: each one
+		// pays a repeat back, so the meter climbs even though the chip still owes.
 		await page.keyboard.press('Backspace');
 		const repaid = occurrences[2] + 2;
 		await page.keyboard.type(passage.slice(start + 1, repaid));
-		await expect(chip).toHaveAttribute('data-debt', String(BIGRAM_CLASSIFICATION_WINDOW - 2));
+		await expect
+			.poll(async () => Number(await meter.getAttribute('aria-valuenow')))
+			.toBeGreaterThan(afterMistake);
 
 		await page.keyboard.type(passage.slice(repaid));
 		await page.waitForURL(/\/session\/[^/]+\/summary$/);

@@ -165,12 +165,13 @@
 	const ledgerEntries = $derived(
 		ledgerSnapshot ? new Map(ledgerSnapshot.entries.map((e) => [e.bigram, e])) : undefined
 	);
-	const creditPct = $derived.by(() => {
-		if (!ledgerSnapshot || ledgerSnapshot.creditTotal <= 0) return 0;
-		const pct = (ledgerSnapshot.credit / ledgerSnapshot.creditTotal) * 100;
+	// Signed: the drill ends ahead only if it leaves less debt than it found.
+	const repaidPct = $derived.by(() => {
+		if (!ledgerSnapshot || ledgerSnapshot.scale <= 0) return 0;
+		const pct = (ledgerSnapshot.netRepaid / ledgerSnapshot.scale) * 100;
 		return Math.max(-100, Math.min(100, pct));
 	});
-	const inDebt = $derived(creditPct < 0);
+	const worseOff = $derived(repaidPct < 0);
 
 	// Pacer wiring. `paceForMode` resolves to 0 for non-speed drills or
 	// when the user has no diagnostic baseline — `ghostPosition` stays
@@ -345,26 +346,26 @@
 	<div class="space-y-3">
 		{#if ledgerSnapshot}
 			<!--
-				Clean-credit meter: one unit per clean target occurrence, minus a
-				full repayment window per mistake. Green grows from the left while
-				the user is clean; once mistakes outrun repayment it goes negative
-				and a red bar grows back from the right.
+				Debt-change meter: total repeats owed at the start of the drill
+				minus what is owed now. Green grows from the left as clean repeats
+				pay debt off; red grows back from the right once mistakes have
+				added more than the session has cleared.
 			-->
 			<div
 				class="flex h-1 w-full overflow-hidden rounded-full bg-base-300/60"
-				class:justify-end={inDebt}
+				class:justify-end={worseOff}
 				role="progressbar"
-				aria-label="Clean bigram credit"
+				aria-label="Bigram debt repaid this drill"
 				aria-valuemin="-100"
 				aria-valuemax="100"
-				aria-valuenow={Math.round(creditPct)}
-				data-testid="clean-credit"
+				aria-valuenow={Math.round(repaidPct)}
+				data-testid="debt-change"
 			>
 				<div
-					class="h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none {inDebt
+					class="h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none {worseOff
 						? 'bg-error'
 						: 'bg-success'}"
-					style="width: {Math.abs(creditPct)}%"
+					style="width: {Math.abs(repaidPct)}%"
 				></div>
 			</div>
 		{/if}
