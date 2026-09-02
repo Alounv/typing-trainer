@@ -58,6 +58,11 @@
 		 */
 		baselineWPM?: number;
 		/**
+		 * Accuracy drills only — clean repeats each target already owes from its
+		 * history, so the chips are honest from the first keystroke.
+		 */
+		initialDebt?: ReadonlyMap<string, number>;
+		/**
 		 * Diagnostic routes pass a builder that turns the just-finalized summary
 		 * (plus its raw events, available in-memory only for this call) into a
 		 * `DiagnosticReport` which is attached to the summary before persistence.
@@ -80,6 +85,7 @@
 		exposureBigrams,
 		drillMode,
 		baselineWPM,
+		initialDebt,
 		buildDiagnosticReport
 	}: Props = $props();
 
@@ -153,17 +159,18 @@
 	// svelte-ignore state_referenced_locally
 	const ledger =
 		drillMode === 'accuracy'
-			? new BigramLedger({ text, targetBigrams: targetBigrams ?? [] })
+			? new BigramLedger({ text, targetBigrams: targetBigrams ?? [], initialDebt })
 			: null;
 	let ledgerSnapshot = $state<LedgerSnapshot | null>(ledger?.snapshot() ?? null);
 	const ledgerEntries = $derived(
 		ledgerSnapshot ? new Map(ledgerSnapshot.entries.map((e) => [e.bigram, e])) : undefined
 	);
-	const creditPct = $derived(
-		ledgerSnapshot && ledgerSnapshot.creditTotal > 0
-			? Math.min(100, (ledgerSnapshot.credit / ledgerSnapshot.creditTotal) * 100)
-			: 0
-	);
+	const creditPct = $derived.by(() => {
+		if (!ledgerSnapshot || ledgerSnapshot.creditTotal <= 0) return 0;
+		const pct = (ledgerSnapshot.credit / ledgerSnapshot.creditTotal) * 100;
+		return Math.max(-100, Math.min(100, pct));
+	});
+	const inDebt = $derived(creditPct < 0);
 
 	// Pacer wiring. `paceForMode` resolves to 0 for non-speed drills or
 	// when the user has no diagnostic baseline — `ghostPosition` stays
@@ -338,22 +345,26 @@
 	<div class="space-y-3">
 		{#if ledgerSnapshot}
 			<!--
-				Clean-credit meter: one unit per clean target occurrence, minus four
-				per mistake. It grows steadily while the user is clean and visibly
-				retreats when they aren't.
+				Clean-credit meter: one unit per clean target occurrence, minus a
+				full repayment window per mistake. Green grows from the left while
+				the user is clean; once mistakes outrun repayment it goes negative
+				and a red bar grows back from the right.
 			-->
 			<div
-				class="h-1 w-full overflow-hidden rounded-full bg-base-300/60"
+				class="flex h-1 w-full overflow-hidden rounded-full bg-base-300/60"
+				class:justify-end={inDebt}
 				role="progressbar"
 				aria-label="Clean bigram credit"
-				aria-valuemin="0"
+				aria-valuemin="-100"
 				aria-valuemax="100"
 				aria-valuenow={Math.round(creditPct)}
 				data-testid="clean-credit"
 			>
 				<div
-					class="h-full rounded-full bg-success transition-[width] duration-300 ease-out motion-reduce:transition-none"
-					style="width: {creditPct}%"
+					class="h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none {inDebt
+						? 'bg-error'
+						: 'bg-success'}"
+					style="width: {Math.abs(creditPct)}%"
 				></div>
 			</div>
 		{/if}

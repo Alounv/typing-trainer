@@ -4,6 +4,7 @@ import type { DrillMode } from '$lib/support/core';
 import { getProfile } from '$lib/settings';
 import { getRecentSessions } from '$lib/support/storage';
 import { consumePlannedSession, resolveDrillMix } from '$lib/plan';
+import { computeBigramDebts } from '$lib/skill';
 
 interface BigramDrillSessionInputs {
 	text: string;
@@ -11,6 +12,8 @@ interface BigramDrillSessionInputs {
 	exposure: readonly string[];
 	drillMode: DrillMode;
 	baselineWPM: number;
+	/** Accuracy drills only — clean repeats each target still owes from history. */
+	initialDebt?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -51,20 +54,16 @@ export async function prepareDrillSession(routeMode: DrillMode): Promise<BigramD
 		wordCount: wordBudget
 	});
 
-	const baselineWPM = await getLatestBaselineWPM();
+	const recent = await getRecentSessions();
+	const baselineWPM =
+		recent.find((s) => s.type === 'diagnostic')?.diagnosticReport?.baselineWPM ?? 0;
 
 	return {
 		text: seq.text,
 		targets: resolved.targets,
 		exposure: resolved.mix?.exposure ?? [],
 		drillMode: routeMode,
-		baselineWPM
+		baselineWPM,
+		initialDebt: routeMode === 'accuracy' ? computeBigramDebts(recent, resolved.targets) : undefined
 	};
-}
-
-/** 0 when no diagnostic on file — shell treats that as "hide the ghost cursor." */
-async function getLatestBaselineWPM(): Promise<number> {
-	const recent = await getRecentSessions();
-	const report = recent.find((s) => s.type === 'diagnostic')?.diagnosticReport;
-	return report?.baselineWPM ?? 0;
 }

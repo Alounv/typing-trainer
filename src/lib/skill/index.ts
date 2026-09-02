@@ -13,3 +13,4 @@ export { generateDiagnosticReport } from './engine';
 export { summarizeBigrams, buildLivePriorityTargets, buildLiveUndertrained } from './assessment';
 export type { BigramSummary } from './assessment';
 export { classifyBigram, summarizeSamples } from './classification';
+export { computeBigramDebts } from './debt';

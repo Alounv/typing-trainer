@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
 	buildLivePriorityTargets,
 	buildLiveUndertrained,
+	computeBigramDebts,
 	extractBigramAggregates,
 	generateDiagnosticReport,
 	summarizeBigrams
 } from './index';
 import { annotateFirstInputs } from '../session/postprocess';
-import { DEFAULT_THRESHOLDS, ERROR_TIME_BUDGET_MS } from '../support/core';
+import {
+	BIGRAM_CLASSIFICATION_WINDOW,
+	DEFAULT_THRESHOLDS,
+	ERROR_TIME_BUDGET_MS
+} from '../support/core';
 import type {
 	BigramAggregate,
 	BigramClassification,
@@ -369,5 +374,53 @@ describe('buildLiveUndertrained', () => {
 
 	it('returns empty when no corpus is supplied', () => {
 		expect(buildLiveUndertrained([], undefined)).toEqual([]);
+	});
+});
+
+describe('computeBigramDebts', () => {
+	/** `samples` reads oldest-first, matching how a session records them. */
+	function withSamples(bigram: string, pattern: string): SessionSummary[] {
+		const samples: BigramSample[] = [...pattern].map((c) => ({
+			correct: c !== 'x',
+			timing: c === 'x' ? null : 100
+		}));
+		return [session('s1', 100, [agg(bigram, 's1', { samples })])];
+	}
+
+	it('owes nothing for a bigram with a clean window', () => {
+		const debts = computeBigramDebts(withSamples('th', '.'.repeat(20)), ['th']);
+		expect(debts.get('th')).toBe(0);
+	});
+
+	it('owes nothing for a bigram with no history at all', () => {
+		expect(computeBigramDebts([], ['th']).get('th')).toBe(0);
+	});
+
+	it('owes a full window when the newest sample is the error', () => {
+		const debts = computeBigramDebts(withSamples('th', '.'.repeat(19) + 'x'), ['th']);
+		expect(debts.get('th')).toBe(BIGRAM_CLASSIFICATION_WINDOW);
+	});
+
+	it('owes one repeat when the error is about to age out', () => {
+		const debts = computeBigramDebts(withSamples('th', 'x' + '.'.repeat(19)), ['th']);
+		expect(debts.get('th')).toBe(1);
+	});
+
+	it('is set by the newest error, not by how many errors there are', () => {
+		// Two errors; the newer one is the sixth-newest sample, so it takes 15
+		// more clean repeats to push it out of a twenty-sample window.
+		const debts = computeBigramDebts(withSamples('th', 'x' + '.'.repeat(13) + 'x' + '.....'), [
+			'th'
+		]);
+		expect(debts.get('th')).toBe(15);
+	});
+
+	it('pools the window across sessions, newest first', () => {
+		const sessions = [
+			session('old', 100, [agg('th', 'old', { samples: [{ correct: false, timing: null }] })]),
+			session('new', 200, [agg('th', 'new', { samples: cleanSamples(19, 100) })])
+		];
+		// 19 clean on top of the old error: one more repeat pushes it out.
+		expect(computeBigramDebts(sessions, ['th']).get('th')).toBe(1);
 	});
 });

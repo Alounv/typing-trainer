@@ -33,7 +33,7 @@
 			<DrillTargetChip {bigram} isExposure={exposureSet.has(bigram)} entry={entries?.get(bigram)} />
 		{/each}
 	</ul>
-	{#if hasMix || showTint || entries}
+	{#if hasMix || showTint}
 		<span></span>
 		<p class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px] text-base-content/50">
 			{#if hasMix}
@@ -50,22 +50,6 @@
 						>cd</span
 					>
 					exposure
-				</span>
-			{/if}
-			{#if entries}
-				<span class="inline-flex items-baseline gap-1.5">
-					<span
-						class="inline-block rounded-sm bg-error/15 px-1.5 py-0.5 align-middle font-mono text-error ring-1 ring-error/40"
-						>ab</span
-					>
-					owes clean repeats
-				</span>
-				<span class="inline-flex items-baseline gap-1.5">
-					<span
-						class="inline-block rounded-sm bg-success/15 px-1.5 py-0.5 align-middle font-mono text-success ring-1 ring-success/40"
-						>cd</span
-					>
-					paid back
 				</span>
 			{/if}
 			{#if showTint}

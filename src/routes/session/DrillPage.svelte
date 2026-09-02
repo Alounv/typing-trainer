@@ -26,6 +26,7 @@
 				targets: readonly string[];
 				exposure: readonly string[];
 				baselineWPM: number;
+				initialDebt?: ReadonlyMap<string, number>;
 		  }
 		| { status: 'error'; message: string };
 
@@ -40,7 +41,8 @@
 				text: inputs.text,
 				targets: inputs.targets,
 				exposure: inputs.exposure,
-				baselineWPM: inputs.baselineWPM
+				baselineWPM: inputs.baselineWPM,
+				initialDebt: inputs.initialDebt
 			};
 		} catch (err) {
 			state = {
@@ -65,5 +67,6 @@
 		exposureBigrams={state.exposure}
 		drillMode={mode}
 		baselineWPM={state.baselineWPM}
+		initialDebt={state.initialDebt}
 	/>
 {/if}

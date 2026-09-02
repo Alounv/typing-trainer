@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BigramLedger, DEFAULT_DAMAGE } from './bigramLedger';
-import type { KeystrokeEvent } from '../support/core';
+import { BIGRAM_CLASSIFICATION_WINDOW, type KeystrokeEvent } from '../support/core';
 
 /**
  * Types `text` against `expected`, one first-input event per position.
@@ -28,6 +28,35 @@ function entry(ledger: BigramLedger, bigram: string) {
 }
 
 describe('BigramLedger', () => {
+	it('owes a full classification window of clean repeats per mistake', () => {
+		// `classifyBigram` wants errorRate < 0.05 over the last 20 samples, and
+		// 1/20 is exactly 0.05 — the error has to leave the window entirely.
+		expect(DEFAULT_DAMAGE).toBe(BIGRAM_CLASSIFICATION_WINDOW);
+	});
+
+	it('starts a target already in debt when its history owes repeats', () => {
+		const text = 'th th th';
+		const ledger = new BigramLedger({
+			text,
+			targetBigrams: ['th'],
+			initialDebt: new Map([['th', 3]])
+		});
+		expect(entry(ledger, 'th').debt).toBe(3);
+		expect(entry(ledger, 'th').wasDamaged).toBe(true);
+
+		type(ledger, text, 'th th');
+		expect(entry(ledger, 'th').debt).toBe(1);
+	});
+
+	it('clamps seeded debt to one full repayment window', () => {
+		const ledger = new BigramLedger({
+			text: 'th',
+			targetBigrams: ['th'],
+			initialDebt: new Map([['th', 999]])
+		});
+		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE);
+	});
+
 	it('counts every occurrence of each target in the text', () => {
 		const ledger = new BigramLedger({ text: 'the theme', targetBigrams: ['th', 'he'] });
 		expect(entry(ledger, 'th').total).toBe(2);
@@ -52,7 +81,7 @@ describe('BigramLedger', () => {
 
 	// Each step re-types from the start; already-recorded positions are ignored.
 	it('pays debt down one clean occurrence at a time', () => {
-		const text = 'th th th';
+		const text = 'th th th th';
 		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
 		type(ledger, text, 't~');
 		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE);
@@ -62,8 +91,8 @@ describe('BigramLedger', () => {
 		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE - 2);
 	});
 
-	it('marks a bigram recovered once its debt is fully repaid', () => {
-		const text = 'th th th th th';
+	it('marks a bigram recovered once a full window of clean repeats is paid', () => {
+		const text = 'th '.repeat(DEFAULT_DAMAGE + 1).trim();
 		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
 		type(ledger, text, text.replace('th', 't~'));
 		expect(entry(ledger, 'th').debt).toBe(0);
@@ -77,16 +106,15 @@ describe('BigramLedger', () => {
 		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE);
 	});
 
-	it('costs DEFAULT_DAMAGE credit per mistake, floored at zero', () => {
+	it('costs DEFAULT_DAMAGE credit per mistake and goes negative', () => {
 		const text = 'th th th th th th';
 		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
 		type(ledger, text, 'th th th th th t~');
-		// 5 clean hits earned, one mistake costs 4.
-		expect(ledger.snapshot().credit).toBe(1);
+		expect(ledger.snapshot().credit).toBe(5 - DEFAULT_DAMAGE);
 
 		const early = new BigramLedger({ text, targetBigrams: ['th'] });
 		type(early, text, 't~');
-		expect(early.snapshot().credit).toBe(0);
+		expect(early.snapshot().credit).toBe(-DEFAULT_DAMAGE);
 	});
 
 	it('charges a mistake on the right-hand char only', () => {
@@ -109,7 +137,7 @@ describe('BigramLedger', () => {
 		type(ledger, text, 't~');
 		ledger.record(event(1, 'h', 'h'));
 		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE);
-		expect(ledger.snapshot().credit).toBe(0);
+		expect(ledger.snapshot().credit).toBe(-DEFAULT_DAMAGE);
 	});
 
 	it('charges a mistake outside the targets to the credit meter', () => {
@@ -117,7 +145,6 @@ describe('BigramLedger', () => {
 		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
 		type(ledger, text, 'th th th th th th a~');
 		expect(entry(ledger, 'th').debt).toBe(0);
-		// 6 clean hits earned, one off-target mistake still costs 4.
-		expect(ledger.snapshot().credit).toBe(2);
+		expect(ledger.snapshot().credit).toBe(6 - DEFAULT_DAMAGE);
 	});
 });

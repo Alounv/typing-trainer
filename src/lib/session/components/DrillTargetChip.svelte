@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { scale } from 'svelte/transition';
-	import type { LedgerEntry } from '../bigramLedger';
+	import { DEFAULT_DAMAGE, type LedgerEntry } from '../bigramLedger';
 
 	interface Props {
 		bigram: string;
@@ -17,13 +16,17 @@
 		if (entry.wasDamaged) return 'recovered';
 		return 'neutral';
 	});
-	// Ambient fill for chips that have never been damaged: how much of this
-	// bigram's presence in the text has been typed cleanly.
-	const cleanPct = $derived(
-		entry && entry.total > 0 ? Math.min(100, (entry.cleanHits / entry.total) * 100) : 0
-	);
 
-	// Flash on the keystroke that adds debt; the pips stay, the flash doesn't.
+	// Underline doubles as the chip's meter: red draining as debt is repaid,
+	// green filling as a never-damaged bigram is typed cleanly.
+	const meterPct = $derived.by(() => {
+		if (!entry) return 0;
+		if (entry.debt > 0) return (entry.debt / DEFAULT_DAMAGE) * 100;
+		if (entry.wasDamaged) return 0;
+		return entry.total > 0 ? Math.min(100, (entry.cleanHits / entry.total) * 100) : 0;
+	});
+
+	// Flash on the keystroke that adds debt; the count stays, the flash doesn't.
 	let previousDebt = 0;
 	let hit = $state(false);
 	let hitTimer: ReturnType<typeof setTimeout> | undefined;
@@ -61,14 +64,17 @@
 	data-state={chipState}
 	data-debt={debt}
 >
-	{#if chipState === 'neutral' && cleanPct > 0}
+	{#if meterPct > 0}
 		<span
-			class="absolute inset-x-0 bottom-0 h-px origin-left bg-success/70 transition-transform duration-200 ease-out motion-reduce:transition-none"
-			style="transform: scaleX({cleanPct / 100})"
+			class="absolute inset-x-0 bottom-0 h-px origin-left transition-transform duration-200 ease-out motion-reduce:transition-none {chipState ===
+			'damaged'
+				? 'bg-error'
+				: 'bg-success/70'}"
+			style="transform: scaleX({meterPct / 100})"
 			aria-hidden="true"
 		></span>
 	{/if}
-	<span class="relative inline-flex items-center gap-1.5">
+	<span class="relative inline-flex items-baseline gap-1">
 		<span
 			>{#each bigram as char, i (i)}{#if char === ' '}<span
 						class="text-base-content/35"
@@ -76,15 +82,7 @@
 					>{:else}{char}{/if}{/each}</span
 		>
 		{#if debt > 0}
-			<span class="inline-flex items-center gap-0.5" aria-hidden="true">
-				{#each Array.from({ length: debt }, (_, i) => i) as pip (pip)}
-					<span
-						class="pip inline-block h-1 w-1 rounded-full bg-error"
-						in:scale={{ duration: 120 }}
-						out:scale={{ duration: 200 }}
-					></span>
-				{/each}
-			</span>
+			<span class="text-[10px] tabular-nums opacity-90" aria-hidden="true">×{debt}</span>
 		{/if}
 	</span>
 </li>

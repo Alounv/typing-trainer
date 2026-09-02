@@ -1,16 +1,23 @@
-import type { KeystrokeEvent } from '../support/core';
+import { BIGRAM_CLASSIFICATION_WINDOW, type KeystrokeEvent } from '../support/core';
 
 /**
  * Live per-bigram debt ledger for accuracy drills. Mistyping a target bigram
- * puts it `damage` repayments in debt; only later clean occurrences pay it
- * down, so a mistake costs 4 where a clean hit earns 1.
+ * puts it {@link DEFAULT_DAMAGE} repayments in debt; only later clean
+ * occurrences pay it down. Targets can start the drill already in debt —
+ * `skill/debt` reads what their history still owes.
  *
  * Attribution matches `skill/extraction.ts`: the bigram at position `p` is
  * `text[p - 1] + text[p]`, charged on the right-hand character.
  */
 
-/** Clean repetitions owed after one mistake on a bigram. */
-export const DEFAULT_DAMAGE = 4;
+/**
+ * Clean repetitions owed after one mistake, taken from the app's own definition
+ * of clean rather than picked: `classifyBigram` wants `errorRate < 0.05` over the
+ * last {@link BIGRAM_CLASSIFICATION_WINDOW} samples, and one error in a
+ * twenty-sample window sits exactly on 0.05. The mistake has to leave the window
+ * entirely, which takes a full window of clean occurrences.
+ */
+export const DEFAULT_DAMAGE = BIGRAM_CLASSIFICATION_WINDOW;
 
 export interface LedgerEntry {
 	bigram: string;
@@ -24,7 +31,7 @@ export interface LedgerEntry {
 
 export interface LedgerSnapshot {
 	entries: LedgerEntry[];
-	/** `cleanHits - damage × mistakes`, floored at 0. */
+	/** `cleanHits - damage × mistakes`. Goes negative — mistakes outrun repayment. */
 	credit: number;
 	creditTotal: number;
 }
@@ -32,6 +39,8 @@ export interface LedgerSnapshot {
 interface LedgerInput {
 	text: string;
 	targetBigrams: readonly string[];
+	/** Repeats already owed when the drill starts, from the bigram's history. */
+	initialDebt?: ReadonlyMap<string, number>;
 	damage?: number;
 }
 
@@ -45,13 +54,14 @@ export class BigramLedger {
 	private mistakes = 0;
 	private creditTotal = 0;
 
-	constructor({ text, targetBigrams, damage = DEFAULT_DAMAGE }: LedgerInput) {
+	constructor({ text, targetBigrams, initialDebt, damage = DEFAULT_DAMAGE }: LedgerInput) {
 		this.text = text;
 		this.damage = damage;
 		for (const bigram of targetBigrams) {
 			if (this.entries.has(bigram)) continue;
 			const total = countOccurrences(text, bigram);
-			this.entries.set(bigram, { bigram, debt: 0, wasDamaged: false, cleanHits: 0, total });
+			const debt = Math.min(damage, Math.max(0, initialDebt?.get(bigram) ?? 0));
+			this.entries.set(bigram, { bigram, debt, wasDamaged: debt > 0, cleanHits: 0, total });
 			this.creditTotal += total;
 		}
 	}
@@ -91,7 +101,7 @@ export class BigramLedger {
 	snapshot(): LedgerSnapshot {
 		return {
 			entries: [...this.entries.values()].map((e) => ({ ...e })),
-			credit: Math.max(0, this.cleanHits - this.damage * this.mistakes),
+			credit: this.cleanHits - this.damage * this.mistakes,
 			creditTotal: this.creditTotal
 		};
 	}
