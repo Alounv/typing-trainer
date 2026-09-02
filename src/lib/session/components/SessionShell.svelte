@@ -7,8 +7,8 @@
 	 *
 	 * Live elapsed / error readouts are deliberately omitted — those are
 	 * shown on the post-session summary so the eye stays on the text
-	 * during typing. The progress + error-budget hairlines above the
-	 * surface are the only ambient signals.
+	 * during typing. The progress bar, and on accuracy drills the target
+	 * chips + clean-credit meter, are the only ambient signals.
 	 *
 	 * Wiring: we build a {@link SessionRunner} from the supplied config and
 	 * feed every keystroke event into it. Once the text is fully typed we
@@ -19,11 +19,13 @@
 	import { resolve } from '$app/paths';
 	import { SvelteSet } from 'svelte/reactivity';
 	import TypingSurface from './TypingSurface.svelte';
+	import DrillTargets from './DrillTargets.svelte';
 	import type { KeystrokeEvent } from '$lib/support/core';
 	import type { DiagnosticReport, DrillMode, SessionType, SessionSummary } from '$lib/support/core';
 	import { SessionRunner } from '../runner';
 	import type { DifficultyMode } from '../bigramDifficulty';
 	import { computeGhostPosition, paceForMode } from '../pacer';
+	import { BigramLedger, type LedgerSnapshot } from '../bigramLedger';
 	import { saveSession } from '../persistence';
 
 	interface Props {
@@ -85,13 +87,6 @@
 	// Highlight only priority targets in the drill text — exposure bigrams
 	// are new, not diagnosed weaknesses, so they don't get the in-text tint.
 	const priorityBigrams = $derived(targetBigrams?.filter((b) => !exposureSet.has(b)));
-	// Legend only shows when both chip styles are actually on screen.
-	const hasMix = $derived(
-		!!exposureBigrams &&
-			exposureBigrams.length > 0 &&
-			!!targetBigrams &&
-			targetBigrams.some((b) => !exposureSet.has(b))
-	);
 	// Word count for the eyebrow micro-label, matching the dashboard plan
 	// card's `Step N · 60 words` vocabulary so the session reads as a
 	// continuation of the plan, not a standalone page.
@@ -114,12 +109,11 @@
 	let position = $state(0);
 	// Every wrong position — drives red coloring in TextDisplay.
 	const errorPositions = new SvelteSet<number>();
-	// Subset: first wrong position in each burst. Drives the live error counter
-	// and corrected-marking eligibility — fumble follow-ups are noise and don't
+	// Subset: first wrong position in each burst. Drives corrected-marking
+	// eligibility — fumble follow-ups are noise and don't
 	// count. Mirrors the burst-follow-up rule in postprocess.ts / extraction.ts.
 	const countedErrorPositions = new SvelteSet<number>();
 	const correctedPositions = new SvelteSet<number>();
-	const errorCount = $derived(countedErrorPositions.size);
 	let elapsedMs = $state(0);
 	let running = $state(false);
 	let saving = $state(false);
@@ -153,13 +147,22 @@
 		return null;
 	})();
 
-	// Accuracy-drill error budget: the per-drill tolerance is 5% of the
-	// full text length. The overlay bar fills to 100% once the user has
-	// burned that budget; under it, fill is proportional. Denominator is
-	// total chars (not chars-typed) so a single early mistake doesn't
-	// slam the bar to full — it grows as the budget shrinks.
-	const errorBudgetPct = $derived(
-		text.length > 0 ? Math.min(100, (errorCount / text.length) * 100 * (100 / 5)) : 0
+	// Accuracy drills run a debt ledger: a mistake puts the bigram four clean
+	// repeats in debt, and each clean occurrence pays one back. The chips show
+	// the per-bigram state, the meter below shows the accumulated credit.
+	// svelte-ignore state_referenced_locally
+	const ledger =
+		drillMode === 'accuracy'
+			? new BigramLedger({ text, targetBigrams: targetBigrams ?? [] })
+			: null;
+	let ledgerSnapshot = $state<LedgerSnapshot | null>(ledger?.snapshot() ?? null);
+	const ledgerEntries = $derived(
+		ledgerSnapshot ? new Map(ledgerSnapshot.entries.map((e) => [e.bigram, e])) : undefined
+	);
+	const creditPct = $derived(
+		ledgerSnapshot && ledgerSnapshot.creditTotal > 0
+			? Math.min(100, (ledgerSnapshot.credit / ledgerSnapshot.creditTotal) * 100)
+			: 0
 	);
 
 	// Pacer wiring. `paceForMode` resolves to 0 for non-speed drills or
@@ -186,6 +189,10 @@
 		}
 		runner.recordEvent(event);
 		position = runner.position;
+		if (ledger) {
+			ledger.record(event);
+			ledgerSnapshot = ledger.snapshot();
+		}
 
 		// Error / correction state for the drill rendering. We don't read
 		// these off the runner (it only cares about first-input accuracy);
@@ -319,75 +326,7 @@
 				by a hairline to mark "this is data you'll look at while
 				typing," not more prose.
 			-->
-			<div
-				class="grid max-w-xl grid-cols-[5rem_1fr] items-baseline gap-x-4 gap-y-2 border-t border-base-300 pt-4"
-			>
-				<span class="text-[11px] font-medium tracking-[0.18em] text-base-content/40 uppercase">
-					Drilling
-				</span>
-				<ul class="flex flex-wrap gap-1.5" aria-label="Drill targets">
-					{#each targetBigrams as bigram (bigram)}
-						{@const isExposure = exposureSet.has(bigram)}
-						<!-- Filled = priority, dashed = exposure. aria carries the same distinction. -->
-						<li
-							class="rounded-sm px-2 py-0.5 font-mono text-xs {isExposure
-								? 'border border-dashed border-base-content/40 text-base-content/60'
-								: 'bg-base-200 text-base-content/80'}"
-							aria-label={isExposure
-								? `${bigram}, new bigram for exposure practice`
-								: `${bigram}, diagnosed weakness`}
-						>
-							<!--
-								Bigrams may contain whitespace (space→letter and letter→space
-								are among the most frequent real-typing transitions). Render
-								the literal space as a dimmed open-box glyph so "␣t" and "t"
-								are visibly distinct.
-							-->
-							{#each bigram as char, i (i)}{#if char === ' '}<span
-										class="text-base-content/35"
-										aria-label="space">␣</span
-									>{:else}{char}{/if}{/each}
-						</li>
-					{/each}
-				</ul>
-				{#if hasMix || drillMode === 'accuracy' || drillMode === 'speed'}
-					<!--
-						Legend: every chip style currently on screen, in one
-						compact row. The dashed/filled distinction and the
-						in-text tint share a single line so the briefing block
-						stays one paragraph deep.
-					-->
-					<span></span>
-					<p class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px] text-base-content/50">
-						{#if hasMix}
-							<span class="inline-flex items-baseline gap-1.5">
-								<span
-									class="inline-block rounded-sm bg-base-200 px-1.5 py-0.5 align-middle font-mono text-base-content/80"
-									>ab</span
-								>
-								diagnosed
-							</span>
-							<span class="inline-flex items-baseline gap-1.5">
-								<span
-									class="inline-block rounded-sm border border-dashed border-base-content/40 px-1.5 py-0.5 align-middle font-mono text-base-content/60"
-									>cd</span
-								>
-								exposure
-							</span>
-						{/if}
-						{#if drillMode === 'accuracy' || drillMode === 'speed'}
-							<span class="inline-flex items-baseline gap-1.5">
-								<span
-									class="inline-block px-0.5 align-middle font-mono"
-									style={`color: var(${drillMode === 'speed' ? '--color-info' : '--color-warning'})`}
-									>ab</span
-								>
-								{drillMode === 'speed' ? 'slowest — chase it' : 'error-prone — slow down'}
-							</span>
-						{/if}
-					</p>
-				{/if}
-			</div>
+			<DrillTargets {targetBigrams} {exposureBigrams} {drillMode} entries={ledgerEntries} />
 		{/if}
 	</header>
 
@@ -397,31 +336,24 @@
 		first keystroke (flat).
 	-->
 	<div class="space-y-3">
-		{#if drillMode === 'accuracy'}
+		{#if ledgerSnapshot}
 			<!--
-				Accuracy-only "error budget" bar. Fills as errorCount /
-				charsTyped approaches the 5% tolerance; clamps at 100% once
-				over budget. Placed above the session progress bar so a
-				glance answers "am I burning my error budget?" without
-				looking at the numeric readout. The track is invisible until
-				the user actually spends a unit of budget — keeps the empty
-				state quiet so two parallel hairlines don't read as one fat
-				bar.
+				Clean-credit meter: one unit per clean target occurrence, minus four
+				per mistake. It grows steadily while the user is clean and visibly
+				retreats when they aren't.
 			-->
 			<div
-				class="h-0.5 w-full overflow-hidden rounded-full transition-colors duration-150 motion-reduce:transition-none {errorCount >
-				0
-					? 'bg-base-300'
-					: 'bg-transparent'}"
+				class="h-1 w-full overflow-hidden rounded-full bg-base-300/60"
 				role="progressbar"
-				aria-label="Error budget used (5% tolerance)"
+				aria-label="Clean bigram credit"
 				aria-valuemin="0"
 				aria-valuemax="100"
-				aria-valuenow={Math.round(errorBudgetPct)}
+				aria-valuenow={Math.round(creditPct)}
+				data-testid="clean-credit"
 			>
 				<div
-					class="h-full bg-error transition-[width] duration-75 ease-out motion-reduce:transition-none"
-					style="width: {errorBudgetPct}%"
+					class="h-full rounded-full bg-success transition-[width] duration-300 ease-out motion-reduce:transition-none"
+					style="width: {creditPct}%"
 				></div>
 			</div>
 		{/if}
@@ -455,9 +387,8 @@
 	<!--
 		No live elapsed / error readouts: those are reserved for the
 		post-session summary so they don't pull the eye off the text
-		while typing. The progress + error-budget hairlines above the
-		surface are the only ambient signals. Save state still surfaces
-		so a failed persistence doesn't disappear silently.
+		while typing. Save state still surfaces so a failed persistence
+		doesn't disappear silently.
 	-->
 	{#if saving || saveError}
 		<div class="flex flex-wrap items-baseline gap-x-6 text-sm">
