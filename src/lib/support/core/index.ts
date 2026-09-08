@@ -3,7 +3,6 @@ export type {
 	BigramSample,
 	BigramAggregate,
 	ClassificationThresholds,
-	DiagnosticReport,
 	PriorityBigram,
 	SessionType,
 	SessionSummary,

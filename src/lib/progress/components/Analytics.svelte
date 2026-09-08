@@ -27,11 +27,6 @@
 
 	let { sessions, diagnosticSessions, corpusFrequencies, thresholds }: Props = $props();
 
-	/** Two most recent diagnostic sessions with an attached report, newest first. */
-	function pickDiagnosticSessions(list: readonly SessionSummary[]): SessionSummary[] {
-		return list.filter((s) => s.diagnosticReport).slice(0, 2);
-	}
-
 	const wpm = $derived(buildDailyWpmSeries(diagnosticSessions));
 	const errorRate = $derived(buildDailyErrorRateSeries(diagnosticSessions));
 	const bigramProgress = $derived(
@@ -49,7 +44,8 @@
 	);
 	const liveClassification = $derived(tallyClassificationMix(bigrams));
 
-	const latestAndPrevDiagnostic = $derived(pickDiagnosticSessions(diagnosticSessions));
+	// Newest first, so [0] is the latest diagnostic and [1] the one before it.
+	const latestAndPrevDiagnostic = $derived(diagnosticSessions.slice(0, 2));
 
 	/** Graduations are a diagnostic-to-diagnostic measurement; `null` until two exist. */
 	const graduatedCount = $derived.by(() => {

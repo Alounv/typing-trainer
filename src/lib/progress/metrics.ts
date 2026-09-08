@@ -315,9 +315,8 @@ export function buildBigramTrend(
 }
 
 /**
- * Bucketed counts across the four classified states. Shape-compatible with
- * `DiagnosticReport.counts` so the classification bar can take either a live tally or a
- * diagnostic snapshot. `unclassified` surfaces separately — it isn't a ladder point.
+ * Bucketed counts across the four classified states. `unclassified` surfaces
+ * separately — it isn't a ladder point.
  */
 interface ClassificationMix {
 	counts: {

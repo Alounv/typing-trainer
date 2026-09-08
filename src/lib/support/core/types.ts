@@ -43,18 +43,6 @@ export interface BigramAggregate {
 	samples?: BigramSample[];
 }
 
-/** Structured output of a diagnostic session. */
-/**
- * Frozen-at-diagnostic-time snapshot. Pared down to the one value that can't
- * be re-derived from session history: the middle-quartiles baseline WPM that
- * drives the pacer. Counts, bottlenecks, priority targets, corpus fit — all
- * computable live from the diagnostic session's `bigramAggregates`.
- */
-export interface DiagnosticReport {
-	/** Middle quartiles of session WPM — drives the pacer. */
-	baselineWPM: number;
-}
-
 /** One entry in the diagnostic priority list. */
 export interface PriorityBigram {
 	bigram: string;
@@ -131,11 +119,6 @@ export interface SessionSummary {
 	 * thresholds frozen in.
 	 */
 	bigramAggregates: BigramAggregate[];
-	/**
-	 * Populated only for `type === 'diagnostic'`. Computed at save time so the
-	 * dashboard can pull priority targets without replaying the raw keystroke log.
-	 */
-	diagnosticReport?: DiagnosticReport;
 }
 
 /**
@@ -158,19 +141,17 @@ export interface SessionConfig {
 	wordBudget: number;
 	bigramsTargeted?: string[];
 	/**
-	 * Only meaningful when `type === 'bigram-drill'`. Drives pacer speed and
-	 * on-screen instruction copy: accuracy mode targets `baselineWPM × 0.60`
-	 * for hasty/acquisition bigrams (slow-down pressure), speed mode targets
-	 * `targetWPM` (baseline × 1.17) for fluency bigrams (push-speed pressure).
-	 * Absent on legacy sessions and non-drill types.
+	 * Only meaningful when `type === 'bigram-drill'`. Drives which bigrams are
+	 * targeted and the on-screen instruction copy. Absent on legacy sessions
+	 * and non-drill types.
 	 */
 	drillMode?: DrillMode;
 }
 
 /**
- * Which treatment the drill session applies. `accuracy` = no speed pressure,
- * repetition on hasty/acquisition + undertrained targets. `speed` = pacer at
- * `targetWPM` over already-accurate fluency targets.
+ * Which treatment the drill session applies. `accuracy` = repetition on
+ * hasty/acquisition + undertrained targets. `speed` = already-accurate fluency
+ * targets.
  */
 export type DrillMode = 'accuracy' | 'speed';
 

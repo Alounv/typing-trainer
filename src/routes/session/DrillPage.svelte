@@ -13,8 +13,7 @@
 		},
 		speed: {
 			title: 'Speed drill',
-			approach:
-				'Push the pace. The pacer ghost runs at your target WPM — stay with it or ahead. Accuracy still counts, but this is where you chase speed.'
+			approach: 'Push the pace. Accuracy still counts, but this is where you chase speed.'
 		}
 	};
 
@@ -25,7 +24,6 @@
 				text: string;
 				targets: readonly string[];
 				exposure: readonly string[];
-				baselineWPM: number;
 				initialDebt?: ReadonlyMap<string, number>;
 		  }
 		| { status: 'error'; message: string };
@@ -41,7 +39,6 @@
 				text: inputs.text,
 				targets: inputs.targets,
 				exposure: inputs.exposure,
-				baselineWPM: inputs.baselineWPM,
 				initialDebt: inputs.initialDebt
 			};
 		} catch (err) {
@@ -66,7 +63,6 @@
 		targetBigrams={state.targets}
 		exposureBigrams={state.exposure}
 		drillMode={mode}
-		baselineWPM={state.baselineWPM}
 		initialDebt={state.initialDebt}
 	/>
 {/if}

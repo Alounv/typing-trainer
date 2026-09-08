@@ -11,7 +11,6 @@ interface BigramDrillSessionInputs {
 	targets: readonly string[];
 	exposure: readonly string[];
 	drillMode: DrillMode;
-	baselineWPM: number;
 	/** Accuracy drills only — clean repeats each target still owes from history. */
 	initialDebt?: ReadonlyMap<string, number>;
 }
@@ -55,15 +54,12 @@ export async function prepareDrillSession(routeMode: DrillMode): Promise<BigramD
 	});
 
 	const recent = hydrateSessions(await getRecentSessions(), profile?.thresholds);
-	const baselineWPM =
-		recent.find((s) => s.type === 'diagnostic')?.diagnosticReport?.baselineWPM ?? 0;
 
 	return {
 		text: seq.text,
 		targets: resolved.targets,
 		exposure: resolved.mix?.exposure ?? [],
 		drillMode: routeMode,
-		baselineWPM,
 		initialDebt: routeMode === 'accuracy' ? computeBigramDebts(recent, resolved.targets) : undefined
 	};
 }

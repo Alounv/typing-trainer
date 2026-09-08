@@ -32,13 +32,10 @@
 
 	interface Props {
 		text: string;
-		/** Exposed bindable cursor — parent can mirror it into Pacer, stats, etc. */
+		/** Exposed bindable cursor — parent can mirror it into stats, progress, etc. */
 		position?: number;
 		errorPositions?: ReadonlySet<number>;
 		correctedPositions?: ReadonlySet<number>;
-		ghostPosition?: number;
-		/** Forwarded to TextDisplay so the ghost overlay's CSS slide matches the pace. */
-		ghostTransitionMs?: number;
 		/** Forwarded to TextDisplay; highlights pending chars inside target bigrams. */
 		targetBigrams?: readonly string[];
 		/** Bigram metric for difficulty coloring; `null` disables it. */
@@ -60,8 +57,6 @@
 		position = $bindable(0),
 		errorPositions,
 		correctedPositions,
-		ghostPosition,
-		ghostTransitionMs,
 		targetBigrams,
 		difficultyMode = null,
 		autoFocus = true,
@@ -130,8 +125,6 @@
 			{position}
 			{errorPositions}
 			{correctedPositions}
-			{ghostPosition}
-			{ghostTransitionMs}
 			targetBigrams={bigramDifficultyMap ? undefined : targetBigrams}
 			{bigramDifficultyMap}
 			difficultyHighlightVar={difficultyMode ? highlightVarForMode(difficultyMode) : null}

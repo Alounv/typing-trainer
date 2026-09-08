@@ -29,23 +29,6 @@
 		/** Subset of `errorPositions` where the user later typed the correct char. */
 		correctedPositions?: ReadonlySet<number>;
 		/**
-		 * Optional pacer ghost position. When set, an overlay bar is drawn
-		 * at that char marking "where the pacer expects you to be". The bar
-		 * slides between positions via a CSS transition — see
-		 * `ghostTransitionMs`. Rendered whether the ghost is ahead of or
-		 * behind the user; hidden only when it overlaps the cursor so the
-		 * two bars never stack.
-		 */
-		ghostPosition?: number;
-		/**
-		 * Duration of the ghost overlay's inter-char slide, in ms. Set by
-		 * the parent to the pace's ms-per-char so the ghost arrives at the
-		 * next character exactly when it's due, producing continuous motion
-		 * instead of char-to-char snaps. Defaults to 150ms for a visible
-		 * glide when the caller doesn't know the pace.
-		 */
-		ghostTransitionMs?: number;
-		/**
 		 * Bigrams to highlight as drill targets. Each character whose position
 		 * starts or ends one of these bigrams renders in the `target` color
 		 * while still pending; once typed it falls back to the normal
@@ -63,8 +46,6 @@
 		position,
 		errorPositions = new Set<number>(),
 		correctedPositions = new Set<number>(),
-		ghostPosition,
-		ghostTransitionMs = 150,
 		targetBigrams,
 		bigramDifficultyMap = null,
 		difficultyHighlightVar = null
@@ -88,7 +69,7 @@
 	// of char descriptors here. On long texts (e.g. 2k+ chars) that would
 	// allocate N objects and force Svelte's each-block to re-diff every
 	// keystroke. Instead, the template iterates `text` directly and calls
-	// `stateFor()` / ghost-check inline — Svelte's fine-grained reactivity
+	// `stateFor()` inline — Svelte's fine-grained reactivity
 	// then re-runs only the class expressions, with no N-wide allocation.
 
 	function stateFor(
@@ -155,13 +136,6 @@
 	 */
 	let cursorRect = $state({ x: 0, y: 0, w: 0, h: 0, ready: false });
 
-	/**
-	 * Pacer ghost geometry, same pattern as `cursorRect`. Hidden (via
-	 * `ready = false`) whenever the ghost is behind the user or absent —
-	 * the overlay shouldn't render *on* the user's cursor.
-	 */
-	let ghostRect = $state({ x: 0, y: 0, w: 0, h: 0, ready: false });
-
 	$effect(() => {
 		// Re-run when position changes. Relies on the viewport being
 		// `position: relative` so the span's `offsetTop` is measured from
@@ -195,33 +169,6 @@
 			top: lineTop,
 			behavior: prefersReducedMotion() ? 'instant' : 'smooth'
 		});
-	});
-
-	/**
-	 * Ghost overlay placement. Same measurement strategy as the cursor,
-	 * but keyed on `ghostPosition`. Guarded on `ghostPosition > position`
-	 * so the ghost disappears once the user catches up rather than
-	 * sitting beneath the cursor bar.
-	 */
-	$effect(() => {
-		if (!viewportEl) return;
-		// Hide only when the ghost overlaps the cursor — otherwise render
-		// it whether the ghost is ahead or behind the user.
-		const hidden = ghostPosition === undefined || ghostPosition === position;
-		if (hidden) {
-			ghostRect = { x: 0, y: 0, w: 0, h: 0, ready: false };
-			return;
-		}
-		const spans = viewportEl.getElementsByTagName('span');
-		const ghostSpan = spans[ghostPosition as number] as HTMLElement | undefined;
-		if (!ghostSpan) return;
-		ghostRect = {
-			x: ghostSpan.offsetLeft,
-			y: ghostSpan.offsetTop,
-			w: ghostSpan.offsetWidth,
-			h: ghostSpan.offsetHeight,
-			ready: true
-		};
 	});
 
 	/**
@@ -268,23 +215,6 @@
 			? 1
 			: 0}"
 		aria-hidden="true"
-	></div>
-
-	<!--
-		Pacer ghost overlay. Draws beneath the char glyphs (the spans sit in
-		a sibling div with higher stacking via default flow order + the z-0
-		we leave implicit on the ghost). Transition duration is supplied by
-		the parent as ms-per-char so the slide across a character completes
-		exactly as the ghost is due to arrive at the next one — visually
-		continuous motion rather than per-frame snaps.
-	-->
-	<div
-		class="pointer-events-none absolute top-0 left-0 rounded-sm border-b border-secondary/60 bg-secondary/15 transition-[transform,width,height,opacity] ease-linear motion-reduce:transition-none"
-		style="transform: translate({ghostRect.x}px, {ghostRect.y}px); width: {ghostRect.w}px; height: {ghostRect.h}px; opacity: {ghostRect.ready
-			? 1
-			: 0}; transition-duration: {ghostTransitionMs}ms"
-		aria-hidden="true"
-		data-testid="pacer-ghost"
 	></div>
 
 	<div class="whitespace-pre-wrap">

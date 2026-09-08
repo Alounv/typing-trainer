@@ -9,7 +9,6 @@ import {
 	decodeStream,
 	encodeStream,
 	extractBigramAggregates,
-	generateDiagnosticReport,
 	hydrateSession,
 	summarizeBigrams,
 	type AnnotatedKeystrokeEvent,
@@ -192,21 +191,6 @@ describe('extractBigramAggregates', () => {
 		const [th] = extractBigramAggregates(events, 's1');
 		expect(th.bigram).toBe('th');
 		expect(th.classification).toBe('healthy');
-	});
-});
-
-describe('generateDiagnosticReport', () => {
-	it('derives baseline WPM from wall-clock event span', () => {
-		// 61 distinct positions spanning 0 to 60_000ms → 61/5/(60/60) ≈ 12.2 WPM.
-		const events: KeystrokeEvent[] = [];
-		for (let i = 0; i < 61; i++) events.push(ev(i, 'a', 'a', i * 1000));
-		const report = generateDiagnosticReport({ events });
-		expect(report.baselineWPM).toBeCloseTo(12.2, 1);
-	});
-
-	it('returns 0 baseline for degenerate inputs', () => {
-		expect(generateDiagnosticReport({ events: [] }).baselineWPM).toBe(0);
-		expect(generateDiagnosticReport({ events: [ev(0, 'a', 'a', 0)] }).baselineWPM).toBe(0);
 	});
 });
 

@@ -10,7 +10,7 @@ import {
 	saveSessionFixture as saveSession,
 	saveLegacyBigramRowsFixture
 } from '../../test-utils/fixtures';
-import type { StoredSession, BigramAggregate, DiagnosticReport } from '../core/types';
+import type { StoredSession, BigramAggregate } from '../core/types';
 
 function makeAggregate(overrides: Partial<BigramAggregate> = {}): BigramAggregate {
 	return {
@@ -104,14 +104,6 @@ describe('storage service — round-trip', () => {
 		const erHistory = await getBigramHistory('er');
 		expect(erHistory).toHaveLength(1);
 		expect(erHistory[0].bigram).toBe('er');
-	});
-
-	it('attaches a diagnostic report to the summary round-trip', async () => {
-		const report: DiagnosticReport = { baselineWPM: 60 };
-		await saveSession(makeSession({ id: 'diag-1', type: 'diagnostic', diagnosticReport: report }));
-
-		const roundTripped = await getSession('diag-1');
-		expect(roundTripped?.diagnosticReport).toEqual(report);
 	});
 
 	it('clearAll wipes every table', async () => {

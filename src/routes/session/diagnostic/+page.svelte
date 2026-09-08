@@ -2,14 +2,14 @@
 	/**
 	 * Diagnostic session route. Assembles a passage of real prose from the
 	 * language's quote bank so the bigram distribution matches natural typing.
-	 * Falls back to word-synth when the language has no bank. On finish, builds
-	 * a `DiagnosticReport` from the in-memory events + aggregates and attaches
-	 * it to the persisted summary.
+	 * Falls back to word-synth when the language has no bank.
+	 *
+	 * Persists nothing a real-text session doesn't: the report it used to
+	 * attach held only the pacer's baseline WPM, and the pacer is gone.
 	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
 	import { prepareDiagnosticSession } from './loader';
-	import { generateDiagnosticReport } from '$lib/skill';
 
 	type LoadState =
 		| { status: 'loading' }
@@ -42,6 +42,5 @@
 		title="Diagnostic"
 		what="A calibration run. We measure your baseline typing speed and flag the bigrams that slow you down."
 		approach="Type at a natural pace. There's no score — the point is representative data, not performance."
-		buildDiagnosticReport={(_summary, events) => generateDiagnosticReport({ events })}
 	/>
 {/if}

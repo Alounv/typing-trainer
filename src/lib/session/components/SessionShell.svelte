@@ -23,11 +23,10 @@
 	import DrillTargets from './DrillTargets.svelte';
 	import TintToggle from './TintToggle.svelte';
 	import type { KeystrokeEvent } from '$lib/support/core';
-	import type { DiagnosticReport, DrillMode, SessionType, StoredSession } from '$lib/support/core';
+	import type { DrillMode, SessionType, StoredSession } from '$lib/support/core';
 	import { SessionRunner } from '../runner';
 	import type { DifficultyMode } from '../bigramDifficulty';
 	import { resolveInitialTint } from '../initialTint';
-	import { computeGhostPosition, paceForMode } from '../pacer';
 	import { BigramLedger, type LedgerSnapshot } from '../bigramLedger';
 	import { saveSession } from '../persistence';
 
@@ -49,32 +48,15 @@
 		 */
 		exposureBigrams?: readonly string[];
 		/**
-		 * Drill treatment mode. Recorded on the persisted summary and drives
-		 * the pacer speed (accuracy → 0.60× baseline, speed → 1.17× baseline).
-		 * Undefined for non-drill types.
+		 * Drill treatment mode. Recorded on the persisted summary. Undefined
+		 * for non-drill types.
 		 */
 		drillMode?: DrillMode;
-		/**
-		 * User's current baseline WPM, from the latest diagnostic report.
-		 * Needed by the pacer to derive a real-time ghost cursor. Absent on
-		 * first-run / no-diagnostic state, in which case the pacer is hidden.
-		 */
-		baselineWPM?: number;
 		/**
 		 * Accuracy drills only — clean repeats each target already owes from its
 		 * history, so the chips are honest from the first keystroke.
 		 */
 		initialDebt?: ReadonlyMap<string, number>;
-		/**
-		 * Diagnostic routes pass a builder that turns the just-finalized row (plus
-		 * its raw events) into a `DiagnosticReport`, which is attached to the row
-		 * before persistence. Keeps the shell type-agnostic — the diagnostic route
-		 * owns the corpus frequencies the engine needs.
-		 */
-		buildDiagnosticReport?: (
-			session: StoredSession,
-			events: readonly KeystrokeEvent[]
-		) => DiagnosticReport;
 	}
 
 	let {
@@ -86,9 +68,7 @@
 		targetBigrams,
 		exposureBigrams,
 		drillMode,
-		baselineWPM,
-		initialDebt,
-		buildDiagnosticReport
+		initialDebt
 	}: Props = $props();
 
 	const exposureSet = $derived(new Set(exposureBigrams ?? []));
@@ -122,7 +102,6 @@
 	// count. Mirrors the burst-follow-up rule in postprocess.ts / extraction.ts.
 	const countedErrorPositions = new SvelteSet<number>();
 	const correctedPositions = new SvelteSet<number>();
-	let elapsedMs = $state(0);
 	let running = $state(false);
 	let saving = $state(false);
 	let saveError = $state<string | null>(null);
@@ -185,23 +164,6 @@
 	const targetPct = $derived(trackPct(ledgerSnapshot?.target ?? 0));
 	const hasWork = $derived(!!ledgerSnapshot && ledgerSnapshot.target > 0);
 
-	// Pacer wiring. `paceForMode` resolves to 0 for non-speed drills or
-	// when the user has no diagnostic baseline — `ghostPosition` stays
-	// undefined in that case, which TextDisplay interprets as "no pacer."
-	// Accuracy drills deliberately hide the pacer (errors are the signal);
-	// only speed drills get a ghost to chase.
-	// Only read `elapsedMs` once `running` is true so the ghost doesn't crawl
-	// forward before the first keystroke (reading/focus time shouldn't count).
-	const paceWPM = $derived(drillMode && baselineWPM ? paceForMode(drillMode, baselineWPM) : 0);
-	const ghostPosition = $derived(
-		paceWPM > 0 && running ? computeGhostPosition(elapsedMs, paceWPM) : undefined
-	);
-	// ms-per-char at the current pace. Passed to TextDisplay so the ghost
-	// overlay's CSS transition takes exactly that long to slide between
-	// consecutive chars — the next boundary arrives precisely when the
-	// slide ends, producing continuous motion. 5 chars = 1 word.
-	const ghostTransitionMs = $derived(paceWPM > 0 ? 60_000 / (paceWPM * 5) : 0);
-
 	function onEvent(event: KeystrokeEvent) {
 		if (sessionStart === null) {
 			sessionStart = performance.now();
@@ -236,7 +198,7 @@
 			}
 		}
 
-		// Finalize as soon as the last char is typed rather than waiting for the next timer tick.
+		// Finalize on the last char rather than on any later signal.
 		if (runner.isComplete()) finalizeAndNavigate();
 	}
 
@@ -247,9 +209,6 @@
 		try {
 			const elapsed = performance.now() - (sessionStart ?? performance.now());
 			const session: StoredSession = runner.finalize(elapsed);
-			if (buildDiagnosticReport) {
-				session.diagnosticReport = buildDiagnosticReport(session, runner.events);
-			}
 			await saveSession(session);
 			await goto(resolve('/session/[id]/summary', { id: session.id }));
 		} catch (err) {
@@ -257,24 +216,6 @@
 			saveError = err instanceof Error ? err.message : 'Failed to save session.';
 		}
 	}
-
-	// Clock. Driven by requestAnimationFrame so the pacer ghost advances
-	// in lockstep with the display refresh — at 200ms setInterval cadence
-	// the ghost visibly stutters next to the real cursor (which moves on
-	// every keystroke). rAF is cheap here: Svelte's fine-grained reactivity
-	// only re-renders the Timer's mm:ss span when the second rolls over,
-	// and only repaints the ghost when its char index changes.
-	$effect(() => {
-		if (!running) return;
-		const anchor = performance.now() - elapsedMs;
-		let frame = 0;
-		const tick = () => {
-			elapsedMs = performance.now() - anchor;
-			frame = window.requestAnimationFrame(tick);
-		};
-		frame = window.requestAnimationFrame(tick);
-		return () => window.cancelAnimationFrame(frame);
-	});
 </script>
 
 <div class="mx-auto max-w-3xl space-y-8">
@@ -409,8 +350,6 @@
 			bind:position
 			{errorPositions}
 			{correctedPositions}
-			{ghostPosition}
-			{ghostTransitionMs}
 			targetBigrams={drillMode ? priorityBigrams : undefined}
 			{difficultyMode}
 			{onEvent}
