@@ -24,7 +24,6 @@ two **support layers**; routes compose domains through a thin route-local
 | Domain       | Responsibility                                          | Public surface                     |
 | ------------ | ------------------------------------------------------- | ---------------------------------- |
 | **Corpus**   | Produces or selects the text the user will type.        | `generateText`, `scoreQuoteByDebt` |
-| **Plan**     | Resolves "what should the user do next?".               | `computePlan`, `resolveDrillMix`   |
 | **Session**  | Runs the live typing loop and saves the result.         | `<SessionShell>`                   |
 | **Skill**    | Measures how well the user types, from raw keystrokes.  | `hydrateSession`, `assessPacing`   |
 | **Progress** | Turns session history into views for the user.          | `<Summary>`, `<Analytics>`         |
@@ -46,25 +45,21 @@ two **support layers**; routes compose domains through a thin route-local
 flowchart TB
     subgraph Routes["routes/"]
         R_Dash["/"]
-        R_Drill["/session/{accuracy,speed}-drill"]
         R_Real["/session/real-text"]
-        R_Diag["/session/diagnostic"]
         R_Summ["/session/[id]/summary"]
         R_Ana["/analytics"]
         R_Set["/settings"]
     end
 
     subgraph Loaders["route-local loader.ts"]
-        L_Drill["drill-loader"]
+        L_Dash["routes/loader"]
         L_Real["real-text/loader"]
-        L_Diag["diagnostic/loader"]
         L_Summ["summary/loader"]
         L_Ana["analytics/loader"]
     end
 
     subgraph Domains["src/lib/"]
         D_Corpus["corpus"]
-        D_Plan["plan"]
         D_Skill["skill"]
         D_Session["session<br/>(&lt;SessionShell&gt;)"]
         D_Progress["progress<br/>(&lt;Summary&gt;, &lt;Analytics&gt;)"]
@@ -72,55 +67,40 @@ flowchart TB
     end
 
     %% Routes → loaders (orchestration) and components.
-    R_Dash --> D_Plan
-    R_Drill --> L_Drill
-    R_Drill --> D_Session
+    R_Dash --> L_Dash
+    R_Dash --> D_Progress
     R_Real --> L_Real
     R_Real --> D_Session
-    R_Diag --> L_Diag
-    R_Diag --> D_Session
-    R_Diag --> D_Skill
     R_Summ --> L_Summ
     R_Summ --> D_Progress
-    R_Summ --> D_Plan
     R_Ana --> L_Ana
     R_Ana --> D_Progress
     R_Set --> D_Settings
 
-    %% Loaders compose domains. Every loader that reads history also depends on
-    %% Skill, because stored rows have to be hydrated into measurements.
-    L_Drill --> D_Skill
+    %% Every loader that reads stored rows also depends on Skill, because
+    %% stored rows have to be hydrated into measurements.
+    L_Dash --> D_Skill
+    L_Real --> D_Skill
     L_Summ --> D_Skill
     L_Ana --> D_Skill
-    L_Drill --> D_Corpus
-    L_Drill --> D_Plan
-    L_Drill --> D_Settings
     L_Real --> D_Corpus
-    L_Real --> D_Plan
     L_Real --> D_Settings
-    L_Diag --> D_Corpus
-    L_Diag --> D_Settings
-    L_Summ --> D_Plan
+    L_Summ --> D_Corpus
     L_Ana --> D_Corpus
     L_Ana --> D_Settings
 
     %% Domain → domain edges (all point toward Skill or Corpus).
-    D_Plan --> D_Skill
-    D_Plan --> D_Corpus
-    D_Plan --> D_Settings
     D_Session --> D_Skill
     D_Session --> D_Settings
     D_Progress --> D_Skill
-    %% Real-text loader hydrates history to price the debt a passage repays.
-    L_Real --> D_Skill
 
     classDef route fill:#1e3a5f,stroke:#5aa9e6,color:#e6f2ff
     classDef loader fill:#3d2b5a,stroke:#a78bfa,color:#f0e6ff
     classDef domain fill:#2d4a2b,stroke:#7cb342,color:#eaffea
 
-    class R_Dash,R_Drill,R_Real,R_Diag,R_Summ,R_Ana,R_Set route
-    class L_Drill,L_Real,L_Diag,L_Summ,L_Ana loader
-    class D_Corpus,D_Plan,D_Session,D_Skill,D_Progress,D_Settings domain
+    class R_Dash,R_Real,R_Summ,R_Ana,R_Set route
+    class L_Dash,L_Real,L_Summ,L_Ana loader
+    class D_Corpus,D_Session,D_Skill,D_Progress,D_Settings domain
 ```
 
 ## The training loop
@@ -186,26 +166,25 @@ Two consequences worth knowing:
   aggregates); consumers read `SessionSummary` (aggregates required). The type
   gap is deliberate — a caller that forgets to hydrate fails to compile.
 
-Rows written before this model have aggregates and no text. They still feed the
-planner, and `hydrateSession` passes them through untouched, but they can never
-gain context: their keystrokes were never kept. Same for the `bigramRecords`
-table, which mirrors those rows only and is never written again.
+Rows written before this model have aggregates and no text. `hydrateSession`
+passes them through untouched, but they can never gain context: their
+keystrokes were never kept. Their session types (`diagnostic`, `bigram-drill`)
+no longer exist either — they stay in `SessionType` so old summaries still open.
+The `bigramRecords` table mirrors those rows only; nothing writes it and nothing
+reads it, and it survives so exporting an old database doesn't drop history.
 
 ## Main flows
 
-- **Dashboard (`/`)** — calls `computePlan` directly (no loader; the dashboard
-  is just a thin view over the plan). `startPlannedSession` / `startFreshPlan`
-  from `$lib/plan` handle the hand-off to session routes.
-- **Drill sessions (`/session/{accuracy,speed}-drill`)** — shared
-  `routes/session/drill-loader.ts` consumes any planned hand-off, resolves a
-  drill mix via `plan`, generates text via `corpus`, and returns a ready-to-render
-  config. `<SessionShell>` captures keystrokes and persists the run via
-  `session/persistence` — the text and the raw stream, nothing derived.
-- **Real-text / diagnostic sessions** — their own `loader.ts` files call into
-  `corpus.generateText` with the right spec; the rest mirrors the drill flow.
+- **Dashboard (`/`)** — `routes/loader` reads recent rows and scores each with
+  `assessPacing`. Scalars only, no stream decoded. One action: start a passage.
+- **Session (`/session/real-text`)** — `real-text/loader` hydrates recent
+  history to price outstanding bigram debt, then asks `corpus` for the passage
+  that repays most per keystroke. `<SessionShell>` captures keystrokes and
+  persists the run via `session/persistence` — the text and the raw stream,
+  nothing derived.
 - **Summary (`/session/[id]/summary`)** — `summary/loader` fetches the session +
-  recent history, re-runs `computePlan` for the "Next session" CTA, and returns
-  one view-model. The route renders `<Summary>` and wires the hand-off actions.
+  recent history and returns one view-model. The route renders `<Summary>`,
+  which states the pacing verdict.
 - **Analytics (`/analytics`)** — `analytics/loader` returns sessions, profile,
   and corpus frequencies; `<Analytics>` renders the charts.
 - **Settings (`/settings`)** — reads/writes via `$lib/settings.profile`;
@@ -213,11 +192,11 @@ table, which mirrors those rows only and is never written again.
 
 ## Testing
 
-Each domain has **one test file per public entry point** (R5 in the now-retired
-reshape plan). Logic domains (`corpus`, `plan`, `skill`) are exercised through
-their public functions; component domains (`session`, `progress`, settings'
-`<DataTransfer>`) lean on the `e2e/` Playwright suite as the outermost frontier.
-`settings/profile.test.ts` is kept because `profile` is a public surface.
+Each domain has **one test file at its frontier**. Logic domains (`corpus`,
+`skill`, `session`) are exercised through their public functions; component
+domains (`progress`, settings' `<DataTransfer>`) lean on the `e2e/` Playwright
+suite as the outermost frontier. `settings/profile.test.ts` is kept because
+`profile` is a public surface.
 
 A test-only helper at `$lib/test-utils/fixtures.ts` lets tests seed state
 without exposing domain internals on the production surface.
