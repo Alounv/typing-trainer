@@ -1,9 +1,5 @@
 import { loadQuoteBank, hasQuoteBank, generateText } from '$lib/corpus';
-import {
-	CHARS_PER_WORD,
-	DEFAULT_REAL_TEXT_WORD_BUDGET,
-	DEFAULT_THRESHOLDS
-} from '$lib/support/core';
+import { CHARS_PER_WORD, DEFAULT_PASSAGE_WORDS, DEFAULT_THRESHOLDS } from '$lib/support/core';
 import { getProfile } from '$lib/settings';
 import { getRecentSessions } from '$lib/support/storage';
 import { computeAllBigramDebts, hydrateSessions } from '$lib/skill';
@@ -14,7 +10,7 @@ interface RealTextSessionInputs {
 
 export async function prepareRealTextSession(): Promise<RealTextSessionInputs> {
 	const profile = await getProfile();
-	const wordBudget = profile?.wordBudgets?.realText ?? DEFAULT_REAL_TEXT_WORD_BUDGET;
+	const passageWords = profile?.passageWords ?? DEFAULT_PASSAGE_WORDS;
 	const language = profile?.language ?? 'en';
 	const secondaryMix = profile?.secondaryMix ?? 0;
 	const secondaryLanguage =
@@ -46,7 +42,7 @@ export async function prepareRealTextSession(): Promise<RealTextSessionInputs> {
 		quoteBank: bank,
 		secondaryQuoteBank: secondaryBank,
 		secondaryMix,
-		targetLengthChars: wordBudget * CHARS_PER_WORD,
+		targetLengthChars: passageWords * CHARS_PER_WORD,
 		bigramDebts
 	});
 	return { text: seq.text };

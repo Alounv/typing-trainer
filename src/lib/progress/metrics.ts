@@ -1,6 +1,5 @@
 import {
 	BIGRAM_CLASSIFICATION_WINDOW,
-	type BigramAggregate,
 	type BigramClassification,
 	type BigramSample,
 	type ClassificationThresholds,

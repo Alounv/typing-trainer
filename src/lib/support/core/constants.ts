@@ -17,17 +17,13 @@ export const MIN_OCCURRENCES_FOR_CLASSIFICATION = 10;
  *  classifier, the difficulty tint, the healthy-bigrams chart, and the sparkline view. */
 export const BIGRAM_CLASSIFICATION_WINDOW = 20;
 
-// --- Word budget defaults (user-tunable via profile) ---
+// --- Passage length (user-tunable via profile) ---
 
-export const DEFAULT_BIGRAM_DRILL_WORD_BUDGET = 25;
-export const DEFAULT_REAL_TEXT_WORD_BUDGET = 25;
-export const DEFAULT_DIAGNOSTIC_WORD_BUDGET = 100;
-
-// --- Plan structure defaults (user-tunable via profile) ---
-
-export const DEFAULT_CYCLES_PER_DAY = 2;
-export const DEFAULT_ACCURACY_DRILLS_PER_CYCLE = 2;
-export const DEFAULT_SPEED_DRILLS_PER_CYCLE = 2;
+/**
+ * Words per passage. Short on purpose: abandoning loses under a minute at
+ * 60 WPM, and every completion is a checkpoint that feeds the ledger.
+ */
+export const DEFAULT_PASSAGE_WORDS = 25;
 
 // --- Priority scoring ---
 

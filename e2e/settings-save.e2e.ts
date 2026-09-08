@@ -6,6 +6,18 @@ import { expect, test } from '@playwright/test';
  * the write boundary would load the old profile back and un-check the box.
  */
 
+test('settings: visiting the page saves nothing', async ({ page }) => {
+	await page.goto('/settings');
+	await expect(page.getByTestId('lang-fr')).toBeVisible();
+
+	// Well past the debounce. The autosave effect runs once when the profile
+	// arrives, and a save there would both write a row nobody asked for and
+	// make "Saved ·" mean nothing — the next real edit could not be told
+	// apart from it.
+	await page.waitForTimeout(1200);
+	await expect(page.getByText(/^Saved ·/)).toHaveCount(0);
+});
+
 test('settings: toggling a language persists across a reload', async ({ page }) => {
 	await page.goto('/settings');
 

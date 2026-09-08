@@ -155,21 +155,8 @@ export interface UserSettings {
 	secondaryMix?: number;
 	/** Per-user override of `DEFAULT_THRESHOLDS`. Advanced users only. */
 	thresholds?: ClassificationThresholds;
-	/** Per-user override of `DEFAULT_*_WORD_BUDGET`. Absent keys fall back to defaults. */
-	wordBudgets?: {
-		bigramDrill: number;
-		realText: number;
-		diagnostic: number;
-	};
-	/**
-	 * Shape of the daily plan: how many cycles, and how many accuracy/speed
-	 * drill repetitions per cycle. Absent keys fall back to `DEFAULT_*` constants.
-	 */
-	planStructure?: {
-		cyclesPerDay: number;
-		accuracyDrillsPerCycle: number;
-		speedDrillsPerCycle: number;
-	};
+	/** Words per passage. Overrides `DEFAULT_PASSAGE_WORDS`. */
+	passageWords?: number;
 	/**
 	 * Whether a session opens with the pending-letter tint on. Only the opening
 	 * state — the in-session toggle can turn it on or off regardless.

@@ -1,9 +1,8 @@
 <script lang="ts">
 	/**
-	 * Settings page (Phase 6.5.1): surfaces the three knobs that live
-	 * on `UserSettings` — language + corpus, session word budgets, and
-	 * classification thresholds. Persists via `saveProfile`; consumers
-	 * (session routes, planner) read back via `getProfile` and fall
+	 * Settings page: the knobs that live on `UserSettings` — language, passage
+	 * length, classification thresholds, and the tint's opening state. Persists
+	 * via `saveProfile`; the session route reads back via `getProfile` and falls
 	 * back to the `DEFAULT_*` constants when fields are absent.
 	 *
 	 * Auto-save on edit (Phase 6.5.2): each field change kicks a short
@@ -17,14 +16,9 @@
 	import { getProfile, saveProfile, buildDefaultProfile, withDefaults } from '$lib/settings';
 	import { VERSION } from '$lib/version';
 	import {
-		DEFAULT_BIGRAM_DRILL_WORD_BUDGET,
-		DEFAULT_REAL_TEXT_WORD_BUDGET,
-		DEFAULT_DIAGNOSTIC_WORD_BUDGET,
+		DEFAULT_PASSAGE_WORDS,
 		DEFAULT_SPEED_THRESHOLD_MS,
-		DEFAULT_HIGH_ERROR_THRESHOLD,
-		DEFAULT_CYCLES_PER_DAY,
-		DEFAULT_ACCURACY_DRILLS_PER_CYCLE,
-		DEFAULT_SPEED_DRILLS_PER_CYCLE
+		DEFAULT_HIGH_ERROR_THRESHOLD
 	} from '$lib/support/core';
 	import type { Language, UserSettings } from '$lib/support/core';
 	import DataTransfer from '$lib/settings/DataTransfer.svelte';
@@ -61,6 +55,14 @@
 	});
 
 	/**
+	 * The effect's first run after load is caused by the profile arriving, not
+	 * by the user changing anything. Saving there wrote a row on a mere page
+	 * visit and — worse — lit up "Saved ·" before any edit, so a later edit's
+	 * save was indistinguishable from this one.
+	 */
+	let pristine = true;
+
+	/**
 	 * Auto-save: debounced `$effect` that reacts to any change in
 	 * `form` once the page has finished loading. The `loadState` guard
 	 * prevents the effect's initial run (which fires against the
@@ -76,6 +78,11 @@
 		// what gets saved is the value at debounce-fire time, not the
 		// older value captured when the edit started.
 		$state.snapshot(form);
+
+		if (pristine) {
+			pristine = false;
+			return;
+		}
 
 		const handle = setTimeout(() => {
 			void save();
@@ -138,8 +145,7 @@
 		</p>
 		<h1 class="text-4xl font-semibold tracking-tight text-base-content">Tune the trainer</h1>
 		<p class="max-w-xl text-base-content/65">
-			Language, word budgets, classification thresholds, plan structure. Stored locally — no
-			account, no sync.
+			Language, passage length, classification thresholds. Stored locally — no account, no sync.
 		</p>
 	</header>
 
@@ -192,8 +198,7 @@
 			<div class="space-y-3 pt-2">
 				<h3 class="text-sm font-semibold tracking-tight">Mix in a second language</h3>
 				<p class="max-w-xl text-sm text-base-content/65">
-					Optionally drop quotes from a second language into real-text sessions. Bigram drills
-					always use the primary language.
+					Optionally draw some passages from a second language's quote bank.
 				</p>
 			</div>
 
@@ -273,67 +278,29 @@
 		<section class="space-y-6" aria-labelledby="budget-heading">
 			<div class="flex items-baseline gap-4">
 				<span class="font-mono text-xs text-base-content/40 tabular-nums">02</span>
-				<h2 id="budget-heading" class="text-xl font-semibold tracking-tight">Word budgets</h2>
+				<h2 id="budget-heading" class="text-xl font-semibold tracking-tight">Passage length</h2>
 			</div>
 			<p class="max-w-xl text-sm text-base-content/65">
-				Words per mini-session. The daily plan stacks several of each, so smaller values mean more,
-				shorter runs.
+				Words per passage. Shorter means more frequent verdicts and a ledger that updates more
+				often; longer means more evidence per session.
 			</p>
 
 			<dl class="divide-y divide-base-300 border-y border-base-300">
 				<div class="flex items-center justify-between gap-6 py-4">
 					<dt class="text-sm">
-						<label for="budget-drill" class="cursor-pointer">Bigram drill</label>
+						<label for="passage-words" class="cursor-pointer">Passage</label>
 						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
-							>default {DEFAULT_BIGRAM_DRILL_WORD_BUDGET}</span
+							>default {DEFAULT_PASSAGE_WORDS}</span
 						>
 					</dt>
 					<dd class="flex items-baseline gap-2">
 						<input
-							id="budget-drill"
+							id="passage-words"
 							type="number"
 							min="1"
 							class="w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
-							bind:value={form.wordBudgets!.bigramDrill}
-							data-testid="budget-drill"
-						/>
-						<span class="font-mono text-xs text-base-content/40">words</span>
-					</dd>
-				</div>
-				<div class="flex items-center justify-between gap-6 py-4">
-					<dt class="text-sm">
-						<label for="budget-realtext" class="cursor-pointer">Real text</label>
-						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
-							>default {DEFAULT_REAL_TEXT_WORD_BUDGET}</span
-						>
-					</dt>
-					<dd class="flex items-baseline gap-2">
-						<input
-							id="budget-realtext"
-							type="number"
-							min="1"
-							class="w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
-							bind:value={form.wordBudgets!.realText}
-							data-testid="budget-realtext"
-						/>
-						<span class="font-mono text-xs text-base-content/40">words</span>
-					</dd>
-				</div>
-				<div class="flex items-center justify-between gap-6 py-4">
-					<dt class="text-sm">
-						<label for="budget-diagnostic" class="cursor-pointer">Diagnostic</label>
-						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
-							>default {DEFAULT_DIAGNOSTIC_WORD_BUDGET}</span
-						>
-					</dt>
-					<dd class="flex items-baseline gap-2">
-						<input
-							id="budget-diagnostic"
-							type="number"
-							min="1"
-							class="w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
-							bind:value={form.wordBudgets!.diagnostic}
-							data-testid="budget-diagnostic"
+							bind:value={form.passageWords}
+							data-testid="passage-words"
 						/>
 						<span class="font-mono text-xs text-base-content/40">words</span>
 					</dd>
@@ -404,92 +371,17 @@
 			</dl>
 		</section>
 
-		<section class="space-y-6" aria-labelledby="plan-heading">
-			<div class="flex items-baseline gap-4">
-				<span class="font-mono text-xs text-base-content/40 tabular-nums">04</span>
-				<h2 id="plan-heading" class="text-xl font-semibold tracking-tight">Plan structure</h2>
-			</div>
-			<p class="max-w-xl text-sm text-base-content/65">
-				How many cycles per day, and how many accuracy/speed drill repetitions per cycle. Each cycle
-				ends with a real-text run.
-			</p>
-
-			<dl class="divide-y divide-base-300 border-y border-base-300">
-				<div class="flex items-center justify-between gap-6 py-4">
-					<dt class="text-sm">
-						<label for="plan-cycles" class="cursor-pointer">Cycles per day</label>
-						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
-							>default {DEFAULT_CYCLES_PER_DAY}</span
-						>
-					</dt>
-					<dd class="flex items-baseline gap-2">
-						<input
-							id="plan-cycles"
-							type="number"
-							min="1"
-							max="10"
-							class="w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
-							bind:value={form.planStructure!.cyclesPerDay}
-							data-testid="plan-cycles"
-						/>
-						<span class="font-mono text-xs text-base-content/40">cycles</span>
-					</dd>
-				</div>
-				<div class="flex items-center justify-between gap-6 py-4">
-					<dt class="text-sm">
-						<label for="plan-accuracy" class="cursor-pointer">Accuracy drills per cycle</label>
-						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
-							>default {DEFAULT_ACCURACY_DRILLS_PER_CYCLE}</span
-						>
-					</dt>
-					<dd class="flex items-baseline gap-2">
-						<input
-							id="plan-accuracy"
-							type="number"
-							min="0"
-							max="10"
-							class="w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
-							bind:value={form.planStructure!.accuracyDrillsPerCycle}
-							data-testid="plan-accuracy"
-						/>
-						<span class="font-mono text-xs text-base-content/40">reps</span>
-					</dd>
-				</div>
-				<div class="flex items-center justify-between gap-6 py-4">
-					<dt class="text-sm">
-						<label for="plan-speed" class="cursor-pointer">Speed drills per cycle</label>
-						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
-							>default {DEFAULT_SPEED_DRILLS_PER_CYCLE}</span
-						>
-					</dt>
-					<dd class="flex items-baseline gap-2">
-						<input
-							id="plan-speed"
-							type="number"
-							min="0"
-							max="10"
-							class="w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
-							bind:value={form.planStructure!.speedDrillsPerCycle}
-							data-testid="plan-speed"
-						/>
-						<span class="font-mono text-xs text-base-content/40">reps</span>
-					</dd>
-				</div>
-			</dl>
-		</section>
-
 		<section class="space-y-6" aria-labelledby="bigramcolor-heading">
 			<div class="flex items-baseline gap-4">
-				<span class="font-mono text-xs text-base-content/40 tabular-nums">05</span>
+				<span class="font-mono text-xs text-base-content/40 tabular-nums">04</span>
 				<h2 id="bigramcolor-heading" class="text-xl font-semibold tracking-tight">
 					Bigram difficulty coloring
 				</h2>
 			</div>
 			<p class="max-w-xl text-sm text-base-content/65">
-				Tint pending letters in drill text by the difficulty of the bigram landing on them — easier
-				transitions in green, harder ones in red. The metric follows the exercise: accuracy drills
-				use error rate, speed drills use mean transition time, real-text uses both. Only colors
-				letters you haven't typed yet, so live feedback isn't muddied.
+				Whether a passage opens with the tint on. This is only the opening state — the in-session
+				toggle switches between tinting error-prone pairs, tinting draggy ones, and off, whatever
+				this is set to. Only pending letters are colored, so live feedback isn't muddied.
 			</p>
 
 			<dl class="divide-y divide-base-300 border-y border-base-300">
