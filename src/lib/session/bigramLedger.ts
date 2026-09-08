@@ -6,9 +6,9 @@ import { BIGRAM_CLASSIFICATION_WINDOW, type KeystrokeEvent } from '../support/co
  * it down. Targets can start the drill already in debt — `skill/debt` reads
  * what their history still owes.
  *
- * The session is scored as the change in total debt, so a drill finishes ahead
- * only if it leaves less owed than it found, and a mistake costs the difference
- * it actually makes rather than a flat penalty.
+ * The drill reports two stocks rather than their difference: repeats paid off
+ * and repeats added. Both only grow, so a bad patch never erases the clean work
+ * that came before it.
  *
  * Attribution matches `skill/extraction.ts`: the bigram at position `p` is
  * `text[p - 1] + text[p]`, charged on the right-hand character.
@@ -35,14 +35,15 @@ export interface LedgerEntry {
 
 export interface LedgerSnapshot {
 	entries: LedgerEntry[];
+	/** Repeats paid off this drill. Only ever grows — clean work is never taken back. */
+	repaid: number;
 	/**
-	 * Debt owed at the start of the drill minus debt owed now. Positive means
-	 * the session left the typist better off than it found them, negative
-	 * worse. A mistake therefore costs the *difference* it makes: erring on a
-	 * bigram already owing 15 takes it back to 20 and costs 5, not 20.
+	 * Repeats mistakes have added this drill. A mistake adds the *difference* it
+	 * makes: erring on a bigram already owing 15 takes it back to 20 and adds 5,
+	 * not 20. Only ever grows.
 	 */
-	netRepaid: number;
-	/** Full-bar value for `netRepaid` in either direction. */
+	added: number;
+	/** Full-lane value for both stocks: the most this drill could pay back. */
 	scale: number;
 }
 
@@ -60,11 +61,15 @@ export class BigramLedger {
 	private readonly entries = new Map<string, LedgerEntry>();
 	/** Correctness of the *first* input at each position — retypes are ignored. */
 	private readonly firstInputs = new Map<number, boolean>();
+	private readonly scale: number;
 	private debtAtStart = 0;
+	private repaid = 0;
+	private added = 0;
 
 	constructor({ text, targetBigrams, initialDebt, damage = DEFAULT_DAMAGE }: LedgerInput) {
 		this.text = text;
 		this.damage = damage;
+		let occurrences = 0;
 		for (const bigram of targetBigrams) {
 			if (this.entries.has(bigram)) continue;
 			const debt = Math.min(damage, Math.max(0, initialDebt?.get(bigram) ?? 0));
@@ -76,7 +81,12 @@ export class BigramLedger {
 				total: countOccurrences(text, bigram)
 			});
 			this.debtAtStart += debt;
+			occurrences += this.entries.get(bigram)!.total;
 		}
+		// A clean occurrence pays at most one repeat, so the drill can never pay
+		// back more than it contains. `damage` keeps the lanes sane when nothing
+		// is owed on arrival and the only movement can be a mistake.
+		this.scale = Math.max(Math.min(this.debtAtStart, occurrences), damage);
 	}
 
 	/** Feed every keystroke, retypes included — only first inputs count. */
@@ -102,6 +112,7 @@ export class BigramLedger {
 				entry = { bigram, debt: 0, wasDamaged: false, cleanHits: 0, total: 0 };
 				this.entries.set(bigram, entry);
 			}
+			this.added += this.damage - entry.debt;
 			entry.debt = this.damage;
 			entry.wasDamaged = true;
 			return;
@@ -109,18 +120,18 @@ export class BigramLedger {
 
 		if (!entry) return;
 		entry.cleanHits++;
-		if (entry.debt > 0) entry.debt--;
+		if (entry.debt > 0) {
+			entry.debt--;
+			this.repaid++;
+		}
 	}
 
 	snapshot(): LedgerSnapshot {
-		const entries = [...this.entries.values()].map((e) => ({ ...e }));
-		const debtNow = entries.reduce((sum, e) => sum + e.debt, 0);
 		return {
-			entries,
-			netRepaid: this.debtAtStart - debtNow,
-			// With nothing owed at the start there is no repayment to scale
-			// against, so one fresh mistake fills the bar.
-			scale: Math.max(this.debtAtStart, this.damage)
+			entries: [...this.entries.values()].map((e) => ({ ...e })),
+			repaid: this.repaid,
+			added: this.added,
+			scale: this.scale
 		};
 	}
 }

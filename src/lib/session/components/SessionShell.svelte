@@ -165,13 +165,14 @@
 	const ledgerEntries = $derived(
 		ledgerSnapshot ? new Map(ledgerSnapshot.entries.map((e) => [e.bigram, e])) : undefined
 	);
-	// Signed: the drill ends ahead only if it leaves less debt than it found.
-	const repaidPct = $derived.by(() => {
-		if (!ledgerSnapshot || ledgerSnapshot.scale <= 0) return 0;
-		const pct = (ledgerSnapshot.netRepaid / ledgerSnapshot.scale) * 100;
-		return Math.max(-100, Math.min(100, pct));
-	});
-	const worseOff = $derived(repaidPct < 0);
+	// Two stocks, never netted against each other: repeats paid off and repeats
+	// mistakes added. Both only grow, so a bad patch can't erase clean work.
+	const lanePct = (value: number) =>
+		ledgerSnapshot && ledgerSnapshot.scale > 0
+			? Math.min(100, (value / ledgerSnapshot.scale) * 100)
+			: 0;
+	const paidPct = $derived(lanePct(ledgerSnapshot?.repaid ?? 0));
+	const addedPct = $derived(lanePct(ledgerSnapshot?.added ?? 0));
 
 	// Pacer wiring. `paceForMode` resolves to 0 for non-speed drills or
 	// when the user has no diagnostic baseline — `ghostPosition` stays
@@ -346,27 +347,39 @@
 	<div class="space-y-3">
 		{#if ledgerSnapshot}
 			<!--
-				Debt-change meter: total repeats owed at the start of the drill
-				minus what is owed now. Green grows from the left as clean repeats
-				pay debt off; red grows back from the right once mistakes have
-				added more than the session has cleared.
+				Two lanes, not one net bar: repeats paid off this drill above,
+				repeats mistakes added below, on a shared scale. Netting them
+				would let a bad patch erase the clean work that came before it.
 			-->
-			<div
-				class="flex h-1 w-full overflow-hidden rounded-full bg-base-300/60"
-				class:justify-end={worseOff}
-				role="progressbar"
-				aria-label="Bigram debt repaid this drill"
-				aria-valuemin="-100"
-				aria-valuemax="100"
-				aria-valuenow={Math.round(repaidPct)}
-				data-testid="debt-change"
-			>
+			<div class="space-y-1">
 				<div
-					class="h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none {worseOff
-						? 'bg-error'
-						: 'bg-success'}"
-					style="width: {Math.abs(repaidPct)}%"
-				></div>
+					class="h-1 w-full overflow-hidden rounded-full bg-base-300/60"
+					role="progressbar"
+					aria-label="Repeats paid back this drill"
+					aria-valuemin="0"
+					aria-valuemax="100"
+					aria-valuenow={Math.round(paidPct)}
+					data-testid="debt-paid"
+				>
+					<div
+						class="h-full rounded-full bg-success transition-[width] duration-300 ease-out motion-reduce:transition-none"
+						style="width: {paidPct}%"
+					></div>
+				</div>
+				<div
+					class="h-1 w-full overflow-hidden rounded-full bg-base-300/60"
+					role="progressbar"
+					aria-label="Repeats added by mistakes this drill"
+					aria-valuemin="0"
+					aria-valuemax="100"
+					aria-valuenow={Math.round(addedPct)}
+					data-testid="debt-added"
+				>
+					<div
+						class="h-full rounded-full bg-error transition-[width] duration-300 ease-out motion-reduce:transition-none"
+						style="width: {addedPct}%"
+					></div>
+				</div>
 			</div>
 		{/if}
 		<div

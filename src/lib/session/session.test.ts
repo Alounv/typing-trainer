@@ -63,12 +63,12 @@ describe('BigramLedger', () => {
 		expect(entry(ledger, 'he').total).toBe(2);
 	});
 
-	it('scores nothing for a clean drill on bigrams that owe nothing', () => {
+	it('books nothing either way for a clean drill on bigrams that owe nothing', () => {
 		const ledger = new BigramLedger({ text: 'the the', targetBigrams: ['th'] });
 		type(ledger, 'the the', 'the the');
 		expect(entry(ledger, 'th').cleanHits).toBe(2);
 		// Nothing was owed, so nothing was repaid — the drill held its ground.
-		expect(ledger.snapshot().netRepaid).toBe(0);
+		expect(ledger.snapshot()).toMatchObject({ repaid: 0, added: 0 });
 	});
 
 	it('scores repayment of debt the typist walked in with', () => {
@@ -82,9 +82,9 @@ describe('BigramLedger', () => {
 			])
 		});
 		type(ledger, text, text);
-		expect(ledger.snapshot().netRepaid).toBe(3);
-		// Full bar = clearing everything that was owed on arrival.
-		expect(ledger.snapshot().scale).toBe(DEFAULT_DAMAGE + 10);
+		expect(ledger.snapshot()).toMatchObject({ repaid: 3, added: 0 });
+		// A full lane is the most this drill could pay back: three occurrences.
+		expect(ledger.snapshot().scale).toBe(DEFAULT_DAMAGE);
 	});
 
 	it('falls back to one window of scale when nothing is owed on arrival', () => {
@@ -131,22 +131,23 @@ describe('BigramLedger', () => {
 		const text = 'th '.repeat(8).trim();
 		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
 		type(ledger, text, 't~ th th th th th');
-		// One mistake (−20) then 5 clean repeats (+5): debt back down to 15.
+		// One mistake (+20 added) then 5 clean repeats (+5 paid).
 		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE - 5);
-		expect(ledger.snapshot().netRepaid).toBe(5 - DEFAULT_DAMAGE);
+		expect(ledger.snapshot()).toMatchObject({ repaid: 5, added: DEFAULT_DAMAGE });
 
-		// Erring again only takes 15 back up to 20, so it costs 5, not 20.
+		// Erring again only takes 15 back up to 20, so it adds 5, not 20 — and
+		// the 5 already paid back stays on the board.
 		type(ledger, text, 't~ th th th th th t~');
 		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE);
-		expect(ledger.snapshot().netRepaid).toBe(-DEFAULT_DAMAGE);
+		expect(ledger.snapshot()).toMatchObject({ repaid: 5, added: DEFAULT_DAMAGE + 5 });
 	});
 
-	it('goes negative by a full window for a mistake on a bigram that owed nothing', () => {
+	it('adds a full window for a mistake on a bigram that owed nothing', () => {
 		const text = 'th th th th th th';
 		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
 		type(ledger, text, 'th th th th th t~');
-		// The five clean repeats paid off nothing — the mistake is the whole story.
-		expect(ledger.snapshot().netRepaid).toBe(-DEFAULT_DAMAGE);
+		// The five clean repeats paid off nothing — nothing was owed.
+		expect(ledger.snapshot()).toMatchObject({ repaid: 0, added: DEFAULT_DAMAGE });
 	});
 
 	it('charges a mistake on the right-hand char only', () => {
@@ -169,7 +170,7 @@ describe('BigramLedger', () => {
 		type(ledger, text, 't~');
 		ledger.record(event(1, 'h', 'h'));
 		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE);
-		expect(ledger.snapshot().netRepaid).toBe(-DEFAULT_DAMAGE);
+		expect(ledger.snapshot()).toMatchObject({ repaid: 0, added: DEFAULT_DAMAGE });
 	});
 
 	it('charges a mistake against seeded debt too', () => {
@@ -181,7 +182,7 @@ describe('BigramLedger', () => {
 		});
 		type(ledger, text, 't~');
 		// History already owed 17; the mistake only adds the missing 3.
-		expect(ledger.snapshot().netRepaid).toBe(-3);
+		expect(ledger.snapshot().added).toBe(3);
 	});
 
 	it('tracks debt for a mistyped bigram that was never a target', () => {
@@ -190,6 +191,6 @@ describe('BigramLedger', () => {
 		type(ledger, text, 'th th th th th th a~');
 		expect(entry(ledger, 'th').debt).toBe(0);
 		expect(entry(ledger, 'ab').debt).toBe(DEFAULT_DAMAGE);
-		expect(ledger.snapshot().netRepaid).toBe(-DEFAULT_DAMAGE);
+		expect(ledger.snapshot().added).toBe(DEFAULT_DAMAGE);
 	});
 });

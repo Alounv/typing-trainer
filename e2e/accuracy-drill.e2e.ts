@@ -3,11 +3,12 @@ import { runDiagnostic } from './fixtures';
 
 /**
  * Accuracy drill feedback loop: mistyping a target bigram damages its chip and
- * pushes the debt meter into the red; later clean occurrences of the same
- * bigram pay repeats back and the meter climbs again.
+ * fills the red lane; later clean occurrences of the same bigram fill the green
+ * one. The two stocks are independent — repayment never shrinks the red lane,
+ * and a mistake never shrinks the green.
  */
 test(
-	'accuracy drill: a mistyped bigram is damaged, then partly repaid',
+	'accuracy drill: a mistake fills the red lane, clean repeats fill the green one',
 	{ annotation: { type: 'slow', description: 'diagnostic pass + accuracy-drill pass end-to-end' } },
 	async ({ page }) => {
 		await runDiagnostic(page);
@@ -44,22 +45,24 @@ test(
 		await page.keyboard.type(target![1] === 'z' ? 'q' : 'z');
 
 		await expect(chip).toHaveAttribute('data-state', 'damaged');
-		const meter = page.getByTestId('debt-change');
-		await expect(meter).toBeVisible();
-		// The mistake added debt the drill has not paid back — the meter is red.
-		const afterMistake = Number(await meter.getAttribute('aria-valuenow'));
-		expect(afterMistake).toBeLessThan(0);
+		const paid = page.getByTestId('debt-paid');
+		const added = page.getByTestId('debt-added');
+		// The mistake fills the red lane; the green lane is untouched by it.
+		await expect(added).not.toHaveAttribute('aria-valuenow', '0');
+		await expect(paid).toHaveAttribute('aria-valuenow', '0');
+		const addedAfterMistake = Number(await added.getAttribute('aria-valuenow'));
 
 		// Correct the miss, then type through two more clean occurrences: each one
-		// pays a repeat back, so the meter climbs even though the chip still owes.
+		// pays a repeat back, and the red lane stays where the mistake left it.
 		await page.keyboard.press('Backspace');
-		const repaid = occurrences[2] + 2;
-		await page.keyboard.type(passage.slice(start + 1, repaid));
+		const repaidAt = occurrences[2] + 2;
+		await page.keyboard.type(passage.slice(start + 1, repaidAt));
 		await expect
-			.poll(async () => Number(await meter.getAttribute('aria-valuenow')))
-			.toBeGreaterThan(afterMistake);
+			.poll(async () => Number(await paid.getAttribute('aria-valuenow')))
+			.toBeGreaterThan(0);
+		await expect(added).toHaveAttribute('aria-valuenow', String(addedAfterMistake));
 
-		await page.keyboard.type(passage.slice(repaid));
+		await page.keyboard.type(passage.slice(repaidAt));
 		await page.waitForURL(/\/session\/[^/]+\/summary$/);
 		await expect(page.getByRole('heading', { name: 'Session summary' })).toBeVisible();
 	}
