@@ -201,7 +201,10 @@ export interface UserSettings {
 		accuracyDrillsPerCycle: number;
 		speedDrillsPerCycle: number;
 	};
-	/** Tint pending letters by the difficulty of the incoming bigram. */
+	/**
+	 * Whether a session opens with the pending-letter tint on. Only the opening
+	 * state — the in-session toggle can turn it on or off regardless.
+	 */
 	colorizeBigramDifficulty?: boolean;
 }
 

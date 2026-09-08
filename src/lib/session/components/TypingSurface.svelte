@@ -82,13 +82,15 @@
 		const mode = difficultyMode;
 		let cancelled = false;
 		void (async () => {
+			// No profile gate here: `colorizeBigramDifficulty` decides which tint a
+			// session *opens* with (see `session/initialTint`). Once the user has a
+			// toggle, a request for a tint is a request for a tint.
 			const profile = await getProfile();
 			if (cancelled) return;
-			if (!profile?.colorizeBigramDifficulty) return;
 			// Recent-window pool, not lifetime: keeps reveal cost bounded as history grows
 			// and feeds `summarizeBigrams` so the tint shares `BIGRAM_CLASSIFICATION_WINDOW`
 			// with the rolling-window classifier.
-			const thresholds = profile.thresholds ?? DEFAULT_THRESHOLDS;
+			const thresholds = profile?.thresholds ?? DEFAULT_THRESHOLDS;
 			const recent = hydrateSessions(await getRecentSessions(), thresholds);
 			if (cancelled) return;
 			const summaries = summarizeBigrams(recent, undefined, thresholds);

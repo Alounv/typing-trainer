@@ -508,7 +508,7 @@
 								class="inline-block h-3.5 w-3.5 rounded-[2px] border border-base-content/35 transition-colors peer-checked:border-primary peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-base-100"
 								aria-hidden="true"
 							></span>
-							<span class="text-sm font-medium">Colorize pending letters</span>
+							<span class="text-sm font-medium">Start sessions with a tint</span>
 						</label>
 					</dt>
 					<dd>

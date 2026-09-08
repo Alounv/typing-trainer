@@ -15,15 +15,18 @@
 	 * finalize, persist, and redirect. Keeps all three session routes
 	 * (diagnostic, bigram-drill, real-text) from duplicating the same ~100 lines.
 	 */
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { SvelteSet } from 'svelte/reactivity';
 	import TypingSurface from './TypingSurface.svelte';
 	import DrillTargets from './DrillTargets.svelte';
+	import TintToggle from './TintToggle.svelte';
 	import type { KeystrokeEvent } from '$lib/support/core';
 	import type { DiagnosticReport, DrillMode, SessionType, StoredSession } from '$lib/support/core';
 	import { SessionRunner } from '../runner';
 	import type { DifficultyMode } from '../bigramDifficulty';
+	import { resolveInitialTint } from '../initialTint';
 	import { computeGhostPosition, paceForMode } from '../pacer';
 	import { BigramLedger, type LedgerSnapshot } from '../bigramLedger';
 	import { saveSession } from '../persistence';
@@ -143,14 +146,22 @@
 
 	const progressPct = $derived(Math.round((position / text.length) * 100));
 
-	// Real-text and diagnostic intentionally stay neutral.
-	const difficultyMode: DifficultyMode | null = (() => {
-		if (type === 'bigram-drill') {
-			if (drillMode === 'speed') return 'speed';
-			if (drillMode === 'accuracy') return 'errors';
-		}
-		return null;
-	})();
+	// The tint is the user's, not the route's. It opens on whatever the last
+	// session's verdict calls for and can be flipped at any point, including
+	// off. `tintChosen` stops the async default from landing on top of a choice
+	// the user already made while it was in flight.
+	let difficultyMode = $state<DifficultyMode | null>(null);
+	let tintChosen = false;
+
+	onMount(async () => {
+		const suggested = await resolveInitialTint();
+		if (!tintChosen) difficultyMode = suggested;
+	});
+
+	function chooseTint(next: DifficultyMode | null) {
+		tintChosen = true;
+		difficultyMode = next;
+	}
 
 	// Accuracy drills run a debt ledger: a mistake puts the bigram four clean
 	// repeats in debt, and each clean occurrence pays one back. The chips show
@@ -327,6 +338,8 @@
 				{/if}
 			</dl>
 		{/if}
+
+		<TintToggle value={difficultyMode} onChange={chooseTint} />
 
 		{#if targetBigrams && targetBigrams.length > 0}
 			<!--
