@@ -21,14 +21,14 @@ two **support layers**; routes compose domains through a thin route-local
 
 ## Domains
 
-| Domain       | Responsibility                                          | Public surface                   |
-| ------------ | ------------------------------------------------------- | -------------------------------- |
-| **Corpus**   | Produces the text the user will type.                   | `generateText`, registry loaders |
-| **Plan**     | Resolves "what should the user do next?".               | `computePlan`, `resolveDrillMix` |
-| **Session**  | Runs the live typing loop and saves the result.         | `<SessionShell>`                 |
-| **Skill**    | Measures how well the user types, from raw keystrokes.  | `hydrateSession`, assessment     |
-| **Progress** | Turns session history into views for the user.          | `<Summary>`, `<Analytics>`       |
-| **Settings** | Reads and writes the user profile; makes data portable. | `profile`, `<DataTransfer>`      |
+| Domain       | Responsibility                                          | Public surface                     |
+| ------------ | ------------------------------------------------------- | ---------------------------------- |
+| **Corpus**   | Produces or selects the text the user will type.        | `generateText`, `scoreQuoteByDebt` |
+| **Plan**     | Resolves "what should the user do next?".               | `computePlan`, `resolveDrillMix`   |
+| **Session**  | Runs the live typing loop and saves the result.         | `<SessionShell>`                   |
+| **Skill**    | Measures how well the user types, from raw keystrokes.  | `hydrateSession`, `assessPacing`   |
+| **Progress** | Turns session history into views for the user.          | `<Summary>`, `<Analytics>`         |
+| **Settings** | Reads and writes the user profile; makes data portable. | `profile`, `<DataTransfer>`        |
 
 ## Support layers (not domains)
 
@@ -109,6 +109,10 @@ flowchart TB
     D_Plan --> D_Corpus
     D_Plan --> D_Settings
     D_Session --> D_Skill
+    D_Session --> D_Settings
+    D_Progress --> D_Skill
+    %% Real-text loader hydrates history to price the debt a passage repays.
+    L_Real --> D_Skill
 
     classDef route fill:#1e3a5f,stroke:#5aa9e6,color:#e6f2ff
     classDef loader fill:#3d2b5a,stroke:#a78bfa,color:#f0e6ff
@@ -118,6 +122,44 @@ flowchart TB
     class L_Drill,L_Real,L_Diag,L_Summ,L_Ana loader
     class D_Corpus,D_Plan,D_Session,D_Skill,D_Progress,D_Settings domain
 ```
+
+## The training loop
+
+Speed and accuracy are one curve, not two skills, so there is one session type
+and one working band (~95-98% accuracy). The band is enforced by a loop that
+closes across sessions rather than by separate modes:
+
+```
+   passage            typing              verdict
+   selection  ──────▶  surface   ──────▶  (summary)
+       ▲                  ▲                   │
+       │                  │  opening tint     │
+       │                  └───────────────────┘
+       │                                      │
+       └────────── bigram debt ◀───────────────┘
+                  (skill/debt)
+```
+
+Three readings of the same history, each with one job:
+
+| Reading                                      | Decides                         |
+| -------------------------------------------- | ------------------------------- |
+| `assessPacing` (wpm + error rate)            | what the summary says           |
+| the same verdict, next session               | which tint the passage opens on |
+| `computeAllBigramDebts` → `scoreQuoteByDebt` | which passage comes next        |
+
+Only `too-careful` — under 2% errors _and_ slower than usual — means speed up,
+so only that flips the tint to draggy pairs. Everything else leaves it on
+error-prone ones, and the typist can override or turn it off at any point.
+
+The tint is deliberately non-prescriptive. A pacer tells you what to do; the
+tint changes what you _notice_ and leaves the regulating to you.
+
+Delivery and accounting are separate choices: real words are what you type,
+transitions are what gets credited. Typing `brown` pays down `br ro ow wn`, so
+`crown` benefits without ever being drilled — which is why the design needs no
+corpus of all words. Real prose supplies the words; the ledger only ever holds
+a few hundred transitions.
 
 ## Storage model: evidence, not conclusions
 
