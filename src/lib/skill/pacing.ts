@@ -1,0 +1,82 @@
+import type { SessionSummary } from '../support/core';
+import {
+	PACING_CAUTIOUS_ERROR_RATE,
+	PACING_COMPARISON_WINDOW,
+	PACING_TARGET_ERROR_RATE
+} from '../support/core';
+
+/**
+ * How the typist paced one session.
+ *
+ * `too-careful` is the verdict the rest of the app acts on: it is the one case
+ * where the answer is *speed up*, so it is what flips the in-session tint from
+ * error-prone pairs to draggy ones.
+ */
+export type PacingVerdict = 'well-paced' | 'too-careful' | 'too-fast';
+
+/**
+ * Only the scalar fields — no aggregates. Both `SessionSummary` and a raw
+ * `StoredSession` row satisfy it, so callers that just want the verdict need
+ * not decode keystroke streams to get it.
+ */
+export type PacingInput = Pick<SessionSummary, 'id' | 'timestamp' | 'type' | 'wpm' | 'errorRate'>;
+
+export interface PacingAssessment {
+	verdict: PacingVerdict;
+	errorRate: number;
+	wpm: number;
+	/** Mean WPM of the comparison window; `undefined` when there is no history. */
+	recentWpm: number | undefined;
+}
+
+/**
+ * Error rate decides the verdict; WPM only splits the clean band in two.
+ *
+ *                    <2%          2-5%         >5%
+ *   at/above pace    well-paced   well-paced   too-fast
+ *   below pace       too-careful  well-paced   too-fast
+ *
+ * Being slower than usual is not itself a finding — plenty of sessions are
+ * just slow. It is only worth saying when accuracy is *also* spotless, which
+ * is the one combination that means there is speed left on the table.
+ *
+ * `history` may include `session` itself — it is excluded by id — and needs no
+ * particular order.
+ */
+export function assessPacing(
+	session: PacingInput,
+	history: readonly PacingInput[] = []
+): PacingAssessment {
+	const recentWpm = recentAverageWpm(session, history);
+	// No baseline yet: with nothing to be slower than, a first session must not
+	// read as too careful. Errors alone then decide.
+	const keepingPace = recentWpm === undefined || session.wpm >= recentWpm;
+
+	return {
+		verdict: verdictFor(session.errorRate, keepingPace),
+		errorRate: session.errorRate,
+		wpm: session.wpm,
+		recentWpm
+	};
+}
+
+function verdictFor(errorRate: number, keepingPace: boolean): PacingVerdict {
+	if (errorRate > PACING_TARGET_ERROR_RATE) return 'too-fast';
+	if (errorRate >= PACING_CAUTIOUS_ERROR_RATE) return 'well-paced';
+	return keepingPace ? 'well-paced' : 'too-careful';
+}
+
+function recentAverageWpm(
+	session: PacingInput,
+	history: readonly PacingInput[]
+): number | undefined {
+	const comparable = history
+		.filter(
+			(s) => s.id !== session.id && s.type === session.type && s.timestamp < session.timestamp
+		)
+		.sort((a, b) => b.timestamp - a.timestamp)
+		.slice(0, PACING_COMPARISON_WINDOW);
+
+	if (comparable.length === 0) return undefined;
+	return comparable.reduce((sum, s) => sum + s.wpm, 0) / comparable.length;
+}

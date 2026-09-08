@@ -4,8 +4,9 @@
  *
  * Owns the whole path from keystrokes to judgement: the stream codec, first-input
  * post-processing, per-bigram extraction and classification (slow/fast,
- * accurate/error-prone), the diagnostic report (baseline WPM), and the live views
- * the planner reads (priority targets, undertrained).
+ * accurate/error-prone), the end-of-session pacing verdict, the diagnostic report
+ * (baseline WPM), and the live views the planner reads (priority targets,
+ * undertrained).
  *
  * Stored rows hold the keystroke stream; the aggregates every consumer reads are
  * measured here on read (`hydrateSession`), so a stored row and a threshold change
@@ -23,3 +24,5 @@ export { summarizeBigrams, buildLivePriorityTargets, buildLiveUndertrained } fro
 export type { BigramSummary } from './assessment';
 export { classifyBigram, summarizeSamples } from './classification';
 export { computeBigramDebts } from './debt';
+export { assessPacing } from './pacing';
+export type { PacingAssessment, PacingInput, PacingVerdict } from './pacing';

@@ -56,6 +56,27 @@ export const ERROR_TIME_BUDGET_MS = 600;
  */
 export const PRIORITY_FREQUENCY_EXPONENT = 0.5;
 
+// --- Pacing bands ---
+
+/**
+ * The ~95-98% working band, as the two edges of the end-of-session verdict.
+ *
+ * Speed and accuracy are one curve: 100% accuracy means speed left unclaimed,
+ * and errors past 5% cost more in corrections than the pace buys. Deliberately
+ * separate from `ClassificationThresholds` — those judge a *bigram* over a
+ * rolling window, these judge a *session* against how hard the typist pushed.
+ */
+export const PACING_CAUTIOUS_ERROR_RATE = 0.02;
+export const PACING_TARGET_ERROR_RATE = 0.05;
+
+/**
+ * Sessions of the same type compared against for "am I slower than usual".
+ * Same-type only: drill passages are bigram-dense and type slower than prose,
+ * so a cross-type average would read every real-text session as a personal
+ * best.
+ */
+export const PACING_COMPARISON_WINDOW = 10;
+
 // --- Shared conversions / windows ---
 
 /** 5 chars ≈ 1 word — translates word budgets into char targets. */

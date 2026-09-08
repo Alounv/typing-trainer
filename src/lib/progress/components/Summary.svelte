@@ -2,10 +2,11 @@
 	import type { ClassificationThresholds, SessionSummary } from '$lib/support/core';
 	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
-	import { summarizeBigrams } from '$lib/skill';
+	import { assessPacing, summarizeBigrams } from '$lib/skill';
 	import { detectWindowedMovements, detectMilestone, movementConcernsFocus } from '../celebrations';
 	import { buildBigramTrend } from '../metrics';
 	import BigramMovements from './BigramMovements.svelte';
+	import PacingBanner from './PacingBanner.svelte';
 	import MilestoneBanner from './MilestoneBanner.svelte';
 	import BigramTable from './BigramTable.svelte';
 
@@ -20,6 +21,11 @@
 	let { session, statsSessions, corpusFrequencies = undefined, thresholds }: Props = $props();
 
 	const milestone = $derived(detectMilestone(session, statsSessions));
+
+	// Needs only the scalar wpm/errorRate, so this costs nothing beyond what the
+	// page already loaded. `statsSessions` includes this session; it excludes
+	// itself by id.
+	const pacing = $derived(assessPacing(session, statsSessions));
 
 	// Compare windowed classifications before vs. after this session so movements
 	// reflect the user's overall standing — same view as the bigram table — rather
@@ -60,6 +66,8 @@
 </script>
 
 <MilestoneBanner event={milestone} />
+
+<PacingBanner assessment={pacing} />
 
 <section class="space-y-4">
 	<dl class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));">
