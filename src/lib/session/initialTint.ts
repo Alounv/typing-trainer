@@ -8,7 +8,7 @@ import type { DifficultyMode } from './bigramDifficulty';
  * Which tint a session opens with.
  *
  * Not persisted, and not a preference — it answers the last session's verdict.
- * Only `too-careful` means *go faster*, so only that flips the tint to the
+ * Only `room-to-push` means *go faster*, so only that flips the tint to the
  * draggy pairs (blue); every other verdict leaves it on the error-prone ones
  * (yellow). The user can override it mid-session; this is just the opening
  * position.
@@ -32,5 +32,5 @@ export async function resolveInitialTint(): Promise<DifficultyMode | null> {
 
 	const last = recent[0];
 	if (!last) return 'errors';
-	return assessPacing(last, recent).verdict === 'too-careful' ? 'speed' : 'errors';
+	return assessPacing(last, recent).verdict === 'room-to-push' ? 'speed' : 'errors';
 }

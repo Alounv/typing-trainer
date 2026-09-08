@@ -642,13 +642,14 @@ describe('assessPacing', () => {
 		paced({ id: 'h2', timestamp: 2_000, wpm: 65 })
 	];
 
-	// The whole 2x3 grid. `keepingPace` is expressed as the WPM the session hit
-	// against a 60 WPM average, so the table reads the way the docs describe it.
+	// The whole grid, against a 60 WPM average. How clean a passage was under
+	// the ceiling makes no difference — 0.5% and 4% both leave pace to decide,
+	// which is why there is no second error threshold.
 	it.each<[string, number, number, PacingVerdict]>([
-		['clean and quick — nothing to fix', 0.01, 70, 'well-paced'],
-		['clean but slow — the one case that says speed up', 0.01, 50, 'too-careful'],
-		['in band, quick', 0.03, 70, 'well-paced'],
-		['in band, slow — still in band, so still fine', 0.03, 50, 'well-paced'],
+		['spotless and quick', 0.005, 70, 'well-paced'],
+		['spotless and clearly slow', 0.005, 50, 'room-to-push'],
+		['in band and quick', 0.04, 70, 'well-paced'],
+		['in band but clearly slow — the case a band-only verdict got wrong', 0.04, 50, 'room-to-push'],
 		['messy but quick — back off', 0.12, 70, 'too-fast'],
 		['messy and slow — still back off; slowness is not the excuse', 0.12, 50, 'too-fast']
 	])('%s', (_label, errorRate, wpm, expected) => {
@@ -657,21 +658,28 @@ describe('assessPacing', () => {
 		expect(result.recentWpm).toBe(60);
 	});
 
-	// Both edges decide a verdict, so they are pinned rather than left to
-	// whichever way the comparison happens to fall. Slow throughout, so the
-	// cautious band resolves to `too-careful` and the boundary is visible.
+	// The one error threshold left, pinned on both sides.
 	it.each<[number, PacingVerdict]>([
-		[0.0199, 'too-careful'],
-		[0.02, 'well-paced'],
 		[0.05, 'well-paced'],
 		[0.0501, 'too-fast']
-	])('error rate %f reads as %s', (errorRate, expected) => {
-		expect(assessPacing(paced({ errorRate, wpm: 50 }), sixtyWpmHistory).verdict).toBe(expected);
+	])('error rate %f reads as %s at full pace', (errorRate, expected) => {
+		expect(assessPacing(paced({ errorRate, wpm: 70 }), sixtyWpmHistory).verdict).toBe(expected);
+	});
+
+	// The dead zone is the whole reason this verdict stays rare: without it,
+	// half of anyone's sessions are below their own mean and would say push.
+	it.each<[string, number, PacingVerdict]>([
+		['a hair under the average is noise, not timidity', 59.9, 'well-paced'],
+		['still inside the margin', 57.1, 'well-paced'],
+		['just past the margin', 56.9, 'room-to-push'],
+		['clearly short', 50, 'room-to-push']
+	])('%s (%f vs a 60 average)', (_label, wpm, expected) => {
+		expect(assessPacing(paced({ errorRate: 0.01, wpm }), sixtyWpmHistory).verdict).toBe(expected);
 	});
 
 	it('reports no baseline on a first session and assumes the pace was fine', () => {
-		// Without history there is nothing to be slower than, so the clean-and-slow
-		// cell must not fire — a first session would always read as too careful.
+		// Without history there is nothing to be slower than, so a first session
+		// must not be told it left speed on the table.
 		const result = assessPacing(paced({ errorRate: 0.01, wpm: 5 }), []);
 		expect(result.recentWpm).toBeUndefined();
 		expect(result.verdict).toBe('well-paced');
@@ -695,7 +703,7 @@ describe('assessPacing', () => {
 			...drills
 		]);
 		expect(result.recentWpm).toBe(60);
-		expect(result.verdict).toBe('too-careful');
+		expect(result.verdict).toBe('room-to-push');
 	});
 
 	it('ignores sessions newer than the one being judged', () => {
@@ -717,8 +725,6 @@ describe('assessPacing', () => {
 	});
 
 	it('treats exactly matching the recent average as keeping pace', () => {
-		// The other boundary that decides a verdict: at the average the typist is
-		// not slower than usual, so a clean session is fine rather than timid.
 		expect(assessPacing(paced({ errorRate: 0.01, wpm: 60 }), sixtyWpmHistory).verdict).toBe(
 			'well-paced'
 		);

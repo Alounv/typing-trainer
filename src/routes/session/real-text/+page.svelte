@@ -36,6 +36,6 @@
 		type="real-text"
 		text={state.text}
 		title="Real text"
-		approach="Aim for a few errors, not none — somewhere around 2-5%. Keep moving; nothing here blocks you, and the verdict comes at the end."
+		approach="Push until errors show, then hold there — 5% is the ceiling. Keep moving; nothing here blocks you, and the verdict comes at the end."
 	/>
 {/if}

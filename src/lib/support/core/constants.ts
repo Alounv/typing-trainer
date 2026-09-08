@@ -55,15 +55,24 @@ export const PRIORITY_FREQUENCY_EXPONENT = 0.5;
 // --- Pacing bands ---
 
 /**
- * The ~95-98% working band, as the two edges of the end-of-session verdict.
+ * Where accuracy stops paying for the pace it buys.
  *
- * Speed and accuracy are one curve: 100% accuracy means speed left unclaimed,
- * and errors past 5% cost more in corrections than the pace buys. Deliberately
- * separate from `ClassificationThresholds` — those judge a *bigram* over a
- * rolling window, these judge a *session* against how hard the typist pushed.
+ * Speed and accuracy are one curve, and past this the corrections cost more
+ * than the speed is worth. Deliberately separate from
+ * `ClassificationThresholds` — those judge a *bigram* over a rolling window,
+ * this judges a *session* against how hard the typist pushed.
  */
-export const PACING_CAUTIOUS_ERROR_RATE = 0.02;
 export const PACING_TARGET_ERROR_RATE = 0.05;
+
+/**
+ * How far under the recent average counts as slow.
+ *
+ * Without a dead zone this fires on about half of all sessions — half of
+ * anyone's sessions land below their own mean, by definition — and a verdict
+ * that common stops being read. 5% keeps it to shortfalls that are actually
+ * a shortfall rather than noise around the average.
+ */
+export const PACING_SLOW_MARGIN = 0.05;
 
 /**
  * Sessions of the same type compared against for "am I slower than usual".

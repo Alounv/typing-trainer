@@ -106,8 +106,9 @@ flowchart TB
 ## The training loop
 
 Speed and accuracy are one curve, not two skills, so there is one session type
-and one working band (~95-98% accuracy). The band is enforced by a loop that
-closes across sessions rather than by separate modes:
+and one ceiling (5% errors — past it the corrections cost more than the pace
+buys). The ceiling is enforced by a loop that closes across sessions rather
+than by separate modes:
 
 ```
    passage            typing              verdict
@@ -128,12 +129,33 @@ Three readings of the same history, each with one job:
 | the same verdict, next session               | which tint the passage opens on |
 | `computeAllBigramDebts` → `scoreQuoteByDebt` | which passage comes next        |
 
-Only `too-careful` — under 2% errors _and_ slower than usual — means speed up,
-so only that flips the tint to draggy pairs. Everything else leaves it on
-error-prone ones, and the typist can override or turn it off at any point.
+Accuracy is checked first, then pace:
 
-The tint is deliberately non-prescriptive. A pacer tells you what to do; the
-tint changes what you _notice_ and leaves the regulating to you.
+```
+                       errors > 5%    errors <= 5%
+  clearly under pace    too-fast      room-to-push
+  at or near pace       too-fast      well-paced
+```
+
+Past the ceiling the pace is wrong however fast it was, so speed is not
+consulted. Under it, accuracy has been paid for and the only question left is
+whether the speed was collected. "Clearly" is a 5% dead zone around the recent
+average (`PACING_SLOW_MARGIN`) — without it, half of anyone's sessions fall
+below their own mean and the verdict would fire every other session.
+
+Only `room-to-push` means speed up, so only that flips the tint to draggy
+pairs. Everything else leaves it on error-prone ones, and the typist can
+override or turn it off at any point.
+
+**What the verdict cannot see.** Being timid and being tired are the same
+signal from here — both are slow with accuracy to spare. So `room-to-push` is
+named for the opportunity rather than a fault, and its copy hands the call back
+to the typist instead of asserting a diagnosis. Acting on it is cheap either
+way: pushing on an off day produces errors, and the next session says
+`too-fast`.
+
+The tint follows the same rule. A pacer tells you what to do; the tint changes
+what you _notice_ and leaves the regulating to you.
 
 Delivery and accounting are separate choices: real words are what you type,
 transitions are what gets credited. Typing `brown` pays down `br ro ow wn`, so

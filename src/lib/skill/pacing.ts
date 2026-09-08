@@ -1,18 +1,18 @@
 import type { SessionSummary } from '../support/core';
 import {
-	PACING_CAUTIOUS_ERROR_RATE,
 	PACING_COMPARISON_WINDOW,
+	PACING_SLOW_MARGIN,
 	PACING_TARGET_ERROR_RATE
 } from '../support/core';
 
 /**
  * How the typist paced one session.
  *
- * `too-careful` is the verdict the rest of the app acts on: it is the one case
+ * `room-to-push` is the verdict the rest of the app acts on: it is the one case
  * where the answer is *speed up*, so it is what flips the in-session tint from
  * error-prone pairs to draggy ones.
  */
-export type PacingVerdict = 'well-paced' | 'too-careful' | 'too-fast';
+export type PacingVerdict = 'well-paced' | 'room-to-push' | 'too-fast';
 
 /**
  * Only the scalar fields — no aggregates. Both `SessionSummary` and a raw
@@ -30,15 +30,23 @@ export interface PacingAssessment {
 }
 
 /**
- * Error rate decides the verdict; WPM only splits the clean band in two.
+ * Accuracy is checked first, then pace:
  *
- *                    <2%          2-5%         >5%
- *   at/above pace    well-paced   well-paced   too-fast
- *   below pace       too-careful  well-paced   too-fast
+ *                            errors > 5%    errors <= 5%
+ *   clearly under pace       too-fast       room-to-push
+ *   at or near pace          too-fast       well-paced
  *
- * Being slower than usual is not itself a finding — plenty of sessions are
- * just slow. It is only worth saying when accuracy is *also* spotless, which
- * is the one combination that means there is speed left on the table.
+ * Past 5% the pace is wrong however fast it was, so speed is not consulted.
+ * Under it, accuracy has been paid for and the only question left is whether
+ * the speed was collected — which is what being clearly slower than usual
+ * says.
+ *
+ * What this deliberately cannot tell apart: being timid and being tired look
+ * identical from here — both are slow with accuracy to spare. So the verdict
+ * reports the observation and `progress/pacingDisplay` hands the call to the
+ * typist rather than asserting a diagnosis the data does not support. Acting
+ * on it is cheap either way: pushing on an off day produces errors, and the
+ * next session says `too-fast`.
  *
  * `history` may include `session` itself — it is excluded by id — and needs no
  * particular order.
@@ -49,21 +57,20 @@ export function assessPacing(
 ): PacingAssessment {
 	const recentWpm = recentAverageWpm(session, history);
 	// No baseline yet: with nothing to be slower than, a first session must not
-	// read as too careful. Errors alone then decide.
-	const keepingPace = recentWpm === undefined || session.wpm >= recentWpm;
+	// read as leaving speed on the table. Errors alone then decide.
+	const clearlySlow = recentWpm !== undefined && session.wpm < recentWpm * (1 - PACING_SLOW_MARGIN);
 
 	return {
-		verdict: verdictFor(session.errorRate, keepingPace),
+		verdict: verdictFor(session.errorRate, clearlySlow),
 		errorRate: session.errorRate,
 		wpm: session.wpm,
 		recentWpm
 	};
 }
 
-function verdictFor(errorRate: number, keepingPace: boolean): PacingVerdict {
+function verdictFor(errorRate: number, clearlySlow: boolean): PacingVerdict {
 	if (errorRate > PACING_TARGET_ERROR_RATE) return 'too-fast';
-	if (errorRate >= PACING_CAUTIOUS_ERROR_RATE) return 'well-paced';
-	return keepingPace ? 'well-paced' : 'too-careful';
+	return clearlySlow ? 'room-to-push' : 'well-paced';
 }
 
 function recentAverageWpm(
