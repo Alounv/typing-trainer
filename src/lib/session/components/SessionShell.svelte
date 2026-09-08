@@ -165,14 +165,15 @@
 	const ledgerEntries = $derived(
 		ledgerSnapshot ? new Map(ledgerSnapshot.entries.map((e) => [e.bigram, e])) : undefined
 	);
-	// Two stocks, never netted against each other: repeats paid off and repeats
-	// mistakes added. Both only grow, so a bad patch can't erase clean work.
-	const lanePct = (value: number) =>
+	// Absolute units on a fixed track, so the filled part can never shrink: a
+	// mistake slides the finish line out instead of taking progress back.
+	const trackPct = (value: number) =>
 		ledgerSnapshot && ledgerSnapshot.scale > 0
 			? Math.min(100, (value / ledgerSnapshot.scale) * 100)
 			: 0;
-	const paidPct = $derived(lanePct(ledgerSnapshot?.repaid ?? 0));
-	const addedPct = $derived(lanePct(ledgerSnapshot?.added ?? 0));
+	const paidPct = $derived(trackPct(ledgerSnapshot?.paid ?? 0));
+	const targetPct = $derived(trackPct(ledgerSnapshot?.target ?? 0));
+	const hasWork = $derived(!!ledgerSnapshot && ledgerSnapshot.target > 0);
 
 	// Pacer wiring. `paceForMode` resolves to 0 for non-speed drills or
 	// when the user has no diagnostic baseline — `ghostPosition` stays
@@ -345,41 +346,36 @@
 		first keystroke (flat).
 	-->
 	<div class="space-y-3">
-		{#if ledgerSnapshot}
+		{#if hasWork}
 			<!--
-				Two lanes, not one net bar: repeats paid off this drill above,
-				repeats mistakes added below, on a shared scale. Netting them
-				would let a bad patch erase the clean work that came before it.
+				Repayment track. Length is every target occurrence in the text, so
+				the filled part is drawn in absolute repeats and never shrinks —
+				a mistake slides the finish line right instead of clawing progress
+				back. The dim band is the work the drill is asking for.
 			-->
-			<div class="space-y-1">
+			<div
+				class="relative h-1 w-full overflow-hidden rounded-full bg-base-300/40"
+				role="progressbar"
+				aria-label="Repeats cleared this drill"
+				aria-valuemin="0"
+				aria-valuemax={ledgerSnapshot?.target ?? 0}
+				aria-valuenow={ledgerSnapshot?.paid ?? 0}
+				data-testid="debt-progress"
+				data-paid={ledgerSnapshot?.paid}
+				data-target={ledgerSnapshot?.target}
+			>
 				<div
-					class="h-1 w-full overflow-hidden rounded-full bg-base-300/60"
-					role="progressbar"
-					aria-label="Repeats paid back this drill"
-					aria-valuemin="0"
-					aria-valuemax="100"
-					aria-valuenow={Math.round(paidPct)}
-					data-testid="debt-paid"
-				>
-					<div
-						class="h-full rounded-full bg-success transition-[width] duration-300 ease-out motion-reduce:transition-none"
-						style="width: {paidPct}%"
-					></div>
-				</div>
+					class="absolute inset-y-0 left-0 bg-base-content/15 transition-[width] duration-300 ease-out motion-reduce:transition-none"
+					style="width: {targetPct}%"
+				></div>
 				<div
-					class="h-1 w-full overflow-hidden rounded-full bg-base-300/60"
-					role="progressbar"
-					aria-label="Repeats added by mistakes this drill"
-					aria-valuemin="0"
-					aria-valuemax="100"
-					aria-valuenow={Math.round(addedPct)}
-					data-testid="debt-added"
-				>
-					<div
-						class="h-full rounded-full bg-error transition-[width] duration-300 ease-out motion-reduce:transition-none"
-						style="width: {addedPct}%"
-					></div>
-				</div>
+					class="absolute inset-y-0 left-0 rounded-full bg-success transition-[width] duration-300 ease-out motion-reduce:transition-none"
+					style="width: {paidPct}%"
+				></div>
+				<div
+					class="absolute inset-y-0 w-0.5 bg-base-content/60 transition-[left] duration-300 ease-out motion-reduce:transition-none"
+					style="left: calc({targetPct}% - 2px)"
+				></div>
 			</div>
 		{/if}
 		<div

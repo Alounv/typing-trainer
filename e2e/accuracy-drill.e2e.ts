@@ -3,12 +3,11 @@ import { runDiagnostic } from './fixtures';
 
 /**
  * Accuracy drill feedback loop: mistyping a target bigram damages its chip and
- * fills the red lane; later clean occurrences of the same bigram fill the green
- * one. The two stocks are independent — repayment never shrinks the red lane,
- * and a mistake never shrinks the green.
+ * slides the finish line out; later clean occurrences of the same bigram walk
+ * progress towards it. Progress itself never goes backwards.
  */
 test(
-	'accuracy drill: a mistake fills the red lane, clean repeats fill the green one',
+	'accuracy drill: a mistake moves the finish line, clean repeats close on it',
 	{ annotation: { type: 'slow', description: 'diagnostic pass + accuracy-drill pass end-to-end' } },
 	async ({ page }) => {
 		await runDiagnostic(page);
@@ -45,22 +44,21 @@ test(
 		await page.keyboard.type(target![1] === 'z' ? 'q' : 'z');
 
 		await expect(chip).toHaveAttribute('data-state', 'damaged');
-		const paid = page.getByTestId('debt-paid');
-		const added = page.getByTestId('debt-added');
-		// The mistake fills the red lane; the green lane is untouched by it.
-		await expect(added).not.toHaveAttribute('aria-valuenow', '0');
-		await expect(paid).toHaveAttribute('aria-valuenow', '0');
-		const addedAfterMistake = Number(await added.getAttribute('aria-valuenow'));
+		// The mistake asks for repeats the drill wasn't asking for before, and
+		// takes nothing away: progress is still zero, not negative.
+		const track = page.getByTestId('debt-progress');
+		await expect(track).toBeVisible();
+		await expect(track).toHaveAttribute('data-paid', '0');
+		const asked = Number(await track.getAttribute('data-target'));
+		expect(asked).toBeGreaterThan(0);
 
 		// Correct the miss, then type through two more clean occurrences: each one
-		// pays a repeat back, and the red lane stays where the mistake left it.
+		// walks progress towards a finish line that stays where it was put.
 		await page.keyboard.press('Backspace');
 		const repaidAt = occurrences[2] + 2;
 		await page.keyboard.type(passage.slice(start + 1, repaidAt));
-		await expect
-			.poll(async () => Number(await paid.getAttribute('aria-valuenow')))
-			.toBeGreaterThan(0);
-		await expect(added).toHaveAttribute('aria-valuenow', String(addedAfterMistake));
+		await expect.poll(async () => Number(await track.getAttribute('data-paid'))).toBe(2);
+		await expect(track).toHaveAttribute('data-target', String(asked));
 
 		await page.keyboard.type(passage.slice(repaidAt));
 		await page.waitForURL(/\/session\/[^/]+\/summary$/);

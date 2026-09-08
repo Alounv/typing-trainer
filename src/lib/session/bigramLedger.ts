@@ -2,13 +2,16 @@ import { BIGRAM_CLASSIFICATION_WINDOW, type KeystrokeEvent } from '../support/co
 
 /**
  * Live per-bigram debt ledger for accuracy drills. Mistyping a bigram puts it
- * {@link DEFAULT_DAMAGE} repayments in debt; only later clean occurrences pay
- * it down. Targets can start the drill already in debt — `skill/debt` reads
- * what their history still owes.
+ * {@link DEFAULT_DAMAGE} repeats in debt; only later clean occurrences pay it
+ * down. Targets can start the drill already in debt — `skill/debt` reads what
+ * their history still owes.
  *
- * The drill reports two stocks rather than their difference: repeats paid off
- * and repeats added. Both only grow, so a bad patch never erases the clean work
- * that came before it.
+ * The drill is scored as a finish line rather than a balance: `paid` is what
+ * has been cleared and only grows, and a mistake moves `target` further out
+ * instead of taking anything back. The line moves by what is still *reachable*
+ * — repeats the remaining text can actually deliver — so every drill stays
+ * winnable. The bigram's real debt still takes the full hit; that is what the
+ * next session inherits.
  *
  * Attribution matches `skill/extraction.ts`: the bigram at position `p` is
  * `text[p - 1] + text[p]`, charged on the right-hand character.
@@ -25,7 +28,7 @@ export const DEFAULT_DAMAGE = BIGRAM_CLASSIFICATION_WINDOW;
 
 export interface LedgerEntry {
 	bigram: string;
-	/** Clean repetitions still owed. 0 = clean. */
+	/** Clean repetitions still owed, carried to the next session. 0 = clean. */
 	debt: number;
 	wasDamaged: boolean;
 	cleanHits: number;
@@ -35,16 +38,21 @@ export interface LedgerEntry {
 
 export interface LedgerSnapshot {
 	entries: LedgerEntry[];
-	/** Repeats paid off this drill. Only ever grows — clean work is never taken back. */
-	repaid: number;
-	/**
-	 * Repeats mistakes have added this drill. A mistake adds the *difference* it
-	 * makes: erring on a bigram already owing 15 takes it back to 20 and adds 5,
-	 * not 20. Only ever grows.
-	 */
-	added: number;
-	/** Full-lane value for both stocks: the most this drill could pay back. */
+	/** Repeats cleared this drill. Only ever grows. */
+	paid: number;
+	/** Repeats this drill is asking for — the finish line. Only ever moves out. */
+	target: number;
+	/** Track length: every target occurrence in the text. Fixed for the drill. */
 	scale: number;
+}
+
+interface Tracked extends LedgerEntry {
+	/** Repeats this drill asks of this bigram — capped by what the text can deliver. */
+	goal: number;
+	/** Repeats cleared on this bigram so far. */
+	cleared: number;
+	/** Positions where this bigram is charged, ascending. */
+	positions: number[];
 }
 
 interface LedgerInput {
@@ -58,35 +66,34 @@ interface LedgerInput {
 export class BigramLedger {
 	private readonly text: string;
 	private readonly damage: number;
-	private readonly entries = new Map<string, LedgerEntry>();
+	private readonly entries = new Map<string, Tracked>();
 	/** Correctness of the *first* input at each position — retypes are ignored. */
 	private readonly firstInputs = new Map<number, boolean>();
 	private readonly scale: number;
-	private debtAtStart = 0;
-	private repaid = 0;
-	private added = 0;
 
 	constructor({ text, targetBigrams, initialDebt, damage = DEFAULT_DAMAGE }: LedgerInput) {
 		this.text = text;
 		this.damage = damage;
-		let occurrences = 0;
+		let scale = 0;
 		for (const bigram of targetBigrams) {
 			if (this.entries.has(bigram)) continue;
+			const positions = chargePositions(text, bigram);
 			const debt = Math.min(damage, Math.max(0, initialDebt?.get(bigram) ?? 0));
 			this.entries.set(bigram, {
 				bigram,
 				debt,
 				wasDamaged: debt > 0,
 				cleanHits: 0,
-				total: countOccurrences(text, bigram)
+				total: positions.length,
+				// Asking for more than the text contains would make the drill
+				// unwinnable before the first keystroke.
+				goal: Math.min(debt, positions.length),
+				cleared: 0,
+				positions
 			});
-			this.debtAtStart += debt;
-			occurrences += this.entries.get(bigram)!.total;
+			scale += positions.length;
 		}
-		// A clean occurrence pays at most one repeat, so the drill can never pay
-		// back more than it contains. `damage` keeps the lanes sane when nothing
-		// is owed on arrival and the only movement can be a mistake.
-		this.scale = Math.max(Math.min(this.debtAtStart, occurrences), damage);
+		this.scale = scale;
 	}
 
 	/** Feed every keystroke, retypes included — only first inputs count. */
@@ -98,48 +105,53 @@ export class BigramLedger {
 
 		// One fumble is one mistake: skip wrongs that follow a wrong.
 		if (!correct && this.firstInputs.get(position - 1) === false) return;
-
 		// No bigram closes on the first character — nothing to owe against.
 		if (position === 0) return;
 
-		const bigram = this.text[position - 1] + this.text[position];
-		let entry = this.entries.get(bigram);
+		const entry = this.entries.get(this.text[position - 1] + this.text[position]);
+		if (!entry) return;
 
 		if (!correct) {
-			// A bigram outside the drill targets still gets tracked once it is
-			// mistyped — it now owes repeats like any other.
-			if (!entry) {
-				entry = { bigram, debt: 0, wasDamaged: false, cleanHits: 0, total: 0 };
-				this.entries.set(bigram, entry);
-			}
-			this.added += this.damage - entry.debt;
 			entry.debt = this.damage;
 			entry.wasDamaged = true;
+			const reachable = entry.positions.filter((p) => p > position).length;
+			// Never pulls the line back in: work already done stays done.
+			entry.goal = Math.max(entry.goal, entry.cleared + Math.min(this.damage, reachable));
 			return;
 		}
 
-		if (!entry) return;
 		entry.cleanHits++;
 		if (entry.debt > 0) {
 			entry.debt--;
-			this.repaid++;
+			entry.cleared++;
 		}
 	}
 
 	snapshot(): LedgerSnapshot {
-		return {
-			entries: [...this.entries.values()].map((e) => ({ ...e })),
-			repaid: this.repaid,
-			added: this.added,
-			scale: this.scale
-		};
+		const entries: LedgerEntry[] = [];
+		let paid = 0;
+		let target = 0;
+		for (const e of this.entries.values()) {
+			entries.push({
+				bigram: e.bigram,
+				debt: e.debt,
+				wasDamaged: e.wasDamaged,
+				cleanHits: e.cleanHits,
+				total: e.total
+			});
+			paid += Math.min(e.cleared, e.goal);
+			target += e.goal;
+		}
+		return { entries, paid, target, scale: this.scale };
 	}
 }
 
-/** Overlapping occurrences — "aaa" contains "aa" twice. */
-function countOccurrences(text: string, bigram: string): number {
-	if (bigram.length === 0) return 0;
-	let count = 0;
-	for (let i = text.indexOf(bigram); i !== -1; i = text.indexOf(bigram, i + 1)) count++;
-	return count;
+/** Positions of the right-hand char of each occurrence, ascending. Overlaps count. */
+function chargePositions(text: string, bigram: string): number[] {
+	const out: number[] = [];
+	if (bigram.length === 0) return out;
+	for (let i = text.indexOf(bigram); i !== -1; i = text.indexOf(bigram, i + 1)) {
+		out.push(i + 1);
+	}
+	return out;
 }
