@@ -1,10 +1,19 @@
 import type { CorpusData, Quote, QuoteBank, QuoteLengthGroup } from './types';
 import { selectQuote } from './quotes';
+import { selectQuoteByDebt } from './debt-selection';
 import { selectRealTextSentence } from './selection';
 
 /**
- * Real-text passage generation. Prefers a quote bank (real prose with
- * attribution); falls back to word-synth when unavailable.
+ * Real-text passage generation from a quote bank.
+ *
+ * Two ways to pick each quote. With `bigramDebts`, quotes are chosen by how
+ * much outstanding debt they can repay per keystroke — the real-text path.
+ * Without it, sampling is weighted by target-bigram density, which is what the
+ * diagnostic wants: representative prose, not text engineered around a chosen
+ * subset of transitions.
+ *
+ * `fallbackCorpus` word-synth remains for languages with no quote bank, which
+ * today means the diagnostic only.
  */
 
 /** Single space — double-space would look jarring between synth sentences. */
@@ -28,8 +37,14 @@ interface RealTextInput {
 	secondaryMix?: number;
 	/** Fallback when no quote bank. Both omitted → throws. */
 	fallbackCorpus?: CorpusData;
-	/** Target-bigram bias for both paths. */
+	/** Target-bigram bias for both paths. Ignored when `bigramDebts` is given. */
 	targetBigrams?: readonly string[];
+	/**
+	 * Clean repeats each bigram still owes. Present → quotes are picked by
+	 * repayable debt per keystroke instead of by target-bigram weighting. An
+	 * empty map means nothing is owed, so selection falls back to sampling.
+	 */
+	bigramDebts?: ReadonlyMap<string, number>;
 	options?: RealTextOptions;
 }
 
@@ -79,6 +94,7 @@ export function generateRealTextSequence(input: RealTextInput): RealTextSequence
 	if (input.quoteBank) {
 		return buildFromQuotes(input.quoteBank, {
 			targetBigrams: input.targetBigrams ?? [],
+			bigramDebts: input.bigramDebts,
 			targetLen,
 			maxChunks,
 			lengthGroup: options.quoteLengthGroup,
@@ -104,6 +120,7 @@ function buildFromQuotes(
 	bank: QuoteBank,
 	opts: {
 		targetBigrams: readonly string[];
+		bigramDebts?: ReadonlyMap<string, number>;
 		targetLen: number;
 		maxChunks: number;
 		lengthGroup?: QuoteLengthGroup;
@@ -168,18 +185,29 @@ function buildFromQuotes(
 	};
 }
 
-// Up to 30 samples for a fresh id that fits the remaining gap, then relax the
-// length cap, then linear scan as a last resort.
+// With a debt map, hand off to debt scoring. Otherwise: up to 30 samples for a
+// fresh id that fits the remaining gap, then relax the length cap, then linear
+// scan as a last resort.
 function pickUnusedQuote(
 	bank: QuoteBank,
 	used: Set<number>,
 	opts: {
 		targetBigrams: readonly string[];
+		bigramDebts?: ReadonlyMap<string, number>;
 		lengthGroup?: QuoteLengthGroup;
 		rng: () => number;
 		remainingGap: number;
 	}
 ): Quote | null {
+	if (opts.bigramDebts && opts.bigramDebts.size > 0) {
+		return selectQuoteByDebt(bank, {
+			debts: opts.bigramDebts,
+			used,
+			remainingGap: opts.remainingGap,
+			rng: opts.rng
+		});
+	}
+
 	const maxAttempts = 30;
 	const maxLen = opts.remainingGap * MAX_OVERSHOOT_RATIO;
 	let fallback: Quote | null = null;

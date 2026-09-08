@@ -4,7 +4,9 @@ import {
 	hasQuoteBank,
 	isBuiltinCorpusId,
 	loadBuiltinCorpus,
-	loadQuoteBank
+	loadQuoteBank,
+	scoreQuoteByDebt,
+	selectQuoteByDebt
 } from './index';
 import type { CorpusData, QuoteBank } from './types';
 
@@ -272,5 +274,121 @@ describe('generateText', () => {
 			const primaryWords = new Set(Object.keys(primary.wordFrequencies));
 			expect(words.every((w) => primaryWords.has(w))).toBe(true);
 		});
+	});
+});
+
+describe('scoreQuoteByDebt', () => {
+	it('scores repayable debt per keystroke', () => {
+		// "abab" holds `ab` twice and `ba` once. `ab` owes 5 but can only be paid
+		// twice here; `ba` owes 1 and gets paid once. So 2 + 1 over 4 chars.
+		const debts = new Map([
+			['ab', 5],
+			['ba', 1]
+		]);
+		expect(scoreQuoteByDebt('abab', debts)).toBeCloseTo(3 / 4);
+	});
+
+	it('caps credit at what the bigram actually owes', () => {
+		// The `min` is the whole point: forty occurrences of a pair owing four
+		// repay four. Without it, one repetitive quote would outrank everything.
+		const debts = new Map([['ab', 2]]);
+		const repetitive = 'ab'.repeat(20);
+		expect(scoreQuoteByDebt(repetitive, debts)).toBeCloseTo(2 / repetitive.length);
+	});
+
+	it('is a density, so bulk alone does not win', () => {
+		const debts = new Map([['ab', 100]]);
+		const short = 'abab';
+		const padded = `abab${' '.repeat(96)}`;
+		expect(scoreQuoteByDebt(short, debts)).toBeGreaterThan(scoreQuoteByDebt(padded, debts));
+	});
+
+	it.each([
+		['nothing owed', 'the quick brown fox', new Map<string, number>()],
+		['no overlap with what is owed', 'xyz', new Map([['ab', 4]])],
+		['too short to contain a bigram', 'a', new Map([['ab', 4]])],
+		['empty', '', new Map([['ab', 4]])]
+	])('scores zero when there is %s', (_label, text, debts) => {
+		expect(scoreQuoteByDebt(text, debts)).toBe(0);
+	});
+
+	it('keeps case apart, matching how bigrams are recorded', () => {
+		const debts = new Map([['Th', 4]]);
+		expect(scoreQuoteByDebt('The', debts)).toBeGreaterThan(0);
+		expect(scoreQuoteByDebt('the', debts)).toBe(0);
+	});
+});
+
+describe('selectQuoteByDebt', () => {
+	const bank: QuoteBank = {
+		language: 'en',
+		groups: [[0, 1000]],
+		quotes: [
+			{ id: 1, text: 'zzz zzz zzz', source: 't', length: 11 },
+			{ id: 2, text: 'abab abab ab', source: 't', length: 12 },
+			{ id: 3, text: 'qqq qqq qqq', source: 't', length: 11 }
+		]
+	};
+
+	/** Walks the bank in order and repeats, so every quote gets sampled. */
+	function cyclingRng(): () => number {
+		let i = 0;
+		return () => (i++ % bank.quotes.length) / bank.quotes.length;
+	}
+
+	it('picks the quote that repays the most per keystroke', () => {
+		const debts = new Map([['ab', 10]]);
+		const picked = selectQuoteByDebt(bank, {
+			debts,
+			used: new Set(),
+			remainingGap: 100,
+			rng: cyclingRng()
+		});
+		expect(picked?.id).toBe(2);
+	});
+
+	it('never returns a quote already used in this passage', () => {
+		const debts = new Map([['ab', 10]]);
+		const picked = selectQuoteByDebt(bank, {
+			debts,
+			used: new Set([2]),
+			remainingGap: 100,
+			rng: cyclingRng()
+		});
+		expect(picked?.id).not.toBe(2);
+	});
+
+	it('returns an overshooting quote rather than nothing', () => {
+		// A tiny remaining gap must not starve the passage — better one quote too
+		// long than a session that cannot be built.
+		const picked = selectQuoteByDebt(bank, {
+			debts: new Map([['ab', 10]]),
+			used: new Set(),
+			remainingGap: 1,
+			rng: cyclingRng()
+		});
+		expect(picked).not.toBeNull();
+	});
+
+	it('returns null only when every quote is used', () => {
+		const picked = selectQuoteByDebt(bank, {
+			debts: new Map([['ab', 10]]),
+			used: new Set([1, 2, 3]),
+			remainingGap: 100,
+			rng: cyclingRng()
+		});
+		expect(picked).toBeNull();
+	});
+
+	it('finds an unused quote the sample missed', () => {
+		// A near-exhausted bank with an rng that keeps landing on used quotes:
+		// the linear scan is what keeps the passage buildable.
+		const picked = selectQuoteByDebt(bank, {
+			debts: new Map([['ab', 10]]),
+			used: new Set([1, 2]),
+			remainingGap: 100,
+			rng: () => 0
+		});
+		expect(picked?.id).toBe(3);
 	});
 });

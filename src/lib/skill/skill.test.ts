@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	annotateFirstInputs,
 	assessPacing,
+	computeAllBigramDebts,
 	buildLivePriorityTargets,
 	buildLiveUndertrained,
 	computeBigramDebts,
@@ -453,6 +454,28 @@ describe('computeBigramDebts', () => {
 		];
 		// 19 clean on top of the old error: one more repeat pushes it out.
 		expect(computeBigramDebts(sessions, ['th']).get('th')).toBe(1);
+	});
+});
+
+describe('computeAllBigramDebts', () => {
+	it('discovers its own universe from history and drops what is settled', () => {
+		// No bigram list to pass: the whole point is that the caller does not
+		// have to know which pairs exist. Settled pairs are dropped so the map
+		// holds only what is actually owed.
+		const sessions = [
+			session('s1', 100, [
+				agg('th', 's1', { samples: cleanSamples(20, 100) }),
+				agg('er', 's1', { samples: [...cleanSamples(19, 100), { correct: false, timing: null }] })
+			])
+		];
+
+		const debts = computeAllBigramDebts(sessions);
+		expect([...debts.keys()]).toEqual(['er']);
+		expect(debts.get('er')).toBe(BIGRAM_CLASSIFICATION_WINDOW);
+	});
+
+	it('returns an empty map with no history', () => {
+		expect(computeAllBigramDebts([]).size).toBe(0);
 	});
 });
 

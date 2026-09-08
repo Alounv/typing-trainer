@@ -21,6 +21,8 @@ type TextSpec =
 			secondaryQuoteBank?: QuoteBank;
 			secondaryMix?: number;
 			targetLengthChars: number;
+			/** Clean repeats each bigram owes — drives passage choice. */
+			bigramDebts?: ReadonlyMap<string, number>;
 	  }
 	| {
 			kind: 'diagnostic';
@@ -46,6 +48,7 @@ export function generateText(spec: TextSpec): { text: string } {
 				secondaryQuoteBank: spec.secondaryQuoteBank,
 				secondaryMix: spec.secondaryMix,
 				fallbackCorpus: spec.corpus,
+				bigramDebts: spec.bigramDebts,
 				options: { targetLengthChars: spec.targetLengthChars }
 			});
 		case 'diagnostic':

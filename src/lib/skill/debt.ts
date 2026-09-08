@@ -28,6 +28,33 @@ export function computeBigramDebts(
 	return out;
 }
 
+/**
+ * Debt for every bigram the typist has actually produced, zero-debt ones
+ * dropped.
+ *
+ * The universe comes from the history rather than the language: a bigram never
+ * typed has no samples, so its debt is zero by definition, and enumerating the
+ * language's thousands of pairs to learn that would be work for nothing.
+ * Dropping the zeros keeps the map to what is actually owed, which is what
+ * passage scoring reads.
+ */
+export function computeAllBigramDebts(
+	sessions: readonly SessionSummary[],
+	thresholds: ClassificationThresholds = DEFAULT_THRESHOLDS,
+	window: number = BIGRAM_CLASSIFICATION_WINDOW
+): Map<string, number> {
+	const seen = new Set<string>();
+	for (const session of sessions) {
+		for (const agg of session.bigramAggregates) seen.add(agg.bigram);
+	}
+
+	const all = computeBigramDebts(sessions, [...seen], thresholds, window);
+	for (const [bigram, debt] of all) {
+		if (debt <= 0) all.delete(bigram);
+	}
+	return all;
+}
+
 /** Newest sample first, capped at `window` per bigram. */
 function poolNewestFirst(
 	sessions: readonly SessionSummary[],

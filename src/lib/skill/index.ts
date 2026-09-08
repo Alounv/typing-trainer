@@ -23,6 +23,6 @@ export { generateDiagnosticReport } from './engine';
 export { summarizeBigrams, buildLivePriorityTargets, buildLiveUndertrained } from './assessment';
 export type { BigramSummary } from './assessment';
 export { classifyBigram, summarizeSamples } from './classification';
-export { computeBigramDebts } from './debt';
+export { computeBigramDebts, computeAllBigramDebts } from './debt';
 export { assessPacing } from './pacing';
 export type { PacingAssessment, PacingInput, PacingVerdict } from './pacing';
