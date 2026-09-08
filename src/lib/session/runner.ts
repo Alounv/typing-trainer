@@ -1,57 +1,51 @@
 import { v4 as uuid } from 'uuid';
-import { annotateFirstInputs } from './postprocess';
-import { extractBigramAggregates } from '../skill';
-import type {
-	ClassificationThresholds,
-	DrillMode,
-	KeystrokeEvent,
-	SessionSummary,
-	SessionType
-} from '../support/core';
+import { annotateFirstInputs, encodeStream } from '../skill';
+import type { DrillMode, KeystrokeEvent, StoredSession, SessionType } from '../support/core';
 
 /**
- * Inputs for turning a finished capture into a persistable summary.
- * `events` is the raw log (retypes included); this function annotates them
- * before bigram extraction so callers don't have to remember that.
+ * Inputs for turning a finished capture into a persistable row.
+ * `events` is the raw log, retypes included — that log *is* what gets stored.
  */
-interface BuildSessionSummaryInput {
+interface BuildStoredSessionInput {
 	events: readonly KeystrokeEvent[];
 	type: SessionType;
-	/** Total drill length in characters — needed because `events` only covers what the user actually typed if they aborted. */
-	textLength: number;
+	/** The prompt. Stored alongside the stream, and the denominator for WPM — event count would let an abandoned run inflate the rate. */
+	text: string;
 	/** `performance.now()` relative duration of the session in ms. */
 	durationMs: number;
 	bigramsTargeted?: string[];
-	/** Drill mode — recorded on the summary so it survives a round-trip through storage. */
+	/** Drill mode — recorded on the row so it survives a round-trip through storage. */
 	drillMode?: DrillMode;
-	/** Override the default classification thresholds. */
-	thresholds?: ClassificationThresholds;
 	/** Injectable for tests; defaults to `uuid()` + `Date.now()`. */
 	idGenerator?: () => string;
 	timestampProvider?: () => number;
 }
 
 /**
- * Pure transform: raw keystroke log → persistable `SessionSummary`. Id and
- * timestamp are the only non-determinism, both injectable for tests.
- * Bigram timings use first-input-only events; raw events are archived separately.
+ * Pure transform: raw keystroke log → persistable row. Id and timestamp are the
+ * only non-determinism, both injectable for tests.
+ *
+ * No bigram aggregates: the row carries the text and the encoded keystroke
+ * stream, and `skill/hydrate` measures bigrams from those on read. `wpm` and
+ * `errorRate` are kept as stored scalars only because every list view sorts and
+ * charts on them — everything else is derived.
  */
-function buildSessionSummary(input: BuildSessionSummaryInput): SessionSummary {
+function buildStoredSession(input: BuildStoredSessionInput): StoredSession {
 	const id = (input.idGenerator ?? uuid)();
 	const timestamp = (input.timestampProvider ?? Date.now)();
 	const annotated = annotateFirstInputs(input.events);
-	const bigramAggregates = extractBigramAggregates(annotated, id, input.thresholds);
 
 	return {
 		id,
 		timestamp,
 		type: input.type,
 		durationMs: input.durationMs,
-		wpm: computeWPM(input.textLength, input.durationMs),
+		wpm: computeWPM(input.text.length, input.durationMs),
 		errorRate: computeErrorRate(annotated),
 		bigramsTargeted: input.bigramsTargeted,
 		drillMode: input.drillMode,
-		bigramAggregates
+		text: input.text,
+		stream: encodeStream(input.events)
 	};
 }
 
@@ -88,8 +82,6 @@ interface SessionRunnerConfig {
 	idGenerator?: () => string;
 	/** Injectable so tests get deterministic timestamps for `finalize`. */
 	timestampProvider?: () => number;
-	/** Override classification thresholds for the final summary. */
-	thresholds?: ClassificationThresholds;
 }
 
 /**
@@ -117,15 +109,14 @@ export class SessionRunner {
 		return this.position_ >= this.config.text.length;
 	}
 
-	finalize(elapsedMs: number): SessionSummary {
-		return buildSessionSummary({
+	finalize(elapsedMs: number): StoredSession {
+		return buildStoredSession({
 			events: this.events_,
 			type: this.config.type,
-			textLength: this.config.text.length,
+			text: this.config.text,
 			durationMs: elapsedMs,
 			bigramsTargeted: this.config.targetBigrams ? [...this.config.targetBigrams] : undefined,
 			drillMode: this.config.drillMode,
-			thresholds: this.config.thresholds,
 			idGenerator: this.config.idGenerator,
 			timestampProvider: this.config.timestampProvider
 		});

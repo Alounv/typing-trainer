@@ -21,21 +21,22 @@ two **support layers**; routes compose domains through a thin route-local
 
 ## Domains
 
-| Domain       | Responsibility                                          | Public surface                        |
-| ------------ | ------------------------------------------------------- | ------------------------------------- |
-| **Corpus**   | Produces the text the user will type.                   | `generateText`, registry loaders      |
-| **Plan**     | Resolves "what should the user do next?".               | `computePlan`, `resolveDrillMix`      |
-| **Session**  | Runs the live typing loop and saves the result.         | `<SessionShell>`                      |
-| **Skill**    | Measures how well the user types each bigram.           | `extractBigramAggregates`, assessment |
-| **Progress** | Turns session history into views for the user.          | `<Summary>`, `<Analytics>`            |
-| **Settings** | Reads and writes the user profile; makes data portable. | `profile`, `<DataTransfer>`           |
+| Domain       | Responsibility                                          | Public surface                   |
+| ------------ | ------------------------------------------------------- | -------------------------------- |
+| **Corpus**   | Produces the text the user will type.                   | `generateText`, registry loaders |
+| **Plan**     | Resolves "what should the user do next?".               | `computePlan`, `resolveDrillMix` |
+| **Session**  | Runs the live typing loop and saves the result.         | `<SessionShell>`                 |
+| **Skill**    | Measures how well the user types, from raw keystrokes.  | `hydrateSession`, assessment     |
+| **Progress** | Turns session history into views for the user.          | `<Summary>`, `<Analytics>`       |
+| **Settings** | Reads and writes the user profile; makes data portable. | `profile`, `<DataTransfer>`      |
 
 ## Support layers (not domains)
 
-- **`support/core`** — Shared types (`SessionSummary`, `BigramAggregate`,
-  `KeystrokeEvent`, `UserSettings`, thresholds, …). Type-only; no runtime; no
-  `$lib/*` imports. The DAG leaf.
-- **`support/storage`** — Dexie wrapper. Only domains and route-local loaders
+- **`support/core`** — Shared types (`StoredSession`, `KeystrokeStream`,
+  `SessionSummary`, `BigramAggregate`, `KeystrokeEvent`, `UserSettings`,
+  thresholds, …). Type-only; no runtime; no `$lib/*` imports. The DAG leaf.
+- **`support/storage`** — Dexie wrapper, and it stays dumb: it reads and writes
+  `StoredSession` rows and derives nothing. Only domains and route-local loaders
   touch it; UI never does.
 - **`support/theme`** — Theme selector component + store.
 
@@ -86,7 +87,11 @@ flowchart TB
     R_Ana --> D_Progress
     R_Set --> D_Settings
 
-    %% Loaders compose domains.
+    %% Loaders compose domains. Every loader that reads history also depends on
+    %% Skill, because stored rows have to be hydrated into measurements.
+    L_Drill --> D_Skill
+    L_Summ --> D_Skill
+    L_Ana --> D_Skill
     L_Drill --> D_Corpus
     L_Drill --> D_Plan
     L_Drill --> D_Settings
@@ -114,6 +119,36 @@ flowchart TB
     class D_Corpus,D_Plan,D_Session,D_Skill,D_Progress,D_Settings domain
 ```
 
+## Storage model: evidence, not conclusions
+
+A session row stores what happened, and every statistic is a reading of it:
+
+```
+        write                                   read
+  keystrokes ──encodeStream──> { text, stream } ──hydrateSession──> aggregates
+                                  (IndexedDB)                       classifications
+```
+
+`text` plus `position` is enough to recover everything else about a keystroke —
+the expected character, the word, the position in that word, the surrounding
+context — so none of it is stored. Roughly 8 bytes per keystroke: a `positions`
+delta (`Int16`, nearly always 1), a `times` delta (`Uint32`, whole ms) and one
+UTF-16 character.
+
+Two consequences worth knowing:
+
+- **Thresholds apply retroactively.** Classifications are computed on read, so
+  changing what "clean" means re-scores the whole history rather than only
+  future sessions.
+- **Reads must hydrate.** `support/storage` hands back `StoredSession` (no
+  aggregates); consumers read `SessionSummary` (aggregates required). The type
+  gap is deliberate — a caller that forgets to hydrate fails to compile.
+
+Rows written before this model have aggregates and no text. They still feed the
+planner, and `hydrateSession` passes them through untouched, but they can never
+gain context: their keystrokes were never kept. Same for the `bigramRecords`
+table, which mirrors those rows only and is never written again.
+
 ## Main flows
 
 - **Dashboard (`/`)** — calls `computePlan` directly (no loader; the dashboard
@@ -122,8 +157,8 @@ flowchart TB
 - **Drill sessions (`/session/{accuracy,speed}-drill`)** — shared
   `routes/session/drill-loader.ts` consumes any planned hand-off, resolves a
   drill mix via `plan`, generates text via `corpus`, and returns a ready-to-render
-  config. `<SessionShell>` captures keystrokes, aggregates via `skill`, persists
-  via `session/persistence`.
+  config. `<SessionShell>` captures keystrokes and persists the run via
+  `session/persistence` — the text and the raw stream, nothing derived.
 - **Real-text / diagnostic sessions** — their own `loader.ts` files call into
   `corpus.generateText` with the right spec; the rest mirrors the drill flow.
 - **Summary (`/session/[id]/summary`)** — `summary/loader` fetches the session +

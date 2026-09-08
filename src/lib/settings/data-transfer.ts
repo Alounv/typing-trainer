@@ -5,31 +5,60 @@
  * session IDs, diverging aggregates); the source file on disk is the undo.
  */
 import { db, SINGLETON_ID } from '$lib/support/storage';
-import type { SessionSummary, BigramAggregate, UserSettings } from '$lib/support/core';
+import type {
+	StoredSession,
+	BigramAggregate,
+	KeystrokeStream,
+	UserSettings
+} from '$lib/support/core';
 
 interface ProfileRecord {
 	id: typeof SINGLETON_ID;
 	settings: UserSettings;
 }
 
-/** Bump when the export shape changes. Higher-version files are rejected on import. */
-const SCHEMA_VERSION = 1;
+/**
+ * Bump when the export shape changes. Higher-version files are rejected on
+ * import; older ones are migrated where the data still makes sense.
+ *
+ *   v1 — sessions carried bigram aggregates and no keystrokes.
+ *   v2 — sessions carry `text` + `stream`; aggregates are derived on read.
+ *
+ * v1 files still import: their sessions land as legacy rows, exactly as
+ * pre-stream rows already in the database behave.
+ */
+const SCHEMA_VERSION = 2;
 
 const APP_TAG = 'typing-trainer' as const;
 
 type BigramRow = BigramAggregate & { key: string };
 
 /**
- * `bigramRecords` is redundant with `sessions[*].bigramAggregates` but we
- * round-trip it faithfully — keeps export/import symmetric with the DB and
- * tolerates orphan rows without a matching session summary.
+ * JSON has no typed arrays, so the stream's numeric columns travel as plain
+ * arrays. Base64 would be the same size once encoded and would drag platform
+ * endianness into a file meant to outlive the machine that wrote it; plain
+ * arrays are portable, inspectable, and compress well (`positions` is a run of
+ * ones).
+ */
+interface SerializedStream {
+	positions: number[];
+	times: number[];
+	typed: string;
+}
+
+type ExportedSession = Omit<StoredSession, 'stream'> & { stream?: SerializedStream };
+
+/**
+ * `bigramRecords` holds legacy per-bigram rows that nothing writes any more; we
+ * round-trip it faithfully so importing an old export doesn't silently drop
+ * pre-stream history, orphan rows included.
  */
 export interface ExportFile {
 	app: typeof APP_TAG;
 	schemaVersion: number;
 	exportedAt: number;
 	data: {
-		sessions: SessionSummary[];
+		sessions: ExportedSession[];
 		bigramRecords: BigramRow[];
 		profile: ProfileRecord | null;
 	};
@@ -53,10 +82,35 @@ export async function exportAll(): Promise<ExportFile> {
 		schemaVersion: SCHEMA_VERSION,
 		exportedAt: Date.now(),
 		data: {
-			sessions,
+			sessions: sessions.map(serializeSession),
 			bigramRecords,
 			profile: profile ?? null
 		}
+	};
+}
+
+function serializeSession({ stream, ...rest }: StoredSession): ExportedSession {
+	if (!stream) return rest;
+	return {
+		...rest,
+		stream: {
+			positions: Array.from(stream.positions),
+			times: Array.from(stream.times),
+			typed: stream.typed
+		}
+	};
+}
+
+function deserializeSession({ stream, ...rest }: ExportedSession): StoredSession {
+	if (!stream) return rest;
+	return { ...rest, stream: toKeystrokeStream(stream) };
+}
+
+function toKeystrokeStream(stream: SerializedStream): KeystrokeStream {
+	return {
+		positions: Int16Array.from(stream.positions),
+		times: Uint32Array.from(stream.times),
+		typed: stream.typed
 	};
 }
 
@@ -79,7 +133,7 @@ export async function importAll(payload: unknown): Promise<void> {
 		await Promise.all([db.sessions.clear(), db.bigramRecords.clear(), db.profile.clear()]);
 
 		if (file.data.sessions.length > 0) {
-			await db.sessions.bulkPut(file.data.sessions);
+			await db.sessions.bulkPut(file.data.sessions.map(deserializeSession));
 		}
 		if (file.data.bigramRecords.length > 0) {
 			await db.bigramRecords.bulkPut(file.data.bigramRecords);
@@ -111,8 +165,9 @@ function validate(payload: unknown): ExportFile {
 			`Export was produced by a newer build (schemaVersion=${payload.schemaVersion}, supported ≤${SCHEMA_VERSION}).`
 		);
 	}
-	if (payload.schemaVersion < SCHEMA_VERSION) {
-		// When v2 lands, replace this with a migrator dispatch.
+	// v1 needs no migration: its sessions have no stream, which is precisely
+	// what a legacy row is. Anything older than v1 never shipped.
+	if (payload.schemaVersion < 1) {
 		throw new ImportValidationError(
 			`Export uses an older schema (v${payload.schemaVersion}) that this build can no longer read.`
 		);
@@ -136,6 +191,7 @@ function validate(payload: unknown): ExportFile {
 		if (!isRecord(s) || typeof s.id !== 'string' || typeof s.timestamp !== 'number') {
 			throw new ImportValidationError('A session row is missing required fields.');
 		}
+		if (s.stream !== undefined) validateStream(s.stream, s.id);
 	}
 	for (const b of bigramRecords) {
 		if (!isRecord(b) || typeof b.key !== 'string' || typeof b.bigram !== 'string') {
@@ -144,6 +200,26 @@ function validate(payload: unknown): ExportFile {
 	}
 
 	return payload as unknown as ExportFile;
+}
+
+/**
+ * A stream whose columns disagree would throw deep inside the codec on read,
+ * long after the import wiped the previous data. Catch it here instead.
+ */
+function validateStream(stream: unknown, sessionId: string): void {
+	if (!isRecord(stream)) {
+		throw new ImportValidationError(`Session ${sessionId} has a malformed keystroke stream.`);
+	}
+	const { positions, times, typed } = stream;
+	if (!Array.isArray(positions) || !Array.isArray(times) || typeof typed !== 'string') {
+		throw new ImportValidationError(`Session ${sessionId} has a malformed keystroke stream.`);
+	}
+	if (positions.length !== times.length || positions.length !== Array.from(typed).length) {
+		throw new ImportValidationError(
+			`Session ${sessionId} has a keystroke stream whose columns disagree ` +
+				`(${positions.length} positions, ${times.length} times, ${Array.from(typed).length} characters).`
+		);
+	}
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

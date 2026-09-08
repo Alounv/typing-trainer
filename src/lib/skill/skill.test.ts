@@ -1,28 +1,55 @@
 import { describe, expect, it } from 'vitest';
 import {
+	annotateFirstInputs,
 	buildLivePriorityTargets,
 	buildLiveUndertrained,
 	computeBigramDebts,
+	decodeStream,
+	encodeStream,
 	extractBigramAggregates,
 	generateDiagnosticReport,
-	summarizeBigrams
+	hydrateSession,
+	summarizeBigrams,
+	type AnnotatedKeystrokeEvent
 } from './index';
-import { annotateFirstInputs } from '../session/postprocess';
 import {
 	BIGRAM_CLASSIFICATION_WINDOW,
 	DEFAULT_THRESHOLDS,
-	ERROR_TIME_BUDGET_MS
+	ERROR_TIME_BUDGET_MS,
+	MIN_OCCURRENCES_FOR_CLASSIFICATION
 } from '../support/core';
 import type {
 	BigramAggregate,
 	BigramClassification,
 	BigramSample,
 	KeystrokeEvent,
-	SessionSummary
+	SessionSummary,
+	StoredSession
 } from '../support/core';
 
-function ev(position: number, expected: string, actual: string, timestamp: number): KeystrokeEvent {
-	return { position, expected, actual, timestamp, wordIndex: 0, positionInWord: position };
+/**
+ * Annotated by construction — `extractBigramAggregates` takes first-input
+ * events, and a lone keystroke is trivially the first input at its position.
+ * Tests that care about burst semantics build raw events and run them through
+ * `annotateFirstInputs` themselves.
+ */
+function ev(
+	position: number,
+	expected: string,
+	actual: string,
+	timestamp: number
+): AnnotatedKeystrokeEvent {
+	return {
+		position,
+		expected,
+		actual,
+		timestamp,
+		wordIndex: 0,
+		positionInWord: position,
+		corrected: false,
+		correctionDelay: 0,
+		burstFollowUp: false
+	};
 }
 
 function agg(
@@ -152,7 +179,7 @@ describe('extractBigramAggregates', () => {
 
 	it('classifies with enough occurrences and clean timing', () => {
 		// Feed 10 clean "th" pairs fast enough to be healthy.
-		const events: KeystrokeEvent[] = [];
+		const events: AnnotatedKeystrokeEvent[] = [];
 		for (let i = 0; i < 10; i++) {
 			events.push(ev(i * 2, 't', 't', i * 1000));
 			events.push(ev(i * 2 + 1, 'h', 'h', i * 1000 + 50));
@@ -422,5 +449,166 @@ describe('computeBigramDebts', () => {
 		];
 		// 19 clean on top of the old error: one more repeat pushes it out.
 		expect(computeBigramDebts(sessions, ['th']).get('th')).toBe(1);
+	});
+});
+
+describe('keystroke stream codec', () => {
+	const TEXT = 'the cat';
+	/** Word coordinates for `TEXT`, written out so the round-trip isn't self-confirming. */
+	const COORDS: readonly [number, number][] = [
+		[0, 0],
+		[0, 1],
+		[0, 2],
+		[0, 3],
+		[1, 0],
+		[1, 1],
+		[1, 2]
+	];
+
+	function stroke(position: number, actual: string, timestamp: number): KeystrokeEvent {
+		const [wordIndex, positionInWord] = COORDS[position];
+		return { position, actual, expected: TEXT[position], timestamp, wordIndex, positionInWord };
+	}
+
+	/** `TEXT` typed correctly, 100ms per key. */
+	function cleanRun(): KeystrokeEvent[] {
+		return [...TEXT].map((ch, i) => stroke(i, ch, i * 100));
+	}
+
+	it('round-trips a clean run, coordinates and all', () => {
+		const raw = cleanRun();
+		expect(decodeStream(encodeStream(raw), TEXT)).toEqual(raw);
+	});
+
+	it('round-trips a mistake and the retype at the same position', () => {
+		// Position 4 typed twice — the second entry is a zero position delta.
+		const raw = [
+			stroke(0, 't', 0),
+			stroke(1, 'h', 100),
+			stroke(2, 'e', 200),
+			stroke(3, ' ', 300),
+			stroke(4, 'x', 400),
+			stroke(4, 'c', 900),
+			stroke(5, 'a', 1000),
+			stroke(6, 't', 1100)
+		];
+		expect(decodeStream(encodeStream(raw), TEXT)).toEqual(raw);
+	});
+
+	it('round-trips a backspace that walks the cursor back a word', () => {
+		const raw = [...cleanRun(), stroke(4, 'c', 800), stroke(5, 'a', 900), stroke(6, 't', 1000)];
+		expect(decodeStream(encodeStream(raw), TEXT)).toEqual(raw);
+	});
+
+	it('rounds timestamps to whole ms, without accumulating the error', () => {
+		const raw = [stroke(0, 't', 0.4), stroke(1, 'h', 100.4), stroke(2, 'e', 200.4)];
+		// Each delta rounds to 100 rather than drifting 0.4ms per keystroke.
+		expect(decodeStream(encodeStream(raw), TEXT).map((e) => e.timestamp)).toEqual([0, 100, 200]);
+	});
+
+	it.each([
+		[
+			'a short times column',
+			{ positions: Int16Array.from([0, 1]), times: Uint32Array.from([0]), typed: 'th' }
+		],
+		[
+			'a short typed column',
+			{ positions: Int16Array.from([0, 1]), times: Uint32Array.from([0, 100]), typed: 't' }
+		],
+		[
+			'a position past the end of the text',
+			{ positions: Int16Array.from([99]), times: Uint32Array.from([0]), typed: 't' }
+		],
+		[
+			'a position before the start of the text',
+			{ positions: Int16Array.from([-1]), times: Uint32Array.from([0]), typed: 't' }
+		]
+	])('throws on %s', (_label, stream) => {
+		expect(() => decodeStream(stream, TEXT)).toThrow(/Corrupt keystroke stream/);
+	});
+});
+
+describe('hydrateSession', () => {
+	function row(overrides: Partial<StoredSession> = {}): StoredSession {
+		return {
+			id: 'sess',
+			timestamp: 1_000,
+			type: 'real-text',
+			durationMs: 60_000,
+			wpm: 50,
+			errorRate: 0,
+			...overrides
+		};
+	}
+
+	/** `n` clean "th " repeats typed at `gapMs` per keystroke. */
+	function repeatedTh(n: number, gapMs: number) {
+		const text = 'th '.repeat(n);
+		const events: KeystrokeEvent[] = [...text].map((ch, i) => ({
+			position: i,
+			expected: ch,
+			actual: ch,
+			timestamp: i * gapMs,
+			wordIndex: Math.floor(i / 3),
+			positionInWord: i % 3
+		}));
+		return { text, events };
+	}
+
+	it('measures the same bigrams the live pipeline would', () => {
+		// Includes a mistake, its retype, and a fumble run — the three cases
+		// where replay could plausibly diverge from live capture.
+		const text = 'the cat sat';
+		const typed = [
+			[0, 't'],
+			[1, 'h'],
+			[2, 'e'],
+			[3, ' '],
+			[4, 'x'],
+			[5, 'y'],
+			[6, 't'],
+			[4, 'c'],
+			[7, ' '],
+			[8, 's'],
+			[9, 'a'],
+			[10, 't']
+		] as const;
+		const raw: KeystrokeEvent[] = typed.map(([position, actual], i) => ({
+			position,
+			actual,
+			expected: text[position],
+			timestamp: i * 120,
+			wordIndex: Math.floor(position / 4),
+			positionInWord: position % 4
+		}));
+
+		const live = extractBigramAggregates(annotateFirstInputs(raw), 'sess');
+		const hydrated = hydrateSession(row({ text, stream: encodeStream(raw) })).bigramAggregates;
+
+		expect(live.length).toBeGreaterThan(0); // else the comparison proves nothing
+		expect(hydrated).toEqual(live);
+	});
+
+	it('re-scores a stored session under changed thresholds', () => {
+		// 10 clean "th" repeats at 150ms — fast under a 200ms bar, slow under 100ms.
+		const { text, events } = repeatedTh(MIN_OCCURRENCES_FOR_CLASSIFICATION, 150);
+		const stored = row({ text, stream: encodeStream(events) });
+
+		const fast = hydrateSession(stored, { speedMs: 200, errorRate: 0.05 });
+		const slow = hydrateSession(stored, { speedMs: 100, errorRate: 0.05 });
+
+		expect(fast.bigramAggregates.find((a) => a.bigram === 'th')!.classification).toBe('healthy');
+		expect(slow.bigramAggregates.find((a) => a.bigram === 'th')!.classification).toBe('fluency');
+	});
+
+	it('hands back a legacy row’s stored aggregates untouched', () => {
+		// No text, no stream — nothing to re-measure from, so the frozen
+		// session-time classification is all there is.
+		const stored = row({ bigramAggregates: [agg('th', 'sess', { classification: 'hasty' })] });
+		expect(hydrateSession(stored).bigramAggregates).toEqual(stored.bigramAggregates);
+	});
+
+	it('reports no bigrams for a row with neither stream nor aggregates', () => {
+		expect(hydrateSession(row()).bigramAggregates).toEqual([]);
 	});
 });

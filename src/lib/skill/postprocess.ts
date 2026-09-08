@@ -4,7 +4,7 @@ import type { KeystrokeEvent } from '../support/core';
  * One per position (the first input); retypes collapse into annotations on
  * that event.
  */
-interface AnnotatedKeystrokeEvent extends KeystrokeEvent {
+export interface AnnotatedKeystrokeEvent extends KeystrokeEvent {
 	corrected: boolean;
 	/** Ms between first input and correcting retype. 0 if never corrected. */
 	correctionDelay: number;

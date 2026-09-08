@@ -4,7 +4,7 @@ import type { DrillMode } from '$lib/support/core';
 import { getProfile } from '$lib/settings';
 import { getRecentSessions } from '$lib/support/storage';
 import { consumePlannedSession, resolveDrillMix } from '$lib/plan';
-import { computeBigramDebts } from '$lib/skill';
+import { computeBigramDebts, hydrateSessions } from '$lib/skill';
 
 interface BigramDrillSessionInputs {
 	text: string;
@@ -54,7 +54,7 @@ export async function prepareDrillSession(routeMode: DrillMode): Promise<BigramD
 		wordCount: wordBudget
 	});
 
-	const recent = await getRecentSessions();
+	const recent = hydrateSessions(await getRecentSessions(), profile?.thresholds);
 	const baselineWPM =
 		recent.find((s) => s.type === 'diagnostic')?.diagnosticReport?.baselineWPM ?? 0;
 

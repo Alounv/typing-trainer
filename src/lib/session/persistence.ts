@@ -6,24 +6,15 @@
  * only thing that still reaches directly into `storage/db` is this
  * file — everything above it calls `saveSession` and never sees Dexie.
  */
-import { db, bigramRecordKey } from '../support/storage';
-import type { SessionSummary } from '../support/core';
+import { db } from '../support/storage';
+import type { StoredSession } from '../support/core';
 
 /**
- * Persist summary + mirrored bigram rows atomically — a partial write would
- * desync `sessions` and `bigramRecords`. Diagnostic reports (when present)
- * ride along on the summary itself; there's no separate table.
+ * Persist one session row: the text, the keystroke stream, and the two scalars
+ * list views sort on. Nothing derived is written, so there is no second table
+ * to keep in step and no transaction to wrap — `bigramRecords` holds legacy
+ * rows only and is deliberately never written again.
  */
-export async function saveSession(summary: SessionSummary): Promise<void> {
-	await db.transaction('rw', db.sessions, db.bigramRecords, async () => {
-		await db.sessions.put(summary);
-
-		const rows = summary.bigramAggregates.map((agg) => ({
-			...agg,
-			key: bigramRecordKey(agg.bigram, agg.sessionId)
-		}));
-		if (rows.length > 0) {
-			await db.bigramRecords.bulkPut(rows);
-		}
-	});
+export async function saveSession(session: StoredSession): Promise<void> {
+	await db.sessions.put(session);
 }

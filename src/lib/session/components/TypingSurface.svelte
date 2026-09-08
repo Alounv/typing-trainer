@@ -22,7 +22,7 @@
 	import type { KeystrokeEvent } from '../../support/core';
 	import { getProfile } from '$lib/settings';
 	import { getRecentSessions } from '$lib/support/storage';
-	import { summarizeBigrams } from '$lib/skill';
+	import { summarizeBigrams, hydrateSessions } from '$lib/skill';
 	import { DEFAULT_THRESHOLDS } from '$lib/support/core';
 	import {
 		buildDifficultyMap,
@@ -88,13 +88,10 @@
 			// Recent-window pool, not lifetime: keeps reveal cost bounded as history grows
 			// and feeds `summarizeBigrams` so the tint shares `BIGRAM_CLASSIFICATION_WINDOW`
 			// with the rolling-window classifier.
-			const recent = await getRecentSessions();
+			const thresholds = profile.thresholds ?? DEFAULT_THRESHOLDS;
+			const recent = hydrateSessions(await getRecentSessions(), thresholds);
 			if (cancelled) return;
-			const summaries = summarizeBigrams(
-				recent,
-				undefined,
-				profile.thresholds ?? DEFAULT_THRESHOLDS
-			);
+			const summaries = summarizeBigrams(recent, undefined, thresholds);
 			bigramDifficultyMap = buildDifficultyMap(summaries, mode);
 		})();
 		return () => {

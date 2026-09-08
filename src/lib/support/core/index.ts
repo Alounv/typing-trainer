@@ -7,6 +7,8 @@ export type {
 	PriorityBigram,
 	SessionType,
 	SessionSummary,
+	StoredSession,
+	KeystrokeStream,
 	SessionConfig,
 	DrillMode,
 	Language,

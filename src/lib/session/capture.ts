@@ -1,5 +1,6 @@
 import type { Attachment } from 'svelte/attachments';
 import type { CaptureConfig, KeystrokeEvent } from '../support/core';
+import { buildWordIndex } from '../skill';
 
 export interface CaptureCallbacks {
 	onEvent?: (event: KeystrokeEvent) => void;
@@ -27,27 +28,9 @@ export function keystrokeCapture(
 		const events: KeystrokeEvent[] = [];
 		const startTime = performance.now();
 
-		// Pre-compute word indexing so the hot path does no scanning. Spaces
-		// get the previous word's index; the next non-space starts a new word
-		// at positionInWord=0.
-		//
-		//   text:             t  h  e  ␣  c  a  t  ␣  s  a  t
-		//   wordIndex:        0  0  0  0  1  1  1  1  2  2  2
-		//   positionInWord:   0  1  2  3  0  1  2  3  0  1  2
-		const wordIndexByPosition: number[] = [];
-		const positionInWordByPosition: number[] = [];
-		let wordIdx = 0;
-		let posInWord = 0;
-		for (let i = 0; i < text.length; i++) {
-			wordIndexByPosition.push(wordIdx);
-			positionInWordByPosition.push(posInWord);
-			if (text[i] === ' ') {
-				wordIdx++;
-				posInWord = 0;
-			} else {
-				posInWord++;
-			}
-		}
+		// Pre-computed once so the hot path does no scanning. Shared with stream
+		// replay, so a decoded event carries the coordinates reported here.
+		const { wordIndexByPosition, positionInWordByPosition } = buildWordIndex(text);
 
 		let position = 0;
 		let composing = false;

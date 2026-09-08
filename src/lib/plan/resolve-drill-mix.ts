@@ -1,6 +1,7 @@
 import type { DrillMode } from '../support/core';
 import type { FrequencyTable } from '../corpus';
-import { buildLivePriorityTargets, buildLiveUndertrained } from '../skill';
+import { buildLivePriorityTargets, buildLiveUndertrained, hydrateSessions } from '../skill';
+import { getProfile } from '../settings';
 import { getBigramHistory, getRecentSessions } from '../support/storage';
 import { findGraduatedBigrams } from './graduation-filter';
 import {
@@ -26,7 +27,8 @@ export async function resolveDrillMix(
 	mode: DrillMode,
 	corpusFrequencies: FrequencyTable | undefined
 ): Promise<DrillMix> {
-	const stats = await getRecentSessions();
+	const [rows, profile] = await Promise.all([getRecentSessions(), getProfile()]);
+	const stats = hydrateSessions(rows, profile?.thresholds);
 
 	// Class-scoped per mode so direct-nav matches the planner's own mode-scoped selection.
 	const classes = mode === 'speed' ? SPEED_CLASSES : ACCURACY_CLASSES;

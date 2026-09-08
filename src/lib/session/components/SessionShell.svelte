@@ -21,7 +21,7 @@
 	import TypingSurface from './TypingSurface.svelte';
 	import DrillTargets from './DrillTargets.svelte';
 	import type { KeystrokeEvent } from '$lib/support/core';
-	import type { DiagnosticReport, DrillMode, SessionType, SessionSummary } from '$lib/support/core';
+	import type { DiagnosticReport, DrillMode, SessionType, StoredSession } from '$lib/support/core';
 	import { SessionRunner } from '../runner';
 	import type { DifficultyMode } from '../bigramDifficulty';
 	import { computeGhostPosition, paceForMode } from '../pacer';
@@ -63,14 +63,13 @@
 		 */
 		initialDebt?: ReadonlyMap<string, number>;
 		/**
-		 * Diagnostic routes pass a builder that turns the just-finalized summary
-		 * (plus its raw events, available in-memory only for this call) into a
-		 * `DiagnosticReport` which is attached to the summary before persistence.
-		 * Keeps the shell type-agnostic — the diagnostic route owns the corpus
-		 * frequencies the engine needs.
+		 * Diagnostic routes pass a builder that turns the just-finalized row (plus
+		 * its raw events) into a `DiagnosticReport`, which is attached to the row
+		 * before persistence. Keeps the shell type-agnostic — the diagnostic route
+		 * owns the corpus frequencies the engine needs.
 		 */
 		buildDiagnosticReport?: (
-			summary: SessionSummary,
+			session: StoredSession,
 			events: readonly KeystrokeEvent[]
 		) => DiagnosticReport;
 	}
@@ -236,12 +235,12 @@
 		saving = true;
 		try {
 			const elapsed = performance.now() - (sessionStart ?? performance.now());
-			const summary: SessionSummary = runner.finalize(elapsed);
+			const session: StoredSession = runner.finalize(elapsed);
 			if (buildDiagnosticReport) {
-				summary.diagnosticReport = buildDiagnosticReport(summary, runner.events);
+				session.diagnosticReport = buildDiagnosticReport(session, runner.events);
 			}
-			await saveSession(summary);
-			await goto(resolve('/session/[id]/summary', { id: summary.id }));
+			await saveSession(session);
+			await goto(resolve('/session/[id]/summary', { id: session.id }));
 		} catch (err) {
 			saving = false;
 			saveError = err instanceof Error ? err.message : 'Failed to save session.';

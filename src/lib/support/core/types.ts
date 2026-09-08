@@ -73,6 +73,29 @@ export interface PriorityBigram {
 
 export type SessionType = 'diagnostic' | 'bigram-drill' | 'real-text';
 
+/**
+ * A session's keystroke log in compact columnar form.
+ *
+ * Columnar rather than an array of objects so IndexedDB stores the numeric
+ * columns as binary through structured clone — the object form costs roughly
+ * fourteen times as much for the same information.
+ *
+ * All three columns share one index space: entry `i` is the `i`-th keystroke.
+ * `positions` and `times` hold deltas from the previous entry (entry 0 is
+ * absolute), which keeps both columns full of small numbers.
+ *
+ * This is the session's evidence. Every bigram statistic in the app is a
+ * reading of it, never the other way round — see `session/stream-codec`.
+ */
+export interface KeystrokeStream {
+	/** Position deltas. Almost always `1`; a retype after backspacing goes negative. */
+	positions: Int16Array;
+	/** Whole-ms deltas since the previous keystroke; entry 0 is since session start. */
+	times: Uint32Array;
+	/** Typed characters in order, one code point per keystroke. */
+	typed: string;
+}
+
 /** Per-session metadata + aggregates. */
 export interface SessionSummary {
 	id: string;
@@ -91,12 +114,38 @@ export interface SessionSummary {
 	 * than a default.
 	 */
 	drillMode?: DrillMode;
+	/**
+	 * The prompt the user typed against. Stored from schema v2 on; absent on
+	 * legacy rows, which is precisely why their `bigramAggregates` are the only
+	 * evidence that survived — with no text there is no context to recover.
+	 */
+	text?: string;
+	/**
+	 * Raw keystroke log, from schema v2 on. The source every statistic is
+	 * derived from; absent on legacy rows.
+	 */
+	stream?: KeystrokeStream;
+	/**
+	 * Derived from `stream` on read, not persisted — see `storage/service`.
+	 * Legacy rows carry them as stored data instead, with their session-time
+	 * thresholds frozen in.
+	 */
 	bigramAggregates: BigramAggregate[];
 	/**
 	 * Populated only for `type === 'diagnostic'`. Computed at save time so the
 	 * dashboard can pull priority targets without replaying the raw keystroke log.
 	 */
 	diagnosticReport?: DiagnosticReport;
+}
+
+/**
+ * What the `sessions` table actually holds. Aggregates are absent on rows
+ * written from schema v2 on — they are re-derived from `stream` at read time,
+ * so persisting them would be a second, staler source of the same truth.
+ * Legacy rows are the mirror image: aggregates, no stream.
+ */
+export interface StoredSession extends Omit<SessionSummary, 'bigramAggregates'> {
+	bigramAggregates?: BigramAggregate[];
 }
 
 export interface SessionConfig {
@@ -156,7 +205,12 @@ export interface UserSettings {
 	colorizeBigramDifficulty?: boolean;
 }
 
-/** Atomic keystroke unit. `corrected` / `correctionDelay` are derived in post-processing. */
+/**
+ * Atomic keystroke unit — the in-memory shape, produced live by capture and
+ * rebuilt from a stored {@link KeystrokeStream} on read. Only `position`,
+ * `actual` and `timestamp` are stored; the rest are functions of the text.
+ * `corrected` / `correctionDelay` are derived in post-processing.
+ */
 export interface KeystrokeEvent {
 	/** Ms since session start, via `performance.now()`. */
 	timestamp: number;

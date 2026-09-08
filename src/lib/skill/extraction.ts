@@ -1,19 +1,16 @@
-import type {
-	BigramAggregate,
-	BigramSample,
-	ClassificationThresholds,
-	KeystrokeEvent
-} from '../support/core';
+import type { BigramAggregate, BigramSample, ClassificationThresholds } from '../support/core';
 import { classifyBigram } from './classification';
+import type { AnnotatedKeystrokeEvent } from './postprocess';
 
 /**
- * First-input event stream → per-bigram aggregates. Precondition: `events` is
- * first-inputs only (use `annotateFirstInputs`); retypes would double-count.
- * Errors are counted on the right-hand char to avoid double-counting across
- * adjacent bigrams. Timing draws only from clean (both-correct) samples.
+ * First-input event stream → per-bigram aggregates. Takes annotated events so
+ * the "first inputs only" precondition is a type rather than a comment —
+ * retypes would double-count. Errors are counted on the right-hand char to
+ * avoid double-counting across adjacent bigrams. Timing draws only from clean
+ * (both-correct) samples.
  */
 export function extractBigramAggregates(
-	events: readonly KeystrokeEvent[],
+	events: readonly AnnotatedKeystrokeEvent[],
 	sessionId: string,
 	thresholds?: ClassificationThresholds
 ): BigramAggregate[] {
@@ -28,9 +25,9 @@ export function extractBigramAggregates(
 		const left = sorted[i];
 		const right = sorted[i + 1];
 		if (right.position !== left.position + 1) continue;
-		// Drop fumble follow-ups (annotateFirstInputs flags them): only the first
-		// wrong key in a burst counts; subsequent wrongs are noise.
-		if ((right as { burstFollowUp?: boolean }).burstFollowUp) continue;
+		// Drop fumble follow-ups: only the first wrong key in a burst counts;
+		// subsequent wrongs are noise.
+		if (right.burstFollowUp) continue;
 
 		const key = left.expected + right.expected;
 		let bucket = buckets.get(key);

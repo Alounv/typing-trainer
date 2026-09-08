@@ -2,6 +2,7 @@ import { getSession, getRecentSessions } from '$lib/support/storage';
 import { computePlan } from '$lib/plan';
 import type { PlannedSession } from '$lib/plan';
 import { getProfile } from '$lib/settings';
+import { hydrateSession, hydrateSessions } from '$lib/skill';
 import { loadBuiltinCorpus, type FrequencyTable } from '$lib/corpus';
 import { DEFAULT_THRESHOLDS } from '$lib/support/core';
 import type { ClassificationThresholds, SessionSummary } from '$lib/support/core';
@@ -18,12 +19,16 @@ export type SummaryViewModel =
 	  };
 
 export async function loadSummaryContext(id: string): Promise<SummaryViewModel> {
-	const [session, statsSessions, profile] = await Promise.all([
+	const [row, statsRows, profile] = await Promise.all([
 		getSession(id),
 		getRecentSessions(),
 		getProfile()
 	]);
-	if (!session) return { status: 'missing' };
+	if (!row) return { status: 'missing' };
+
+	const thresholds = profile?.thresholds ?? DEFAULT_THRESHOLDS;
+	const session = hydrateSession(row, thresholds);
+	const statsSessions = hydrateSessions(statsRows, thresholds);
 
 	const { plan } = await computePlan({ statsSessions });
 
@@ -40,7 +45,7 @@ export async function loadSummaryContext(id: string): Promise<SummaryViewModel> 
 		session,
 		statsSessions,
 		corpusFrequencies,
-		thresholds: profile?.thresholds ?? DEFAULT_THRESHOLDS,
+		thresholds,
 		next: plan[0]
 	};
 }

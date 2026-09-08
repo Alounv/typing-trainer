@@ -7,7 +7,7 @@
 import type { SessionSummary, UserSettings } from '../support/core';
 import { getProfile } from '../settings';
 import { getBigramHistory, getRecentSessions } from '../support/storage';
-import { buildLivePriorityTargets, buildLiveUndertrained } from '../skill';
+import { buildLivePriorityTargets, buildLiveUndertrained, hydrateSessions } from '../skill';
 import { loadBuiltinCorpus } from '../corpus';
 import type { FrequencyTable } from '../corpus';
 import { findGraduatedBigrams } from './graduation-filter';
@@ -46,9 +46,12 @@ interface ComputePlanOptions {
 
 /** Resolve everything the dashboard needs: planner + graduation filter in one await. */
 export async function computePlan(opts: ComputePlanOptions = {}): Promise<PlanContext> {
-	const statsSessions = opts.statsSessions ?? (await getRecentSessions());
-
 	const userSettings = await getProfile();
+	// Stored rows hold keystrokes, not statistics — hydration measures them, and
+	// does it against this user's thresholds so an override re-scores history too.
+	const statsSessions =
+		opts.statsSessions ?? hydrateSessions(await getRecentSessions(), userSettings?.thresholds);
+
 	const corpusFrequencies = await loadCorpusFrequencies(userSettings);
 
 	// Class-scoped so an error-weighted ranking can't starve the fluency-only
