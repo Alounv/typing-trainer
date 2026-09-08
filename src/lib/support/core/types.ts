@@ -59,6 +59,10 @@ export interface PriorityBigram {
 	classification: Exclude<BigramClassification, 'healthy'>;
 }
 
+/**
+ * `real-text` is the only type produced now. `diagnostic` and `bigram-drill`
+ * remain because stored rows carry them — history has to stay readable.
+ */
 export type SessionType = 'diagnostic' | 'bigram-drill' | 'real-text';
 
 /**
@@ -131,29 +135,13 @@ export interface StoredSession extends Omit<SessionSummary, 'bigramAggregates'> 
 	bigramAggregates?: BigramAggregate[];
 }
 
-export interface SessionConfig {
-	type: SessionType;
-	/**
-	 * Total words the runner targets. Small on purpose — a drill/real-text mini-session
-	 * is ≤1 min at 60 WPM, so abandoning loses at most a minute and every completion
-	 * is a checkpoint.
-	 */
-	wordBudget: number;
-	bigramsTargeted?: string[];
-	/**
-	 * Only meaningful when `type === 'bigram-drill'`. Drives which bigrams are
-	 * targeted and the on-screen instruction copy. Absent on legacy sessions
-	 * and non-drill types.
-	 */
-	drillMode?: DrillMode;
-}
-
 /**
- * Which treatment the drill session applies. `accuracy` = repetition on
- * hasty/acquisition + undertrained targets. `speed` = already-accurate fluency
- * targets.
+ * Legacy only. Which treatment a drill session applied, back when drills
+ * existed — `accuracy` was repetition on error-prone targets, `speed` was
+ * already-accurate ones. Kept because stored rows carry it and the summary page
+ * has to label old sessions.
  */
-export type DrillMode = 'accuracy' | 'speed';
+type DrillMode = 'accuracy' | 'speed';
 
 export type Language = 'en' | 'fr';
 

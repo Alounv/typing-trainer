@@ -20,14 +20,12 @@
 	import { resolve } from '$app/paths';
 	import { SvelteSet } from 'svelte/reactivity';
 	import TypingSurface from './TypingSurface.svelte';
-	import DrillTargets from './DrillTargets.svelte';
 	import TintToggle from './TintToggle.svelte';
 	import type { KeystrokeEvent } from '$lib/support/core';
-	import type { DrillMode, SessionType, StoredSession } from '$lib/support/core';
+	import type { SessionType, StoredSession } from '$lib/support/core';
 	import { SessionRunner } from '../runner';
 	import type { DifficultyMode } from '../bigramDifficulty';
 	import { resolveInitialTint } from '../initialTint';
-	import { BigramLedger, type LedgerSnapshot } from '../bigramLedger';
 	import { saveSession } from '../persistence';
 
 	interface Props {
@@ -39,57 +37,13 @@
 		what?: string;
 		/** One-sentence guidance on how the user should type through it. */
 		approach?: string;
-		/** Drill targets, recorded on the summary for later analysis. */
-		targetBigrams?: readonly string[];
-		/**
-		 * Subset of `targetBigrams` that are exposure backfill (not diagnosed
-		 * weaknesses). Renders in the dashed style; anything not in this list
-		 * is treated as priority.
-		 */
-		exposureBigrams?: readonly string[];
-		/**
-		 * Drill treatment mode. Recorded on the persisted summary. Undefined
-		 * for non-drill types.
-		 */
-		drillMode?: DrillMode;
-		/**
-		 * Accuracy drills only — clean repeats each target already owes from its
-		 * history, so the chips are honest from the first keystroke.
-		 */
-		initialDebt?: ReadonlyMap<string, number>;
 	}
 
-	let {
-		type,
-		text,
-		title,
-		what,
-		approach,
-		targetBigrams,
-		exposureBigrams,
-		drillMode,
-		initialDebt
-	}: Props = $props();
+	let { type, text, title, what, approach }: Props = $props();
 
-	const exposureSet = $derived(new Set(exposureBigrams ?? []));
-	// Highlight only priority targets in the drill text — exposure bigrams
-	// are new, not diagnosed weaknesses, so they don't get the in-text tint.
-	const priorityBigrams = $derived(targetBigrams?.filter((b) => !exposureSet.has(b)));
-	// Word count for the eyebrow micro-label, matching the dashboard plan
-	// card's `Step N · 60 words` vocabulary so the session reads as a
-	// continuation of the plan, not a standalone page.
+	// Word count for the eyebrow micro-label, so the passage's size is legible
+	// before the first keystroke.
 	const wordCount = $derived(text.trim().split(/\s+/).filter(Boolean).length);
-	// Eyebrow text per session type. Drills append the mode so the page
-	// stamps both *what kind of session* and *which treatment*. Other
-	// types render their bare type name — `DIAGNOSTIC`, `REAL TEXT`.
-	const eyebrowLabel = $derived(
-		(() => {
-			if (type === 'bigram-drill' && drillMode) return `Drill · ${drillMode}`;
-			if (type === 'diagnostic') return 'Diagnostic';
-			if (type === 'real-text') return 'Real text';
-			return null;
-		})()
-	);
 
 	// Reactive mirrors of runner state. The runner itself is plain TS with
 	// no reactivity; we shadow the bits the UI reads in $state so the
@@ -118,9 +72,7 @@
 	// svelte-ignore state_referenced_locally
 	const runner = new SessionRunner({
 		type,
-		text,
-		targetBigrams,
-		drillMode
+		text
 	});
 
 	const progressPct = $derived(Math.round((position / text.length) * 100));
@@ -142,28 +94,6 @@
 		difficultyMode = next;
 	}
 
-	// Accuracy drills run a debt ledger: a mistake puts the bigram four clean
-	// repeats in debt, and each clean occurrence pays one back. The chips show
-	// the per-bigram state, the meter below shows the accumulated credit.
-	// svelte-ignore state_referenced_locally
-	const ledger =
-		drillMode === 'accuracy'
-			? new BigramLedger({ text, targetBigrams: targetBigrams ?? [], initialDebt })
-			: null;
-	let ledgerSnapshot = $state<LedgerSnapshot | null>(ledger?.snapshot() ?? null);
-	const ledgerEntries = $derived(
-		ledgerSnapshot ? new Map(ledgerSnapshot.entries.map((e) => [e.bigram, e])) : undefined
-	);
-	// Absolute units on a fixed track, so the filled part can never shrink: a
-	// mistake slides the finish line out instead of taking progress back.
-	const trackPct = (value: number) =>
-		ledgerSnapshot && ledgerSnapshot.scale > 0
-			? Math.min(100, (value / ledgerSnapshot.scale) * 100)
-			: 0;
-	const paidPct = $derived(trackPct(ledgerSnapshot?.paid ?? 0));
-	const targetPct = $derived(trackPct(ledgerSnapshot?.target ?? 0));
-	const hasWork = $derived(!!ledgerSnapshot && ledgerSnapshot.target > 0);
-
 	function onEvent(event: KeystrokeEvent) {
 		if (sessionStart === null) {
 			sessionStart = performance.now();
@@ -171,11 +101,6 @@
 		}
 		runner.recordEvent(event);
 		position = runner.position;
-		if (ledger) {
-			ledger.record(event);
-			ledgerSnapshot = ledger.snapshot();
-		}
-
 		// Error / correction state for the drill rendering. We don't read
 		// these off the runner (it only cares about first-input accuracy);
 		// these sets drive the character-state classes on TextDisplay.
@@ -228,31 +153,12 @@
 	-->
 	<header class="space-y-6">
 		<div class="space-y-3">
-			{#if eyebrowLabel}
-				<!--
-					Eyebrow micro-label, mirroring the dashboard plan card's
-					`Step N · 60 words` vocabulary. Stamps the page as part of
-					the planned session stack rather than a standalone screen.
-					Drills get a leading dot tinted to match the in-text
-					bigram highlight for the mode — a single quiet
-					differentiator between accuracy and speed without giving
-					the page a second accent color. Diagnostic and real-text
-					skip the dot since they have no mode-specific tint.
-				-->
-				<p
-					class="flex items-baseline gap-2 text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase"
-					data-testid="session-eyebrow"
-				>
-					{#if drillMode}
-						<span
-							aria-hidden="true"
-							class="inline-block h-1.5 w-1.5 rounded-full"
-							style={`background-color: var(${drillMode === 'speed' ? '--color-info' : '--color-warning'})`}
-						></span>
-					{/if}
-					<span>{eyebrowLabel} · {wordCount} words</span>
-				</p>
-			{/if}
+			<p
+				class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase"
+				data-testid="session-eyebrow"
+			>
+				Real text · {wordCount} words
+			</p>
 			<h1 class="text-4xl font-semibold tracking-tight">{title}</h1>
 		</div>
 		{#if what || approach}
@@ -281,56 +187,14 @@
 		{/if}
 
 		<TintToggle value={difficultyMode} onChange={chooseTint} />
-
-		{#if targetBigrams && targetBigrams.length > 0}
-			<!--
-				Same grid as the dl above, so the `DRILLING` label sits in
-				the same column as `WHAT / HOW`. Separated from the briefing
-				by a hairline to mark "this is data you'll look at while
-				typing," not more prose.
-			-->
-			<DrillTargets {targetBigrams} {exposureBigrams} {drillMode} entries={ledgerEntries} />
-		{/if}
 	</header>
 
 	<!--
-		Ambient progress: hairline bar above the drill. Doubles as a visible
+		Ambient progress: hairline bar above the passage. Doubles as a visible
 		signal that the session has started (filled) vs. is waiting on the
 		first keystroke (flat).
 	-->
 	<div class="space-y-3">
-		{#if hasWork}
-			<!--
-				Repayment track. Length is every target occurrence in the text, so
-				the filled part is drawn in absolute repeats and never shrinks —
-				a mistake slides the finish line right instead of clawing progress
-				back. The dim band is the work the drill is asking for.
-			-->
-			<div
-				class="relative h-1 w-full overflow-hidden rounded-full bg-base-300/40"
-				role="progressbar"
-				aria-label="Repeats cleared this drill"
-				aria-valuemin="0"
-				aria-valuemax={ledgerSnapshot?.target ?? 0}
-				aria-valuenow={ledgerSnapshot?.paid ?? 0}
-				data-testid="debt-progress"
-				data-paid={ledgerSnapshot?.paid}
-				data-target={ledgerSnapshot?.target}
-			>
-				<div
-					class="absolute inset-y-0 left-0 bg-base-content/15 transition-[width] duration-300 ease-out motion-reduce:transition-none"
-					style="width: {targetPct}%"
-				></div>
-				<div
-					class="absolute inset-y-0 left-0 rounded-full bg-success transition-[width] duration-300 ease-out motion-reduce:transition-none"
-					style="width: {paidPct}%"
-				></div>
-				<div
-					class="absolute inset-y-0 w-0.5 bg-base-content/60 transition-[left] duration-300 ease-out motion-reduce:transition-none"
-					style="left: calc({targetPct}% - 2px)"
-				></div>
-			</div>
-		{/if}
 		<div
 			class="h-0.5 w-full overflow-hidden rounded-full bg-base-300"
 			role="progressbar"
@@ -350,7 +214,6 @@
 			bind:position
 			{errorPositions}
 			{correctedPositions}
-			targetBigrams={drillMode ? priorityBigrams : undefined}
 			{difficultyMode}
 			{onEvent}
 		/>

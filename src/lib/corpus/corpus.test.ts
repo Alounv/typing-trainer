@@ -8,26 +8,7 @@ import {
 	scoreQuoteByDebt,
 	selectQuoteByDebt
 } from './index';
-import type { CorpusData, QuoteBank } from './types';
-
-function fixtureCorpus(): CorpusData {
-	return {
-		config: { id: 'test', language: 'en', wordlistId: 'test' },
-		wordFrequencies: {
-			the: 100,
-			and: 80,
-			there: 50,
-			other: 30,
-			together: 25,
-			of: 20,
-			to: 18,
-			in: 15,
-			that: 12,
-			is: 10
-		},
-		bigramFrequencies: { th: 200, he: 180, an: 120, er: 90, in: 70, re: 60 }
-	};
-}
+import type { QuoteBank } from './types';
 
 function fixtureQuoteBank(): QuoteBank {
 	return {
@@ -99,82 +80,34 @@ describe('registry', () => {
 });
 
 describe('generateText', () => {
-	it('bigram-drill: produces a non-empty word sequence drawn from the corpus', () => {
-		const { text } = generateText({
-			kind: 'bigram-drill',
-			corpus: fixtureCorpus(),
-			targetBigrams: ['th'],
-			wordCount: 20
-		});
-		const words = text.split(' ');
-		expect(words).toHaveLength(20);
-		// 100%-target-bearing contract: every picked word must contain 'th'.
-		expect(words.every((w) => w.includes('th'))).toBe(true);
-	});
-
-	it('bigram-drill: throws when the corpus has no usable words', () => {
-		const empty: CorpusData = {
-			config: { id: 'x', language: 'en', wordlistId: 'x' },
-			wordFrequencies: {},
-			bigramFrequencies: {}
-		};
-		expect(() =>
-			generateText({ kind: 'bigram-drill', corpus: empty, targetBigrams: ['th'], wordCount: 5 })
-		).toThrow();
-	});
-
-	it('real-text: uses quotes from the bank when supplied', () => {
+	it('assembles the passage from the bank verbatim', () => {
 		const bank = fixtureQuoteBank();
-		const { text } = generateText({
-			kind: 'real-text',
-			corpus: fixtureCorpus(),
-			quoteBank: bank,
-			targetLengthChars: 40
-		});
+		const { text } = generateText({ quoteBank: bank, targetLengthChars: 40 });
 		// The output must reproduce at least one quote's text verbatim — we don't
-		// care which, just that the bank is being used as the source.
+		// care which, just that real prose is the source and nothing rewrites it.
 		expect(bank.quotes.some((q) => text.includes(q.text))).toBe(true);
 	});
 
-	it('real-text: falls back to word-synth when no quote bank is available', () => {
+	it('prefers quotes that repay debt', () => {
+		const bank: QuoteBank = {
+			language: 'en',
+			groups: [[0, 1000]],
+			quotes: [
+				{ id: 1, text: 'zzz zzz zzz zzz zzz zzz.', source: 't', length: 24 },
+				{ id: 2, text: 'abab abab abab abab abab.', source: 't', length: 25 }
+			]
+		};
 		const { text } = generateText({
-			kind: 'real-text',
-			corpus: fixtureCorpus(),
-			quoteBank: undefined,
-			targetLengthChars: 60
-		});
-		expect(text.length).toBeGreaterThanOrEqual(60);
-		// Every word in the synth output should be from the fixture corpus.
-		const corpusWords = new Set(Object.keys(fixtureCorpus().wordFrequencies));
-		for (const w of text.split(' ')) {
-			expect(corpusWords.has(w)).toBe(true);
-		}
-	});
-
-	it('diagnostic: meets the requested char target', () => {
-		const { text } = generateText({
-			kind: 'diagnostic',
-			corpus: fixtureCorpus(),
-			quoteBank: undefined,
-			targetChars: 150
-		});
-		expect(text.length).toBeGreaterThanOrEqual(150);
-	});
-
-	it('diagnostic: assembles from the quote bank when supplied', () => {
-		const bank = fixtureQuoteBank();
-		const { text } = generateText({
-			kind: 'diagnostic',
-			corpus: fixtureCorpus(),
 			quoteBank: bank,
-			targetChars: 100
+			targetLengthChars: 20,
+			bigramDebts: new Map([['ab', 10]])
 		});
-		expect(bank.quotes.some((q) => text.includes(q.text))).toBe(true);
+		expect(text).toContain('abab');
 	});
 
 	// `rng() * 100 < secondaryMix` is deterministic at 0 (always primary) and at
 	// 100 (always secondary, since Math.random < 1) — no RNG injection needed.
-	describe('real-text language mix', () => {
+	describe('language mix', () => {
 		it.each([
 			{ mix: 100, expected: 'secondary', forbidden: 'primary' },
 			{ mix: 0, expected: 'primary', forbidden: 'secondary' }
@@ -182,8 +115,6 @@ describe('generateText', () => {
 			const primary = fixtureQuoteBank();
 			const secondary = fixtureSecondaryBank();
 			const { text } = generateText({
-				kind: 'real-text',
-				corpus: fixtureCorpus(),
 				quoteBank: primary,
 				secondaryQuoteBank: secondary,
 				secondaryMix: mix,
@@ -199,80 +130,12 @@ describe('generateText', () => {
 			const primary = fixtureQuoteBank();
 			const secondary = fixtureSecondaryBank();
 			const { text } = generateText({
-				kind: 'real-text',
-				corpus: fixtureCorpus(),
 				quoteBank: primary,
 				secondaryQuoteBank: secondary,
 				targetLengthChars: 40
 			});
 			expect(primary.quotes.some((q) => text.includes(q.text))).toBe(true);
 			expect(secondary.quotes.some((q) => text.includes(q.text))).toBe(false);
-		});
-	});
-
-	// Targets always come from primary; only the word pool swaps per draw.
-	describe('bigram-drill language mix', () => {
-		const secondaryCorpus: CorpusData = {
-			config: { id: 'fr', language: 'fr', wordlistId: 'fr' },
-			wordFrequencies: {
-				methode: 100, // "th" — target-bearing
-				ethique: 80, // "th" — target-bearing
-				bonjour: 50,
-				maison: 40,
-				travail: 30
-			},
-			bigramFrequencies: { th: 30, et: 80, ai: 100 }
-		};
-
-		it('mix=100 draws drill words from the secondary corpus when it has target-bearing words', () => {
-			const { text } = generateText({
-				kind: 'bigram-drill',
-				corpus: fixtureCorpus(),
-				secondaryCorpus,
-				secondaryMix: 100,
-				targetBigrams: ['th'],
-				wordCount: 10
-			});
-			const words = text.split(' ');
-			const secondaryWords = new Set(Object.keys(secondaryCorpus.wordFrequencies));
-			expect(words.every((w) => w.includes('th'))).toBe(true);
-			expect(words.every((w) => secondaryWords.has(w))).toBe(true);
-		});
-
-		it('partial mix lays out primary first, then secondary as a contiguous block', () => {
-			// mix=30 of 10 words → 7 primary, 3 secondary, in that order.
-			const { text } = generateText({
-				kind: 'bigram-drill',
-				corpus: fixtureCorpus(),
-				secondaryCorpus,
-				secondaryMix: 30,
-				targetBigrams: ['th'],
-				wordCount: 10
-			});
-			const words = text.split(' ');
-			const primaryWords = new Set(Object.keys(fixtureCorpus().wordFrequencies));
-			const secondaryWords = new Set(Object.keys(secondaryCorpus.wordFrequencies));
-			expect(words.slice(0, 7).every((w) => primaryWords.has(w))).toBe(true);
-			expect(words.slice(7).every((w) => secondaryWords.has(w))).toBe(true);
-		});
-
-		it('falls back to primary when secondary has no target-bearing words for the target', () => {
-			// "zz" matches neither corpus → mix inactive → primary-only.
-			const primary: CorpusData = {
-				...fixtureCorpus(),
-				wordFrequencies: { ...fixtureCorpus().wordFrequencies, buzz: 5 }
-			};
-			const { text } = generateText({
-				kind: 'bigram-drill',
-				corpus: primary,
-				secondaryCorpus,
-				secondaryMix: 100,
-				targetBigrams: ['zz'],
-				wordCount: 10
-			});
-			const words = text.split(' ');
-			const primaryWords = new Set(Object.keys(primary.wordFrequencies));
-			expect(words.every((w) => primaryWords.has(w))).toBe(true);
 		});
 	});
 });

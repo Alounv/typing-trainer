@@ -4,27 +4,10 @@
 import 'fake-indexeddb/auto';
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearAll, getBigramHistory, getRecentSessions, getSession } from './service';
+import { clearAll, getRecentSessions, getSession } from './service';
 import { saveProfile } from '../../settings/profile';
-import {
-	saveSessionFixture as saveSession,
-	saveLegacyBigramRowsFixture
-} from '../../test-utils/fixtures';
-import type { StoredSession, BigramAggregate } from '../core/types';
-
-function makeAggregate(overrides: Partial<BigramAggregate> = {}): BigramAggregate {
-	return {
-		bigram: 'th',
-		sessionId: 's1',
-		occurrences: 12,
-		meanTime: 140,
-		stdTime: 22,
-		errorCount: 0,
-		errorRate: 0,
-		classification: 'healthy',
-		...overrides
-	};
-}
+import { saveSessionFixture as saveSession } from '../../test-utils/fixtures';
+import type { StoredSession } from '../core/types';
 
 /** A current row: the text plus its keystroke stream, and nothing derived. */
 function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
@@ -71,11 +54,6 @@ describe('storage service — round-trip', () => {
 		expect(stream?.typed).toBe('the');
 	});
 
-	it('writes no bigram rows — aggregates are derived, not stored', async () => {
-		await saveSession(makeSession());
-		expect(await getBigramHistory('th')).toEqual([]);
-	});
-
 	it('returns undefined for unknown sessions', async () => {
 		expect(await getSession('does-not-exist')).toBeUndefined();
 	});
@@ -89,31 +67,13 @@ describe('storage service — round-trip', () => {
 		expect(recent.map((s) => s.id)).toEqual(['b', 'c', 'a']);
 	});
 
-	it('reads legacy bigram rows newest-first', async () => {
-		// Pre-stream history the graduation filter still consults.
-		await saveLegacyBigramRowsFixture([
-			makeAggregate({ bigram: 'th', sessionId: 's1', meanTime: 140 }),
-			makeAggregate({ bigram: 'er', sessionId: 's1', meanTime: 180 }),
-			makeAggregate({ bigram: 'th', sessionId: 's2', meanTime: 130 })
-		]);
-
-		const thHistory = await getBigramHistory('th');
-		expect(thHistory.map((a) => a.sessionId)).toEqual(['s2', 's1']);
-		expect(thHistory.every((a) => a.bigram === 'th')).toBe(true);
-
-		const erHistory = await getBigramHistory('er');
-		expect(erHistory).toHaveLength(1);
-		expect(erHistory[0].bigram).toBe('er');
-	});
-
 	it('clearAll wipes every table', async () => {
 		await saveSession(makeSession());
-		await saveLegacyBigramRowsFixture([makeAggregate()]);
 		await saveProfile({ language: 'en' });
 
 		await clearAll();
 
 		expect(await getSession('s1')).toBeUndefined();
-		expect(await getBigramHistory('th')).toEqual([]);
+		expect(await getRecentSessions()).toEqual([]);
 	});
 });

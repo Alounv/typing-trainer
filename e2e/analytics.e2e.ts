@@ -1,15 +1,15 @@
 import { expect, test } from '@playwright/test';
-import { runDiagnostic } from './fixtures';
+import { runSession, runSessions } from './fixtures';
 
 /**
- * Analytics page renders its four sections once at least one diagnostic is on
+ * Analytics page renders its four sections once at least one session is on
  * file. Covers the render path — loader → <Analytics> → charts — not chart
  * interactivity. A crash in any of the derived values (bigram summaries, WPM
  * series, classification mix, graduations) would fail here.
  */
 
-test('analytics: renders all four sections after a diagnostic is recorded', async ({ page }) => {
-	await runDiagnostic(page);
+test('analytics: renders all four sections after a session is recorded', async ({ page }) => {
+	await runSession(page);
 
 	await page.goto('/analytics');
 
@@ -28,7 +28,7 @@ test('analytics: renders all four sections after a diagnostic is recorded', asyn
 test('analytics: bigram table exposes the priority factors as sortable columns', async ({
 	page
 }) => {
-	await runDiagnostic(page);
+	await runSessions(page, 5);
 	await page.goto('/analytics');
 
 	const table = page.getByTestId('bigram-table');

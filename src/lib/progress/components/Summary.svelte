@@ -3,7 +3,7 @@
 	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
 	import { assessPacing, summarizeBigrams } from '$lib/skill';
-	import { detectWindowedMovements, detectMilestone, movementConcernsFocus } from '../celebrations';
+	import { detectWindowedMovements, detectMilestone } from '../celebrations';
 	import { buildBigramTrend } from '../metrics';
 	import BigramMovements from './BigramMovements.svelte';
 	import PacingBanner from './PacingBanner.svelte';
@@ -32,18 +32,10 @@
 	// than a single noisy session's per-session classification.
 	const allMovements = $derived(detectWindowedMovements(statsSessions, session.id, thresholds));
 
-	// On accuracy/speed drills, hide movements that don't concern the trained
-	// axis — pure-speed transitions clutter an accuracy summary and vice versa.
-	// Other session types (diagnostic, real-text) show everything.
-	const movements = $derived.by(() => {
-		if (session.drillMode === 'accuracy') {
-			return allMovements.filter((m) => movementConcernsFocus(m, 'accuracy'));
-		}
-		if (session.drillMode === 'speed') {
-			return allMovements.filter((m) => movementConcernsFocus(m, 'speed'));
-		}
-		return allMovements;
-	});
+	// Every movement shows. The drill-era filtering by trained axis is gone with
+	// the drills — a real-text session trains both, so hiding either half would
+	// hide half of what changed.
+	const movements = $derived(allMovements);
 
 	const sessionRows = $derived.by(() => {
 		const include = new Set<string>([

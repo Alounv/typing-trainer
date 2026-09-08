@@ -1,4 +1,4 @@
-import { getRecentSessions, getRecentDiagnosticSessions } from '$lib/support/storage';
+import { getRecentSessions } from '$lib/support/storage';
 import { getProfile } from '$lib/settings';
 import { hydrateSessions } from '$lib/skill';
 import { loadBuiltinCorpus, type FrequencyTable } from '$lib/corpus';
@@ -7,7 +7,6 @@ import type { ClassificationThresholds, SessionSummary, UserSettings } from '$li
 
 interface AnalyticsInputs {
 	sessions: SessionSummary[];
-	diagnosticSessions: SessionSummary[];
 	profile: UserSettings | undefined;
 	/** `undefined` when the corpus chunk failed to load — consumers treat it as "no frequency weighting". */
 	corpusFrequencies: FrequencyTable | undefined;
@@ -17,9 +16,8 @@ interface AnalyticsInputs {
 export async function loadAnalyticsInputs(): Promise<AnalyticsInputs> {
 	// No cap: cumulative healthy-bigram-over-time needs full history to be accurate
 	// for early dots (otherwise the rolling-window classifier sees a truncated past).
-	const [sessionRows, diagnosticRows, profile] = await Promise.all([
+	const [sessionRows, profile] = await Promise.all([
 		getRecentSessions(Number.POSITIVE_INFINITY),
-		getRecentDiagnosticSessions(Number.POSITIVE_INFINITY),
 		getProfile()
 	]);
 
@@ -28,7 +26,6 @@ export async function loadAnalyticsInputs(): Promise<AnalyticsInputs> {
 	// configured on the day each session was typed.
 	const thresholds = profile?.thresholds ?? DEFAULT_THRESHOLDS;
 	const sessions = hydrateSessions(sessionRows, thresholds);
-	const diagnosticSessions = hydrateSessions(diagnosticRows, thresholds);
 
 	// Best-effort: corpus failures still render the chart (summarizeBigrams falls back to freq=1).
 	let corpusFrequencies: FrequencyTable | undefined;
@@ -41,7 +38,6 @@ export async function loadAnalyticsInputs(): Promise<AnalyticsInputs> {
 
 	return {
 		sessions,
-		diagnosticSessions,
 		profile,
 		corpusFrequencies,
 		thresholds

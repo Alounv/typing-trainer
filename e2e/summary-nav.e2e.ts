@@ -1,22 +1,27 @@
 import { expect, test } from '@playwright/test';
-import { runDiagnostic } from './fixtures';
+import { runSession } from './fixtures';
 
 /**
- * Summary page hand-off actions. After completing a session the summary offers
- * either a "Next session" button (plan still has items) or a "Day complete"
- * CTA plus "Start another round" (plan exhausted). A fresh user has a multi-
- * session plan, so after a single diagnostic we expect the "Next session" path.
+ * Summary hand-off, and the round trip back to the dashboard. A completed
+ * session has to be reachable again from the recent list — that list is the
+ * only history surface left now the plan is gone.
  */
+test('summary: next passage starts another session, and the session shows up on the dashboard', async ({
+	page
+}) => {
+	await runSession(page);
 
-test('summary: Next session CTA routes to another session', async ({ page }) => {
-	await runDiagnostic(page);
+	await expect(page.getByTestId('pacing-verdict')).toBeVisible();
 
-	const nextButton = page.getByTestId('next-session');
-	await expect(nextButton).toBeVisible();
-
-	await nextButton.click();
-	await expect(page).toHaveURL(/\/session\/(accuracy-drill|speed-drill|real-text|diagnostic)$/);
-	// The session route's textbox must be present — proves the hand-off stash
-	// was consumed and the loader built a passage (not just that nav fired).
+	await page.getByTestId('next-session').click();
+	await expect(page).toHaveURL(/\/session\/real-text$/);
+	// Proves the loader actually built a passage, not just that nav fired.
 	await expect(page.getByRole('textbox')).toBeVisible();
+
+	await page.goto('/');
+	const recent = page.getByTestId('recent-sessions');
+	await expect(recent).toBeVisible();
+	await expect(recent.getByTestId('pacing-badge')).toHaveCount(1);
+	await recent.getByRole('link', { name: 'Details →' }).click();
+	await expect(page).toHaveURL(/\/session\/[^/]+\/summary$/);
 });

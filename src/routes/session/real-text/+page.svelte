@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
-	 * Real-text session route. Loads quote bank + fallback corpus, generates a
-	 * passage sized to the planned word budget. Self-contained mini-workout.
+	 * The session route. Picks a passage from the quote bank by how much of the
+	 * typist's outstanding bigram debt it can repay.
 	 */
 	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
@@ -36,6 +36,6 @@
 		type="real-text"
 		text={state.text}
 		title="Real text"
-		approach="Where drill precision becomes typing flow. Keep moving; errors are recorded but never blocking."
+		approach="Aim for a few errors, not none — somewhere around 2-5%. Keep moving; nothing here blocks you, and the verdict comes at the end."
 	/>
 {/if}

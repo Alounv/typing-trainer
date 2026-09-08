@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { annotateFirstInputs, encodeStream } from '../skill';
-import type { DrillMode, KeystrokeEvent, StoredSession, SessionType } from '../support/core';
+import type { KeystrokeEvent, StoredSession, SessionType } from '../support/core';
 
 /**
  * Inputs for turning a finished capture into a persistable row.
@@ -13,9 +13,6 @@ interface BuildStoredSessionInput {
 	text: string;
 	/** `performance.now()` relative duration of the session in ms. */
 	durationMs: number;
-	bigramsTargeted?: string[];
-	/** Drill mode — recorded on the row so it survives a round-trip through storage. */
-	drillMode?: DrillMode;
 	/** Injectable for tests; defaults to `uuid()` + `Date.now()`. */
 	idGenerator?: () => string;
 	timestampProvider?: () => number;
@@ -42,8 +39,6 @@ function buildStoredSession(input: BuildStoredSessionInput): StoredSession {
 		durationMs: input.durationMs,
 		wpm: computeWPM(input.text.length, input.durationMs),
 		errorRate: computeErrorRate(annotated),
-		bigramsTargeted: input.bigramsTargeted,
-		drillMode: input.drillMode,
 		text: input.text,
 		stream: encodeStream(input.events)
 	};
@@ -71,13 +66,6 @@ function computeErrorRate(annotated: readonly { expected: string; actual: string
 interface SessionRunnerConfig {
 	type: SessionType;
 	text: string;
-	/**
-	 * Target bigrams for a drill session. Recorded on the summary for later
-	 * analysis (cross-session graduation lives in `practice/graduation-filter`).
-	 */
-	targetBigrams?: readonly string[];
-	/** Drill mode (accuracy / speed). Unused for non-drill types. */
-	drillMode?: DrillMode;
 	/** Injectable so tests get deterministic ids. */
 	idGenerator?: () => string;
 	/** Injectable so tests get deterministic timestamps for `finalize`. */
@@ -115,8 +103,6 @@ export class SessionRunner {
 			type: this.config.type,
 			text: this.config.text,
 			durationMs: elapsedMs,
-			bigramsTargeted: this.config.targetBigrams ? [...this.config.targetBigrams] : undefined,
-			drillMode: this.config.drillMode,
 			idGenerator: this.config.idGenerator,
 			timestampProvider: this.config.timestampProvider
 		});

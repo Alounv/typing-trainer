@@ -22,12 +22,10 @@ interface ProfileRecord {
  * to what "clean" means re-score the whole history instead of only future
  * sessions. Legacy rows can never gain context — they never stored their text.
  *
- * `bigramRecords` mirrors the aggregates of legacy rows only. Nothing writes to
- * it any more; it exists so pre-stream history keeps feeding the planner, and
- * goes away with the last legacy row.
- *
- * Diagnostic reports ride along on the session row itself, so there is no
- * separate reports table.
+ * `bigramRecords` holds the aggregates of legacy rows. Nothing writes it and
+ * nothing reads it — the graduation filter that consulted it is gone. It is
+ * kept only so exporting an old database doesn't silently drop pre-stream
+ * history; its rows can never gain context, because they never stored text.
  *
  * Indexes are unchanged by the stream migration — both shapes live in `v1`'s
  * stores. To change an index: bump `version(n)` with a new `.stores(...)` and
@@ -46,11 +44,6 @@ class TypingTrainerDB extends Dexie {
 			profile: 'id'
 		});
 	}
-}
-
-/** Dexie needs a scalar primary key, so the `(bigram, sessionId)` pair is pre-joined. */
-export function bigramRecordKey(bigram: string, sessionId: string): string {
-	return `${bigram}::${sessionId}`;
 }
 
 /** Shared singleton — opening multiple Dexies on one DB name causes upgrade weirdness. */

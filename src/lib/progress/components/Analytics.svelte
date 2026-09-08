@@ -9,7 +9,6 @@
 		buildBigramTrendFromSamples,
 		buildRecentSamplesIndex,
 		BIGRAM_SPARKLINE_SAMPLE_LIMIT,
-		countGraduations,
 		tallyClassificationMix
 	} from '../metrics';
 	import WpmChart from './WpmChart.svelte';
@@ -20,15 +19,17 @@
 
 	interface Props {
 		sessions: readonly SessionSummary[];
-		diagnosticSessions: readonly SessionSummary[];
 		corpusFrequencies: FrequencyTable | undefined;
 		thresholds: ClassificationThresholds;
 	}
 
-	let { sessions, diagnosticSessions, corpusFrequencies, thresholds }: Props = $props();
+	let { sessions, corpusFrequencies, thresholds }: Props = $props();
 
-	const wpm = $derived(buildDailyWpmSeries(diagnosticSessions));
-	const errorRate = $derived(buildDailyErrorRateSeries(diagnosticSessions));
+	// Every session, not just diagnostics: with one session type there is no
+	// longer a calibration run to single out, and the trend is more honest for
+	// covering everything typed.
+	const wpm = $derived(buildDailyWpmSeries(sessions));
+	const errorRate = $derived(buildDailyErrorRateSeries(sessions));
 	const bigramProgress = $derived(
 		buildBigramProgressSeries(sessions, corpusFrequencies, thresholds)
 	);
@@ -44,17 +45,6 @@
 	);
 	const liveClassification = $derived(tallyClassificationMix(bigrams));
 
-	// Newest first, so [0] is the latest diagnostic and [1] the one before it.
-	const latestAndPrevDiagnostic = $derived(diagnosticSessions.slice(0, 2));
-
-	/** Graduations are a diagnostic-to-diagnostic measurement; `null` until two exist. */
-	const graduatedCount = $derived.by(() => {
-		const [latest, previous] = latestAndPrevDiagnostic;
-		return latest && previous
-			? countGraduations(previous.bigramAggregates, latest.bigramAggregates)
-			: null;
-	});
-
 	const classifiedCount = $derived(
 		liveClassification.counts.healthy +
 			liveClassification.counts.fluency +
@@ -67,17 +57,17 @@
 	<div class="flex items-baseline justify-between">
 		<h2 class="text-xl font-semibold">WPM trend</h2>
 		<p class="text-sm text-base-content/55">
-			{diagnosticSessions.length}
-			{diagnosticSessions.length === 1 ? 'diagnostic' : 'diagnostics'}
+			{sessions.length}
+			{sessions.length === 1 ? 'session' : 'sessions'}
 		</p>
 	</div>
 	<div class="rounded-lg border border-base-300 bg-base-100 p-4">
 		<WpmChart points={wpm} />
 	</div>
 	<p class="text-xs text-base-content/55">
-		Dots are the daily median across diagnostics. On days with several diagnostics, a vertical
-		whisker shows the day's full range. The line is a 7-day rolling average; the shaded band is ±1σ
-		around that average.
+		Dots are the daily median across sessions. On days with several sessions, a vertical whisker
+		shows the day's full range. The line is a 7-day rolling average; the shaded band is ±1σ around
+		that average.
 	</p>
 </section>
 
@@ -90,9 +80,9 @@
 		<ErrorRateChart points={errorRate} />
 	</div>
 	<p class="text-xs text-base-content/55">
-		Daily median of the per-diagnostic error rate (fraction of keystrokes that were first-input
-		errors), with the day's full range shown as a vertical whisker on multi-diagnostic days. The
-		line smooths across 7 days.
+		Daily median of the per-session error rate (fraction of keystrokes that were first-input
+		errors), with the day's full range shown as a vertical whisker on multi-session days. The line
+		smooths across 7 days.
 	</p>
 </section>
 
@@ -152,19 +142,6 @@
 				{liveClassification.unclassified}
 				{liveClassification.unclassified === 1 ? 'bigram is' : 'bigrams are'} still undertrained (fewer
 				than 10 observations) and excluded from the bar.
-			</p>
-		{/if}
-		{#if graduatedCount !== null}
-			<p class="text-sm text-base-content/70" data-testid="graduations-delta">
-				{#if graduatedCount === 0}
-					No bigrams graduated to healthy between diagnostics yet — keep going.
-				{:else if graduatedCount === 1}
-					<span class="font-medium text-success">1 bigram</span> graduated to healthy since the previous
-					diagnostic.
-				{:else}
-					<span class="font-medium text-success">{graduatedCount} bigrams</span>
-					graduated to healthy since the previous diagnostic.
-				{/if}
 			</p>
 		{/if}
 		<p class="text-xs text-base-content/55">

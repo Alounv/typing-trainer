@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { runDiagnostic } from './fixtures';
+import { runSession } from './fixtures';
 
 /**
- * Counterpart to `data-import.e2e.ts`. Seeds one diagnostic session so there
+ * Counterpart to `data-import.e2e.ts`. Seeds one session so there
  * is something to export, clicks the export button, intercepts the triggered
  * download, parses the JSON, and asserts the wire shape. Guards against a
  * regression in `exportAll` that would silently ship a malformed payload —
@@ -12,7 +12,7 @@ import { runDiagnostic } from './fixtures';
 test('data export: downloaded JSON round-trips through the same shape import accepts', async ({
 	page
 }) => {
-	await runDiagnostic(page);
+	await runSession(page);
 
 	await page.goto('/settings');
 	await expect(page.getByTestId('data-export')).toBeVisible();
@@ -41,7 +41,7 @@ test('data export: downloaded JSON round-trips through the same shape import acc
 	// stream whose three columns line up. Typed arrays don't survive JSON, so
 	// this is where a botched serialization would show up.
 	const session = payload.data.sessions[0];
-	expect(session.type).toBe('diagnostic');
+	expect(session.type).toBe('real-text');
 	expect(typeof session.text).toBe('string');
 	expect(session.text.length).toBeGreaterThan(0);
 	expect(Array.isArray(session.stream.positions)).toBe(true);

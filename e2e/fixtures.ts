@@ -16,8 +16,17 @@ export async function typeCurrentPassage(page: Page): Promise<void> {
 	await expect(page.getByRole('heading', { name: 'Session summary' })).toBeVisible();
 }
 
-/** Complete one diagnostic session. Used to seed baseline WPM + bigram data. */
-export async function runDiagnostic(page: Page): Promise<void> {
-	await page.goto('/session/diagnostic');
+/** Complete one passage, so there is history for the next thing to read. */
+export async function runSession(page: Page): Promise<void> {
+	await page.goto('/session/real-text');
 	await typeCurrentPassage(page);
+}
+
+/**
+ * Several passages back to back. A single passage is ~125 chars, which is too
+ * few bigrams for anything that needs a populated table; the diagnostic that
+ * used to seed these tests was five times longer on its own.
+ */
+export async function runSessions(page: Page, count: number): Promise<void> {
+	for (let i = 0; i < count; i++) await runSession(page);
 }

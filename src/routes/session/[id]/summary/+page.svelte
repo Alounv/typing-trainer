@@ -3,7 +3,6 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { loadSummaryContext, type SummaryViewModel } from './loader';
-	import { startPlannedSession, startFreshPlan } from '$lib/plan';
 	import type { SessionSummary } from '$lib/support/core';
 	import Summary from '$lib/progress/components/Summary.svelte';
 
@@ -23,8 +22,8 @@
 	});
 
 	/**
-	 * Enter triggers the primary CTA (next session or dashboard). We skip form fields and modifier
-	 * combos so we don't hijack native inputs or OS shortcuts.
+	 * Enter starts the next passage. We skip form fields and modifier combos so
+	 * we don't hijack native inputs or OS shortcuts.
 	 */
 	function onWindowKeydown(event: KeyboardEvent) {
 		if (state.status !== 'ready') return;
@@ -40,17 +39,17 @@
 		}
 
 		event.preventDefault();
-		if (state.next) {
-			startPlannedSession(state.next);
-		} else {
-			window.location.href = resolve('/');
-		}
+		window.location.href = resolve('/session/real-text');
 	}
 
-	/** Legacy drill sessions (no `drillMode`) fall back to generic "Bigram drill" so old records render. */
+	/**
+	 * Only `real-text` is produced now; the rest are historical rows whose
+	 * session types no longer exist. They still have to render — a summary the
+	 * user can open must say what it was.
+	 */
 	function sessionTypeLabel(s: SessionSummary): string {
-		if (s.type === 'diagnostic') return 'Diagnostic';
 		if (s.type === 'real-text') return 'Real text';
+		if (s.type === 'diagnostic') return 'Diagnostic';
 		if (s.drillMode === 'accuracy') return 'Accuracy drill';
 		if (s.drillMode === 'speed') return 'Speed drill';
 		return 'Bigram drill';
@@ -78,7 +77,7 @@
 					class="rounded-sm border border-base-300 bg-base-200 px-1.5 py-0.5 font-mono text-[0.65rem] tracking-normal text-base-content/70"
 					>Enter</kbd
 				>
-				{state.next ? 'next session' : 'dashboard'}
+				next passage
 			</p>
 		{/if}
 	</header>
@@ -100,35 +99,19 @@
 		/>
 
 		<div class="flex flex-wrap items-center gap-6 pt-2">
-			{#if state.next}
-				{@const next = state.next}
-				<button
-					type="button"
-					class="btn btn-lg btn-primary"
-					onclick={() => startPlannedSession(next)}
-					data-testid="next-session"
-				>
-					Next session: {next.label} →
-				</button>
-				<a
-					href={resolve('/')}
-					class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
-				>
-					Back to dashboard
-				</a>
-			{:else}
-				<a href={resolve('/')} class="btn btn-lg btn-primary" data-testid="day-complete-cta"
-					>Day complete · Back to dashboard</a
-				>
-				<button
-					type="button"
-					class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
-					onclick={() => startFreshPlan()}
-					data-testid="summary-start-another-round"
-				>
-					Start another round
-				</button>
-			{/if}
+			<a
+				href={resolve('/session/real-text')}
+				class="btn btn-lg btn-primary"
+				data-testid="next-session"
+			>
+				Next passage →
+			</a>
+			<a
+				href={resolve('/')}
+				class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
+			>
+				Back to practice
+			</a>
 		</div>
 	{/if}
 </div>

@@ -11,7 +11,6 @@
 		| {
 				status: 'ready';
 				sessions: SessionSummary[];
-				diagnosticSessions: SessionSummary[];
 				corpusFrequencies: FrequencyTable | undefined;
 				thresholds: ClassificationThresholds;
 		  }
@@ -21,9 +20,8 @@
 
 	onMount(async () => {
 		try {
-			const { sessions, diagnosticSessions, corpusFrequencies, thresholds } =
-				await loadAnalyticsInputs();
-			state = { status: 'ready', sessions, diagnosticSessions, corpusFrequencies, thresholds };
+			const { sessions, corpusFrequencies, thresholds } = await loadAnalyticsInputs();
+			state = { status: 'ready', sessions, corpusFrequencies, thresholds };
 		} catch (err) {
 			state = {
 				status: 'error',
@@ -39,7 +37,7 @@
 			Progress · {VERSION}
 		</p>
 		<h1 class="text-4xl font-semibold tracking-tight text-base-content">Analytics</h1>
-		<p class="text-base-content/65">WPM trend, bigram breakdown, diagnostic history.</p>
+		<p class="text-base-content/65">WPM trend, error rate, and where each bigram stands.</p>
 	</header>
 
 	{#if state.status === 'loading'}
@@ -49,7 +47,6 @@
 	{:else}
 		<Analytics
 			sessions={state.sessions}
-			diagnosticSessions={state.diagnosticSessions}
 			corpusFrequencies={state.corpusFrequencies}
 			thresholds={state.thresholds}
 		/>

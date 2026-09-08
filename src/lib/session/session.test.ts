@@ -1,187 +1,127 @@
 import { describe, expect, it } from 'vitest';
-import { BigramLedger, DEFAULT_DAMAGE } from './bigramLedger';
-import { BIGRAM_CLASSIFICATION_WINDOW, type KeystrokeEvent } from '../support/core';
+import { SessionRunner } from './runner';
+import { buildDifficultyMap } from './bigramDifficulty';
+import type { BigramSummary } from '../skill';
+import type { KeystrokeEvent } from '../support/core';
 
-/**
- * Types `typed` against `expected`, one first-input event per position.
- * A `~` in `typed` marks a wrong key there. Re-typing from the start is a no-op
- * for positions already recorded, so steps can build on each other.
- */
-function type(ledger: BigramLedger, expected: string, typed: string) {
+function event(
+	position: number,
+	expected: string,
+	actual: string,
+	timestamp: number
+): KeystrokeEvent {
+	return { timestamp, expected, actual, position, wordIndex: 0, positionInWord: position };
+}
+
+/** Types `typed` against `expected`, one event per position, 100ms apart. */
+function run(expected: string, typed: string, elapsedMs = 60_000) {
+	const runner = new SessionRunner({
+		type: 'real-text',
+		text: expected,
+		idGenerator: () => 'fixed-id',
+		timestampProvider: () => 1_000
+	});
 	for (let i = 0; i < typed.length; i++) {
-		ledger.record(event(i, expected[i], typed[i] === '~' ? '#' : typed[i]));
+		runner.recordEvent(event(i, expected[i], typed[i], i * 100));
 	}
+	return { runner, session: runner.finalize(elapsedMs) };
 }
 
-function event(position: number, expected: string, actual: string): KeystrokeEvent {
-	return {
-		timestamp: position,
-		expected,
-		actual,
-		position,
-		wordIndex: 0,
-		positionInWord: position
-	};
-}
+describe('SessionRunner', () => {
+	it('stores the text and the keystroke stream, and no aggregates', () => {
+		const { session } = run('the cat', 'the cat');
 
-function entry(ledger: BigramLedger, bigram: string) {
-	return ledger.snapshot().entries.find((e) => e.bigram === bigram)!;
-}
-
-/** `n` occurrences of "th", space-separated. Charged at positions 1, 4, 7, … */
-function repeated(n: number): string {
-	return 'th '.repeat(n).trim();
-}
-
-describe('BigramLedger', () => {
-	it('owes a full classification window of clean repeats per mistake', () => {
-		// `classifyBigram` wants errorRate < 0.05 over the last 20 samples, and
-		// 1/20 is exactly 0.05 — the error has to leave the window entirely.
-		expect(DEFAULT_DAMAGE).toBe(BIGRAM_CLASSIFICATION_WINDOW);
+		expect(session.text).toBe('the cat');
+		expect(session.stream?.typed).toBe('the cat');
+		expect(session.stream?.positions).toBeInstanceOf(Int16Array);
+		// Aggregates are a reading of the stream, measured on load.
+		expect(session.bigramAggregates).toBeUndefined();
 	});
 
-	it('measures the track in target occurrences', () => {
-		const ledger = new BigramLedger({ text: 'the theme', targetBigrams: ['th', 'he'] });
-		expect(entry(ledger, 'th').total).toBe(2);
-		expect(ledger.snapshot().scale).toBe(4);
+	it('rates WPM off the prompt length, not the keystroke count', () => {
+		// An abandoned run types fewer chars than the prompt. Counting events
+		// would call that a normal-speed session over a shorter text.
+		const full = run('the cat sat', 'the cat sat').session;
+		const abandoned = run('the cat sat', 'the').session;
+
+		expect(abandoned.wpm).toBe(full.wpm);
+		expect(full.wpm).toBeCloseTo(11 / 5, 5);
 	});
 
-	it('asks for nothing when nothing is owed on arrival', () => {
-		const text = repeated(3);
-		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
-		type(ledger, text, text);
-		expect(ledger.snapshot()).toMatchObject({ paid: 0, target: 0 });
+	it('counts an error once, however many times the position is retyped', () => {
+		const runner = new SessionRunner({ type: 'real-text', text: 'ab' });
+		runner.recordEvent(event(0, 'a', 'x', 0)); // wrong
+		runner.recordEvent(event(0, 'a', 'a', 100)); // retyped correctly
+		runner.recordEvent(event(1, 'b', 'b', 200));
+
+		// First input is what counts: 1 wrong out of 2 positions.
+		expect(runner.finalize(60_000).errorRate).toBeCloseTo(0.5, 5);
 	});
 
-	it('opens the drill asking for the debt the typist walked in with', () => {
-		const text = repeated(6);
-		const ledger = new BigramLedger({
-			text,
-			targetBigrams: ['th'],
-			initialDebt: new Map([['th', 4]])
-		});
-		expect(ledger.snapshot()).toMatchObject({ paid: 0, target: 4 });
-
-		type(ledger, text, text);
-		expect(ledger.snapshot()).toMatchObject({ paid: 4, target: 4 });
+	it('completes on the last position, not on the event count', () => {
+		const runner = new SessionRunner({ type: 'real-text', text: 'ab' });
+		runner.recordEvent(event(0, 'a', 'x', 0));
+		runner.recordEvent(event(0, 'a', 'a', 100));
+		expect(runner.isComplete()).toBe(false);
+		runner.recordEvent(event(1, 'b', 'b', 200));
+		expect(runner.isComplete()).toBe(true);
 	});
 
-	it('never asks for more repeats than the text can deliver', () => {
-		// Owes a full window but the drill only contains three occurrences.
-		const ledger = new BigramLedger({
-			text: repeated(3),
-			targetBigrams: ['th'],
-			initialDebt: new Map([['th', DEFAULT_DAMAGE]])
-		});
-		expect(ledger.snapshot().target).toBe(3);
+	it('reports zero WPM for a zero-duration session rather than infinity', () => {
+		expect(run('ab', 'ab', 0).session.wpm).toBe(0);
+	});
+});
+
+describe('buildDifficultyMap', () => {
+	function summary(overrides: Partial<BigramSummary>): BigramSummary {
+		return {
+			bigram: 'th',
+			classification: 'healthy',
+			meanTime: 150,
+			errorRate: 0,
+			occurrences: 20,
+			timeLostPerOccurrence: 0,
+			...overrides
+		} as BigramSummary;
+	}
+
+	it('scores the error tint by error rate against the ceiling', () => {
+		const map = buildDifficultyMap(
+			[summary({ bigram: 'th', errorRate: 0.05 }), summary({ bigram: 'er', errorRate: 0.1 })],
+			'errors'
+		);
+		expect(map.get('th')).toBeCloseTo(0.5, 5);
+		// At and past the ceiling the tint is full — a 40% error rate is not
+		// four times as red as 10%.
+		expect(map.get('er')).toBe(1);
 	});
 
-	it('moves the finish line out by what is still reachable', () => {
-		const text = repeated(6);
-		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
-		type(ledger, text, 't~');
-		// Five occurrences left after the mistake, so five repeats are asked for.
-		expect(ledger.snapshot()).toMatchObject({ paid: 0, target: 5 });
-
-		type(ledger, text, text.replace('th', 't~'));
-		expect(ledger.snapshot()).toMatchObject({ paid: 5, target: 5 });
+	it('scores the pace tint by rank, so only the draggiest pop', () => {
+		const map = buildDifficultyMap(
+			[
+				summary({ bigram: 'aa', meanTime: 100 }),
+				summary({ bigram: 'bb', meanTime: 200 }),
+				summary({ bigram: 'cc', meanTime: 300 })
+			],
+			'speed'
+		);
+		expect(map.get('aa')).toBe(0);
+		expect(map.get('cc')).toBe(1);
+		// The middle of three is ranked at 0.5, and the quartic curve keeps it
+		// nearly untinted rather than half-tinted.
+		expect(map.get('bb')).toBeLessThan(0.1);
 	});
 
-	it('leaves paid work alone when the line moves', () => {
-		const text = repeated(6);
-		const ledger = new BigramLedger({
-			text,
-			targetBigrams: ['th'],
-			initialDebt: new Map([['th', 3]])
-		});
-		type(ledger, text, 'th th');
-		expect(ledger.snapshot()).toMatchObject({ paid: 2, target: 3 });
-
-		// Erring on the third occurrence: three still reachable after it.
-		type(ledger, text, 'th th t~');
-		expect(ledger.snapshot()).toMatchObject({ paid: 2, target: 5 });
-	});
-
-	it('does not move the line when there is nothing left to run', () => {
-		const text = repeated(6);
-		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
-		type(ledger, text, 'th th th th th t~');
-		expect(ledger.snapshot()).toMatchObject({ paid: 0, target: 0 });
-	});
-
-	it('still charges the bigram a full window for the next session', () => {
-		const text = repeated(2);
-		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
-		type(ledger, text, 't~');
-		// The drill only asks for the one repeat it can deliver…
-		expect(ledger.snapshot().target).toBe(1);
-		// …but the debt carried forward is the whole window.
-		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE);
-	});
-
-	it('pays debt down one clean occurrence at a time', () => {
-		const text = repeated(4);
-		const ledger = new BigramLedger({
-			text,
-			targetBigrams: ['th'],
-			initialDebt: new Map([['th', DEFAULT_DAMAGE]])
-		});
-		type(ledger, text, 'th');
-		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE - 1);
-		type(ledger, text, 'th th');
-		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE - 2);
-	});
-
-	it('clamps seeded debt to one full repayment window', () => {
-		const ledger = new BigramLedger({
-			text: repeated(1),
-			targetBigrams: ['th'],
-			initialDebt: new Map([['th', 999]])
-		});
-		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE);
-	});
-
-	it('marks a bigram recovered once its debt is fully repaid', () => {
-		const text = repeated(DEFAULT_DAMAGE + 1);
-		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
-		type(ledger, text, text.replace('th', 't~'));
-		expect(entry(ledger, 'th')).toMatchObject({ debt: 0, wasDamaged: true });
-	});
-
-	it('re-damages a bigram in full when it is mistyped again', () => {
-		const text = repeated(3);
-		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
-		type(ledger, text, 't~ th t~');
-		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE);
-	});
-
-	it('charges a mistake on the right-hand char only', () => {
-		const ledger = new BigramLedger({ text: 'the', targetBigrams: ['th', 'he'] });
-		type(ledger, 'the', 'th~');
-		expect(entry(ledger, 'th').debt).toBe(0);
-		expect(entry(ledger, 'he').debt).toBe(DEFAULT_DAMAGE);
-	});
-
-	it('treats a fumble run as a single mistake', () => {
-		const ledger = new BigramLedger({ text: 'the', targetBigrams: ['th', 'he'] });
-		type(ledger, 'the', 't~~');
-		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE);
-		expect(entry(ledger, 'he').debt).toBe(0);
-	});
-
-	it('ignores retypes — only the first input at a position counts', () => {
-		const text = repeated(2);
-		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
-		type(ledger, text, 't~');
-		ledger.record(event(1, 'h', 'h'));
-		expect(entry(ledger, 'th').debt).toBe(DEFAULT_DAMAGE);
-		expect(ledger.snapshot().paid).toBe(0);
-	});
-
-	it('ignores a mistake on a bigram the drill is not targeting', () => {
-		const text = 'th ab th';
-		const ledger = new BigramLedger({ text, targetBigrams: ['th'] });
-		type(ledger, text, 'th a~');
-		expect(ledger.snapshot()).toMatchObject({ paid: 0, target: 0 });
-	});
+	it.each(['errors', 'speed'] as const)(
+		'leaves unclassified bigrams untinted in %s mode',
+		(mode) => {
+			// Under the occurrence floor there is no evidence to tint with, and a
+			// guessed tint would send the eye to the wrong place.
+			const map = buildDifficultyMap(
+				[summary({ bigram: 'zq', classification: 'unclassified', errorRate: 0.5, meanTime: 900 })],
+				mode
+			);
+			expect(map.has('zq')).toBe(false);
+		}
+	);
 });

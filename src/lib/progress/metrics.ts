@@ -342,22 +342,3 @@ export function tallyClassificationMix(
 	}
 	return mix;
 }
-
-/**
- * Count how many bigrams transitioned into `healthy` between two diagnostic snapshots.
- * A bigram absent from `before` but healthy in `after` counts; regressions don't.
- */
-export function countGraduations(
-	before: readonly BigramAggregate[],
-	after: readonly BigramAggregate[]
-): number {
-	const beforeClass = new Map<string, BigramClassification>();
-	for (const a of before) beforeClass.set(a.bigram, a.classification);
-	let graduated = 0;
-	for (const a of after) {
-		if (a.classification !== 'healthy') continue;
-		const prev = beforeClass.get(a.bigram);
-		if (prev !== 'healthy') graduated++;
-	}
-	return graduated;
-}

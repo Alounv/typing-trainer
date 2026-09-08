@@ -1,19 +1,17 @@
 import { expect, test } from '@playwright/test';
 
-test('dashboard renders and nav links route correctly', async ({ page }) => {
+test('dashboard renders and its one action starts a passage', async ({ page }) => {
 	await page.goto('/');
-	// The landing is CTA-first, not a generic "Dashboard" header. Asserting
-	// on the Start Diagnostic CTA is a more meaningful shape check than
-	// pinning the h1 text anyway.
-	await expect(page.getByTestId('start-diagnostic')).toBeVisible();
+	// The landing is CTA-first: there is one action, and nothing to choose
+	// between. Asserting on it is a more meaningful shape check than the h1.
+	await page.getByTestId('start-session').click();
+	await expect(page).toHaveURL(/\/session\/real-text$/);
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Real text');
+	await expect(page.getByRole('textbox')).toBeFocused();
+});
 
-	// Two drill overrides now — accuracy and speed live on separate routes.
-	await page.getByTestId('override-accuracy-drill').click();
-	await expect(page).toHaveURL(/\/session\/accuracy-drill$/);
-	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Accuracy drill');
-
+test('dashboard says so when there is no history to show', async ({ page }) => {
 	await page.goto('/');
-	await page.getByTestId('override-speed-drill').click();
-	await expect(page).toHaveURL(/\/session\/speed-drill$/);
-	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Speed drill');
+	await expect(page.getByTestId('no-history')).toBeVisible();
+	await expect(page.getByTestId('recent-sessions')).toHaveCount(0);
 });

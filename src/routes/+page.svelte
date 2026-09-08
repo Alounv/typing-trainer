@@ -1,25 +1,29 @@
 <script lang="ts">
 	/**
-	 * Dashboard. Reads recent sessions + latest diagnostic, asks the scheduler
-	 * what to do next, renders the plan as quick-start cards. Progress charts
-	 * and sparklines live on `/analytics` — this page is "now what?", not trends.
+	 * Dashboard. One action and a look back at recent sessions.
+	 *
+	 * It used to be a plan: a scheduler decided what kind of session came next
+	 * and rendered it as a stack of cards. That question no longer exists —
+	 * there is one session type, and which passage it serves is chosen from
+	 * outstanding debt when the session loads. So the page answers "how has it
+	 * been going" instead of "what now", and trends still live on `/analytics`.
 	 */
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { computePlan, startFreshPlan, startPlannedSession, type PlanContext } from '$lib/plan';
 	import { VERSION } from '$lib/version';
+	import PacingBadge from '$lib/progress/components/PacingBadge.svelte';
+	import { loadDashboard, type DashboardData } from './loader';
 
 	type LoadState =
 		| { status: 'loading' }
-		| { status: 'ready'; data: PlanContext }
+		| { status: 'ready'; data: DashboardData }
 		| { status: 'error'; message: string };
 
 	let state = $state<LoadState>({ status: 'loading' });
 
 	onMount(async () => {
 		try {
-			const data = await computePlan();
-			state = { status: 'ready', data };
+			state = { status: 'ready', data: await loadDashboard() };
 		} catch (err) {
 			state = {
 				status: 'error',
@@ -28,178 +32,73 @@
 		}
 	});
 
-	function wordsLabel(wordBudget: number): string {
-		return `${wordBudget} words`;
-	}
+	const dateFormat = new Intl.DateTimeFormat(undefined, {
+		month: 'short',
+		day: 'numeric',
+		hour: '2-digit',
+		minute: '2-digit'
+	});
 </script>
 
 <div class="mx-auto max-w-3xl space-y-12">
-	<header class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-		<div class="space-y-3">
-			<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
-				Typing Trainer · {VERSION}
-			</p>
-			<h1 class="text-4xl font-semibold tracking-tight text-base-content">Today's plan</h1>
-		</div>
-		<!-- Bump the plan-window cursor to now → fresh plan on next load. -->
-		<button
-			type="button"
-			class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
-			data-testid="restart-plan"
-			onclick={() => startFreshPlan()}
-		>
-			Start fresh plan →
-		</button>
+	<header class="space-y-3">
+		<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
+			Typing Trainer · {VERSION}
+		</p>
+		<h1 class="text-4xl font-semibold tracking-tight text-base-content">Practice</h1>
+		<p class="max-w-xl text-base-content/65">
+			Real prose, chosen for the transitions you currently owe repeats on.
+		</p>
 	</header>
+
+	<section>
+		<a
+			href={resolve('/session/real-text')}
+			class="btn btn-lg btn-primary"
+			data-testid="start-session"
+		>
+			Start a passage →
+		</a>
+	</section>
 
 	{#if state.status === 'loading'}
 		<p class="text-base-content/60">Loading…</p>
 	{:else if state.status === 'error'}
 		<p class="text-error" role="alert">{state.message}</p>
+	{:else if state.data.recent.length === 0}
+		<section class="border-t border-base-300 pt-6" data-testid="no-history">
+			<p class="text-sm text-base-content/55">
+				No sessions yet. The first few passages are chosen at random — there is nothing owed to
+				score them against until you have typed some.
+			</p>
+		</section>
 	{:else}
-		{@const data = state.data}
-
-		{#if data.allDoneForToday}
-			<!--
-				Day done. Deliberately quiet — celebration is reserved for
-				structural change. The "Start fresh plan" button in the header
-				is the escape hatch for anyone who wants to keep practising.
-			-->
-			<section class="space-y-3" data-testid="day-complete">
-				<h2 class="text-2xl font-semibold text-base-content">Today's plan is done.</h2>
-				<p class="text-base-content/65">Rest is part of the work. Come back tomorrow.</p>
-			</section>
-		{/if}
-
-		<!--
-			Planned session stack. Each card mirrors the shell's tone: big
-			headline, one-line rationale, single primary action. Numbered
-			so the user reads them as an ordered pair ("first this, then
-			that") rather than two parallel choices.
-		-->
-		<section class="space-y-4">
-			{#each data.plan as planned, i (i)}
-				<article
-					class="rounded-lg border border-base-300 p-6 transition-colors hover:border-base-content/30"
-					data-testid={`plan-card-${planned.config.type}`}
-				>
-					<div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-						<div class="space-y-1">
-							<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
-								Step {i + 1} · {wordsLabel(planned.config.wordBudget)}
-							</p>
-							<h2 class="text-2xl font-semibold text-base-content">
-								{planned.label}
-							</h2>
-							{#if planned.rationale}
-								<p class="max-w-xl text-sm text-base-content/65">
-									{planned.rationale}
-								</p>
-							{/if}
-						</div>
-						<button
-							type="button"
-							class="btn tracking-wide btn-primary"
-							onclick={() => startPlannedSession(planned)}
-							data-testid={`start-${planned.config.type}`}
+		<section class="space-y-4 border-t border-base-300 pt-6">
+			<h2 class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
+				Recent sessions
+			</h2>
+			<ul class="divide-y divide-base-300" data-testid="recent-sessions">
+				{#each state.data.recent as session (session.id)}
+					<li class="flex flex-wrap items-baseline gap-x-6 gap-y-1 py-3 text-sm">
+						<span class="w-32 shrink-0 text-base-content/50">
+							{dateFormat.format(new Date(session.timestamp))}
+						</span>
+						<span class="font-mono text-base-content/90 tabular-nums">
+							{session.wpm.toFixed(1)}<span class="text-base-content/40"> wpm</span>
+						</span>
+						<span class="font-mono text-base-content/90 tabular-nums">
+							{(session.errorRate * 100).toFixed(1)}<span class="text-base-content/40">% err</span>
+						</span>
+						<PacingBadge verdict={session.verdict} />
+						<a
+							href={resolve('/session/[id]/summary', { id: session.id })}
+							class="ml-auto text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
 						>
-							Start →
-						</button>
-					</div>
-
-					{#if planned.config.bigramsTargeted && planned.config.bigramsTargeted.length > 0}
-						<!-- Target chips — two styles when mix includes exposure backfill. -->
-						{@const exposureSet = new Set(planned.drillMix?.exposure ?? [])}
-						{@const mixed =
-							exposureSet.size > 0 &&
-							planned.config.bigramsTargeted.some((b) => !exposureSet.has(b))}
-						<ul class="mt-4 flex flex-wrap gap-1.5" aria-label="Drill targets">
-							{#each planned.config.bigramsTargeted as bigram (bigram)}
-								{@const isExposure = exposureSet.has(bigram)}
-								<li
-									class="rounded-sm px-2 py-0.5 font-mono text-xs {isExposure
-										? 'border border-dashed border-base-content/40 text-base-content/60'
-										: 'bg-base-200 text-base-content/80'}"
-									aria-label={isExposure
-										? `${bigram}, new bigram for exposure practice`
-										: `${bigram}, diagnosed weakness`}
-								>
-									{bigram}
-								</li>
-							{/each}
-						</ul>
-						{#if mixed}
-							<p class="mt-2 text-[11px] text-base-content/50">
-								<span
-									class="mr-1 inline-block rounded-sm bg-base-200 px-1.5 py-0.5 align-middle font-mono text-base-content/80"
-									>ab</span
-								>
-								diagnosed weakness ·
-								<span
-									class="mx-1 inline-block rounded-sm border border-dashed border-base-content/40 px-1.5 py-0.5 align-middle font-mono text-base-content/60"
-									>cd</span
-								>
-								new bigram — not enough data yet
-							</p>
-						{/if}
-					{/if}
-				</article>
-			{/each}
+							Details →
+						</a>
+					</li>
+				{/each}
+			</ul>
 		</section>
-
-		<!-- Override row: planner's usually right, but user can drop into a specific kind. -->
-		<section class="flex flex-wrap items-center gap-3 border-t border-base-300 pt-6 text-sm">
-			<p class="text-base-content/55">Or run something specific:</p>
-			<a
-				href={resolve('/session/diagnostic')}
-				class="btn btn-ghost btn-sm"
-				data-testid="override-diagnostic"
-			>
-				Diagnostic
-			</a>
-			<a
-				href={resolve('/session/accuracy-drill')}
-				class="btn btn-ghost btn-sm"
-				data-testid="override-accuracy-drill"
-			>
-				Accuracy drill
-			</a>
-			<a
-				href={resolve('/session/speed-drill')}
-				class="btn btn-ghost btn-sm"
-				data-testid="override-speed-drill"
-			>
-				Speed drill
-			</a>
-			<a
-				href={resolve('/session/real-text')}
-				class="btn btn-ghost btn-sm"
-				data-testid="override-realtext"
-			>
-				Real text
-			</a>
-		</section>
-
-		{#if data.lastSession}
-			<section
-				class="flex flex-wrap items-baseline gap-x-6 gap-y-2 border-t border-base-300 pt-6 text-sm"
-			>
-				<p class="text-base-content/55">Last session</p>
-				<p class="font-mono text-base-content/90 tabular-nums">
-					{data.lastSession.wpm.toFixed(1)}<span class="text-base-content/40"> WPM</span>
-				</p>
-				<p class="font-mono text-base-content/90 tabular-nums">
-					{(data.lastSession.errorRate * 100).toFixed(1)}<span class="text-base-content/40">
-						% err</span
-					>
-				</p>
-				<a
-					href={resolve('/session/[id]/summary', { id: data.lastSession.id })}
-					class="ml-auto text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
-				>
-					See details →
-				</a>
-			</section>
-		{/if}
 	{/if}
 </div>

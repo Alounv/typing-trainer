@@ -8,8 +8,6 @@ export type {
 	SessionSummary,
 	StoredSession,
 	KeystrokeStream,
-	SessionConfig,
-	DrillMode,
 	Language,
 	UserSettings,
 	KeystrokeEvent,

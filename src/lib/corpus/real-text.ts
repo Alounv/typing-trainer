@@ -1,22 +1,20 @@
-import type { CorpusData, Quote, QuoteBank, QuoteLengthGroup } from './types';
+import type { Quote, QuoteBank, QuoteLengthGroup } from './types';
 import { selectQuote } from './quotes';
 import { selectQuoteByDebt } from './debt-selection';
-import { selectRealTextSentence } from './selection';
 
 /**
- * Real-text passage generation from a quote bank.
+ * Assemble a passage from a quote bank.
  *
- * Two ways to pick each quote. With `bigramDebts`, quotes are chosen by how
- * much outstanding debt they can repay per keystroke — the real-text path.
- * Without it, sampling is weighted by target-bigram density, which is what the
- * diagnostic wants: representative prose, not text engineered around a chosen
- * subset of transitions.
+ * Two ways to pick each quote. With `bigramDebts`, by how much outstanding
+ * debt the quote repays per keystroke. Without — a first session, nothing owed
+ * yet — by uniform sampling, since there is nothing to score against.
  *
- * `fallbackCorpus` word-synth remains for languages with no quote bank, which
- * today means the diagnostic only.
+ * There is no synthesised fallback any longer: word-synth existed for the
+ * diagnostic, and generated text trains transitions inside nonsense the
+ * fingers will never meet again.
  */
 
-/** Single space — double-space would look jarring between synth sentences. */
+/** Single space — double-space would look jarring between quotes. */
 const QUOTE_SEPARATOR = ' ';
 
 /** 1400 chars ≈ 5 min at 60 WPM. */
@@ -29,15 +27,13 @@ const CLOSE_ENOUGH_RATIO = 0.85;
 const MAX_OVERSHOOT_RATIO = 1.5;
 
 interface RealTextInput {
-	/** Preferred source: a quote bank for the session's language. */
-	quoteBank?: QuoteBank;
+	/** The only source of material: a quote bank for the session's language. */
+	quoteBank: QuoteBank;
 	/** Second-language bank; with `secondaryMix > 0`, each draw rolls to pick a bank. */
 	secondaryQuoteBank?: QuoteBank;
 	/** 0..100 share of draws taken from `secondaryQuoteBank`. */
 	secondaryMix?: number;
-	/** Fallback when no quote bank. Both omitted → throws. */
-	fallbackCorpus?: CorpusData;
-	/** Target-bigram bias for both paths. Ignored when `bigramDebts` is given. */
+	/** Target-bigram sampling bias. Ignored when `bigramDebts` is given. */
 	targetBigrams?: readonly string[];
 	/**
 	 * Clean repeats each bigram still owes. Present → quotes are picked by
@@ -51,68 +47,40 @@ interface RealTextInput {
 interface RealTextOptions {
 	/** Target character count; default 1400. Actual output may exceed by one chunk. */
 	targetLengthChars?: number;
-	/** Length-bucket filter for the quote path. Ignored by the word-synth fallback. */
+	/** Length-bucket filter. */
 	quoteLengthGroup?: QuoteLengthGroup;
-	/** Words per synth sentence. Ignored by the quote path. */
-	synthWordsPerSentence?: number;
-	/** Max chunks (quotes or synth sentences) to concatenate — safety valve. */
+	/** Max quotes to concatenate — safety valve. */
 	maxChunks?: number;
 	/** Injectable RNG. Defaults to `Math.random`. */
 	rng?: () => number;
 }
 
-/** Provenance of each assembled chunk — lets UI render source lines. */
-type RealTextSegment =
-	| { kind: 'quote'; text: string; quote: Quote }
-	| { kind: 'synth'; text: string };
+/** Provenance of each quote — lets UI render source lines. */
+interface RealTextSegment {
+	text: string;
+	quote: Quote;
+}
 
 interface RealTextSequence {
 	/** Concatenated passage — feeds directly into the typing surface. */
 	text: string;
 	segments: RealTextSegment[];
-	stats: {
-		chunks: number;
-		chars: number;
-		source: 'quote-bank' | 'word-synth' | 'quote-bank-exhausted';
-	};
+	stats: { chunks: number; chars: number };
 }
 
-/**
- * Generate a real-text sequence. Quote bank first (no id repeats within a call);
- * fallback synth until char target is met. Throws when neither is supplied.
- */
+/** Concatenate quotes up to the char target, no id repeated within a call. */
 export function generateRealTextSequence(input: RealTextInput): RealTextSequence {
-	if (!input.quoteBank && !input.fallbackCorpus) {
-		throw new Error('generateRealTextSequence: need quoteBank or fallbackCorpus');
-	}
-
 	const options = input.options ?? {};
-	const targetLen = options.targetLengthChars ?? DEFAULT_TARGET_LENGTH_CHARS;
-	const maxChunks = options.maxChunks ?? 200;
-	const rng = options.rng ?? Math.random;
 
-	if (input.quoteBank) {
-		return buildFromQuotes(input.quoteBank, {
-			targetBigrams: input.targetBigrams ?? [],
-			bigramDebts: input.bigramDebts,
-			targetLen,
-			maxChunks,
-			lengthGroup: options.quoteLengthGroup,
-			rng,
-			synthFallback: input.fallbackCorpus,
-			synthWordsPerSentence: options.synthWordsPerSentence,
-			secondaryBank: input.secondaryQuoteBank,
-			secondaryMix: input.secondaryMix ?? 0
-		});
-	}
-
-	return buildFromSynth({
-		corpus: input.fallbackCorpus!,
+	return buildFromQuotes(input.quoteBank, {
 		targetBigrams: input.targetBigrams ?? [],
-		targetLen,
-		maxChunks,
-		wordsPerSentence: options.synthWordsPerSentence,
-		rng
+		bigramDebts: input.bigramDebts,
+		targetLen: options.targetLengthChars ?? DEFAULT_TARGET_LENGTH_CHARS,
+		maxChunks: options.maxChunks ?? 200,
+		lengthGroup: options.quoteLengthGroup,
+		rng: options.rng ?? Math.random,
+		secondaryBank: input.secondaryQuoteBank,
+		secondaryMix: input.secondaryMix ?? 0
 	});
 }
 
@@ -125,8 +93,6 @@ function buildFromQuotes(
 		maxChunks: number;
 		lengthGroup?: QuoteLengthGroup;
 		rng: () => number;
-		synthFallback?: CorpusData;
-		synthWordsPerSentence?: number;
 		secondaryBank?: QuoteBank;
 		secondaryMix: number;
 	}
@@ -159,29 +125,14 @@ function buildFromQuotes(
 		const quote = pickUnusedQuote(finalBank, finalUsed, { ...opts, remainingGap });
 		if (!quote) break;
 		finalUsed.add(quote.id);
-		segments.push({ kind: 'quote', text: quote.text, quote });
+		segments.push({ text: quote.text, quote });
 		charCount += quote.text.length;
-	}
-
-	// Quote bank short of target → pad with synth if fallback corpus present.
-	let source: RealTextSequence['stats']['source'] = 'quote-bank';
-	if (charCount < closeEnough && opts.synthFallback) {
-		source = 'quote-bank-exhausted';
-		while (charCount < closeEnough && segments.length < opts.maxChunks) {
-			const sentence = selectRealTextSentence(opts.synthFallback, {
-				wordCount: opts.synthWordsPerSentence,
-				targetBigrams: opts.targetBigrams,
-				rng: opts.rng
-			});
-			segments.push({ kind: 'synth', text: sentence });
-			charCount += sentence.length;
-		}
 	}
 
 	return {
 		text: segments.map((s) => s.text).join(QUOTE_SEPARATOR),
 		segments,
-		stats: { chunks: segments.length, chars: charCount, source }
+		stats: { chunks: segments.length, chars: charCount }
 	};
 }
 
@@ -226,32 +177,4 @@ function pickUnusedQuote(
 	// Strong targetBigrams bias may keep returning the same matches.
 	for (const q of bank.quotes) if (!used.has(q.id)) return q;
 	return null;
-}
-
-function buildFromSynth(opts: {
-	corpus: CorpusData;
-	targetBigrams: readonly string[];
-	targetLen: number;
-	maxChunks: number;
-	wordsPerSentence?: number;
-	rng: () => number;
-}): RealTextSequence {
-	const segments: RealTextSegment[] = [];
-	let charCount = 0;
-
-	while (charCount < opts.targetLen && segments.length < opts.maxChunks) {
-		const sentence = selectRealTextSentence(opts.corpus, {
-			wordCount: opts.wordsPerSentence,
-			targetBigrams: opts.targetBigrams,
-			rng: opts.rng
-		});
-		segments.push({ kind: 'synth', text: sentence });
-		charCount += sentence.length;
-	}
-
-	return {
-		text: segments.map((s) => s.text).join(QUOTE_SEPARATOR),
-		segments,
-		stats: { chunks: segments.length, chars: charCount, source: 'word-synth' }
-	};
 }
