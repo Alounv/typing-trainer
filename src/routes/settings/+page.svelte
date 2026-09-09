@@ -1,7 +1,10 @@
 <script lang="ts">
 	/**
 	 * Settings page: the knobs that live on `UserSettings` — language, passage
-	 * length, classification thresholds, and the tint's opening state. Persists
+	 * length, and the tint's opening state. Classification thresholds are on
+	 * `UserSettings` too but are no longer editable here: they silently re-score
+	 * every past session, which is not a thing to hand someone behind a number
+	 * input. A profile that already carries custom ones still honours them. Persists
 	 * via `saveProfile`; the session route reads back via `getProfile` and falls
 	 * back to the `DEFAULT_*` constants when fields are absent.
 	 *
@@ -15,11 +18,7 @@
 	import { onMount } from 'svelte';
 	import { getProfile, saveProfile, buildDefaultProfile, withDefaults } from '$lib/settings';
 	import { VERSION } from '$lib/version';
-	import {
-		DEFAULT_PASSAGE_WORDS,
-		DEFAULT_SPEED_THRESHOLD_MS,
-		DEFAULT_HIGH_ERROR_THRESHOLD
-	} from '$lib/support/core';
+	import { DEFAULT_PASSAGE_WORDS } from '$lib/support/core';
 	import type { Language, UserSettings } from '$lib/support/core';
 	import DataTransfer from '$lib/settings/DataTransfer.svelte';
 
@@ -43,9 +42,8 @@
 	onMount(async () => {
 		try {
 			const stored = await getProfile();
-			// Merge over defaults so a legacy profile missing `wordBudgets`
-			// or `thresholds` still renders sane values instead of
-			// `undefined` in the inputs.
+			// Merge over defaults so a legacy profile missing a field still
+			// renders a sane value instead of `undefined` in the inputs.
 			if (stored) form = withDefaults(stored);
 			loadState = 'ready';
 		} catch (err) {
@@ -199,7 +197,7 @@
 		</p>
 		<h1 class="text-4xl font-semibold tracking-tight text-base-content">Tune the trainer</h1>
 		<p class="max-w-xl text-base-content/65">
-			Language, passage length, classification thresholds. Stored locally — no account, no sync.
+			Language, passage length, and how a session opens. Stored locally — no account, no sync.
 		</p>
 	</header>
 
@@ -346,44 +344,9 @@
 			</dl>
 		</section>
 
-		<section class="space-y-6" aria-labelledby="threshold-heading">
-			<div class="flex items-baseline gap-4">
-				<span class="font-mono text-xs text-base-content/40 tabular-nums">03</span>
-				<h2 id="threshold-heading" class="text-xl font-semibold tracking-tight">Thresholds</h2>
-			</div>
-			<p class="max-w-xl text-sm text-base-content/65">
-				When a bigram counts as fast or error-prone.
-			</p>
-
-			<dl class="divide-y divide-base-300 border-y border-base-300">
-				<!-- Stored as ms per transition, shown as WPM: 12000 = 60000 ms/min ÷ 5 chars/word. -->
-				{@render numberRow({
-					id: 'threshold-speed',
-					label: 'Speed',
-					fallback: Math.round(12000 / DEFAULT_SPEED_THRESHOLD_MS),
-					value: Math.round(12000 / form.thresholds!.speedMs),
-					unit: 'WPM',
-					onInput: (wpm) => {
-						if (wpm > 0) form.thresholds!.speedMs = Math.round(12000 / wpm);
-					}
-				})}
-				{@render numberRow({
-					id: 'threshold-errorrate',
-					label: 'Error rate',
-					fallback: (DEFAULT_HIGH_ERROR_THRESHOLD * 100).toFixed(1),
-					value: (form.thresholds!.errorRate * 100).toFixed(1),
-					unit: '%',
-					onInput: (pct) => (form.thresholds!.errorRate = pct / 100),
-					min: '0',
-					max: '100',
-					step: '0.1'
-				})}
-			</dl>
-		</section>
-
 		<section class="space-y-6" aria-labelledby="bigramcolor-heading">
 			<div class="flex items-baseline gap-4">
-				<span class="font-mono text-xs text-base-content/40 tabular-nums">04</span>
+				<span class="font-mono text-xs text-base-content/40 tabular-nums">03</span>
 				<h2 id="bigramcolor-heading" class="text-xl font-semibold tracking-tight">
 					Bigram difficulty coloring
 				</h2>

@@ -13,11 +13,10 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
 	return {
 		id: 's1',
 		timestamp: 1_000,
-		type: 'bigram-drill',
+		type: 'real-text',
 		durationMs: 300_000,
 		wpm: 68,
 		errorRate: 0.03,
-		bigramsTargeted: ['th'],
 		text: 'the',
 		stream: {
 			positions: Int16Array.from([0, 1, 1]),

@@ -81,15 +81,6 @@ export interface SessionSummary {
 	/** Raw, not smoothed. Smoothing lives in `progress/`. */
 	wpm: number;
 	errorRate: number;
-	/** Set for `bigram-drill`, absent for `real-text` and `diagnostic`. */
-	bigramsTargeted?: string[];
-	/**
-	 * Set for `bigram-drill` sessions from the treatment-rotation era forward.
-	 * Absent on legacy drill sessions (pre-rotation) and on non-drill types,
-	 * so consumers must treat `undefined` as "unknown / not applicable" rather
-	 * than a default.
-	 */
-	drillMode?: DrillMode;
 	/**
 	 * The prompt the user typed against. Stored from schema v2 on; absent on
 	 * legacy rows, which is precisely why their `bigramAggregates` are the only
@@ -118,14 +109,6 @@ export interface SessionSummary {
 export interface StoredSession extends Omit<SessionSummary, 'bigramAggregates'> {
 	bigramAggregates?: BigramAggregate[];
 }
-
-/**
- * Legacy only. Which treatment a drill session applied, back when drills
- * existed — `accuracy` was repetition on error-prone targets, `speed` was
- * already-accurate ones. Kept because stored rows carry it and the summary page
- * has to label old sessions.
- */
-type DrillMode = 'accuracy' | 'speed';
 
 export type Language = 'en' | 'fr';
 

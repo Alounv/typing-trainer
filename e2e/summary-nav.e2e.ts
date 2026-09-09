@@ -2,20 +2,30 @@ import { expect, test } from '@playwright/test';
 import { runSession } from './fixtures';
 
 /**
- * The round trip back to the dashboard. A completed session has to be
- * reachable again from the recent list — that list is the only history
- * surface left now the plan is gone. Starting the next passage is the
- * dashboard's job; the summary no longer offers it.
+ * The summary has two ways out and both matter: straight into the next
+ * passage, which is the loop the app is built around, and back to the
+ * dashboard, whose recent list is the only history surface left now the
+ * plan is gone.
  */
+test('summary: leads into the next passage', async ({ page }) => {
+	await runSession(page);
+
+	await expect(page.getByTestId('pacing-verdict')).toBeVisible();
+
+	await page.getByTestId('next-session').click();
+	await expect(page).toHaveURL(/\/session\/real-text$/);
+	// Proves the loader actually built a passage, not just that nav fired.
+	await expect(page.getByRole('textbox')).toBeVisible();
+});
+
 test('summary: returns to the dashboard, where the finished session is listed', async ({
 	page
 }) => {
 	await runSession(page);
 
-	await expect(page.getByTestId('pacing-verdict')).toBeVisible();
-
 	await page.getByTestId('back-to-practice').click();
 	await expect(page).toHaveURL(/\/$/);
+
 	const recent = page.getByTestId('recent-sessions');
 	await expect(recent).toBeVisible();
 	await expect(recent.getByTestId('pacing-badge')).toHaveCount(1);

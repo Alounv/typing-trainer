@@ -87,66 +87,61 @@
 	</p>
 </section>
 
-<section class="space-y-3" data-testid="healthy-bigrams-trend">
+<!--
+	Where the bigrams stand, at two resolutions: the bar is today, the chart is
+	how today was arrived at. They were two sections with two headings and two
+	explanations, which read as two subjects rather than one.
+-->
+<section class="space-y-3" data-testid="classification-distribution">
 	<div class="flex items-baseline justify-between">
 		<h2 class="text-xl font-semibold">Bigram progress</h2>
 		<p class="text-sm text-base-content/55">Across all sessions</p>
 	</div>
-	<div class="rounded-lg border border-base-300 bg-base-100 p-4">
-		<SessionTrendChart
-			points={bigramProgress.healthy}
-			secondary={bigramProgress.beyondAcquisition}
-			yFloor={0}
-			ariaLabel="Bigram progress across sessions"
-			variant="success"
-			emptyLabel="No sessions yet — complete one to start tracking bigram progress."
-		/>
-		<div
-			class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/60"
-			aria-hidden="true"
-		>
-			<span class="inline-flex items-center gap-1.5">
-				<span class="inline-block h-0.5 w-4 bg-success"></span>
-				Healthy
-			</span>
-			<span class="inline-flex items-center gap-1.5">
-				<span
-					class="inline-block h-0.5 w-4 bg-base-content/35"
-					style="background-image: linear-gradient(to right, currentColor 50%, transparent 50%); background-size: 6px 100%;"
-				></span>
-				Beyond acquisition (healthy + fluency + hasty)
-			</span>
-		</div>
-	</div>
-	<p class="text-xs text-base-content/55">
-		Solid: bigrams classified healthy. Dashed: total past the acquisition phase (healthy + fluency +
-		hasty). The gap is your in-progress practice.
-	</p>
-</section>
 
-<section class="space-y-3" data-testid="classification-distribution">
-	<div class="flex items-baseline justify-between">
-		<h2 class="text-xl font-semibold">Classification mix</h2>
-	</div>
 	{#if classifiedCount > 0}
-		<div class="rounded-lg border border-base-300 bg-base-100 p-4">
+		<div class="space-y-4 rounded-lg border border-base-300 bg-base-100 p-4">
 			<ClassificationBar counts={liveClassification.counts} />
+			<hr class="border-base-300" />
+			<div data-testid="healthy-bigrams-trend">
+				<SessionTrendChart
+					points={bigramProgress.healthy}
+					secondary={bigramProgress.beyondAcquisition}
+					yFloor={0}
+					ariaLabel="Bigram progress across sessions"
+					variant="success"
+					emptyLabel="No sessions yet — complete one to start tracking bigram progress."
+				/>
+				<div
+					class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/60"
+					aria-hidden="true"
+				>
+					<span class="inline-flex items-center gap-1.5">
+						<span class="inline-block h-0.5 w-4 bg-success"></span>
+						Healthy
+					</span>
+					<span class="inline-flex items-center gap-1.5">
+						<span
+							class="inline-block h-0.5 w-4 bg-base-content/35"
+							style="background-image: linear-gradient(to right, currentColor 50%, transparent 50%); background-size: 6px 100%;"
+						></span>
+						Beyond acquisition (healthy + fluency + hasty)
+					</span>
+				</div>
+			</div>
 		</div>
-		{#if liveClassification.unclassified > 0}
-			<p class="text-xs text-base-content/55">
+		<p class="text-xs text-base-content/55">
+			The bar is your bigrams now, sized by share. The chart is the healthy count over time (solid)
+			against everything past acquisition (dashed) — the gap between them is what you are still
+			working on.
+			{#if liveClassification.unclassified > 0}
 				{liveClassification.unclassified}
 				{liveClassification.unclassified === 1 ? 'bigram is' : 'bigrams are'} still undertrained (fewer
-				than 10 observations) and excluded from the bar.
-			</p>
-		{/if}
-		<p class="text-xs text-base-content/55">
-			Each segment is a bigram bucket sized by share of your classified bigrams. Goal over time:
-			shift the bar toward green (healthy).
+				than 10 observations) and excluded from both.{/if}
 		</p>
 	{:else}
 		<p class="text-sm text-base-content/60">
 			Not enough practice yet — classifications need at least 10 observations per bigram. Keep
-			drilling and this will fill in.
+			typing and this will fill in.
 		</p>
 	{/if}
 </section>

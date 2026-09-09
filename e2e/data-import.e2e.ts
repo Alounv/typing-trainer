@@ -30,7 +30,6 @@ test('data import: a valid export round-trips through the UI without DataCloneEr
 					durationMs: 60_000,
 					wpm: 65,
 					errorRate: 0.02,
-					bigramsTargeted: ['th'],
 					bigramAggregates: [
 						{
 							bigram: 'th',
