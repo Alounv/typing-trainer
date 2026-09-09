@@ -89,10 +89,17 @@ interface Bucket {
 /** Buckets → points: median per bucket, then a trailing rolling mean and ±1σ
  *  across them. Only multi-sample buckets get a whisker, which is why the
  *  per-session series never shows one. */
-function buildSeries(buckets: readonly Bucket[]): TrendPoint[] {
+/**
+ * Days, not sessions — the daily charts bucket by date, so this is a week.
+ * Deliberately not {@link RECENT_WINDOW}: that counts sessions, and twenty days
+ * of smoothing would flatten a chart whose whole job is showing movement.
+ */
+export const TREND_SMOOTHING_DAYS = 7;
+
+function buildSeries(buckets: readonly Bucket[], window: number): TrendPoint[] {
 	const values = buckets.map((b) => median(b.values));
-	const rolling = rollingAverage(values, RECENT_WINDOW);
-	const sigmas = rollingStdDev(values, RECENT_WINDOW);
+	const rolling = rollingAverage(values, window);
+	const sigmas = rollingStdDev(values, window);
 
 	return buckets.map((bucket, i) => {
 		const mean = rolling[i];
@@ -147,15 +154,24 @@ function perDay(
 }
 
 export function buildWpmSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
-	return buildSeries(perSession(sessions, (s) => s.wpm));
+	return buildSeries(
+		perSession(sessions, (s) => s.wpm),
+		RECENT_WINDOW
+	);
 }
 
 export function buildDailyWpmSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
-	return buildSeries(perDay(sessions, (s) => s.wpm));
+	return buildSeries(
+		perDay(sessions, (s) => s.wpm),
+		TREND_SMOOTHING_DAYS
+	);
 }
 
 export function buildDailyErrorRateSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
-	return buildSeries(perDay(sessions, (s) => s.errorRate));
+	return buildSeries(
+		perDay(sessions, (s) => s.errorRate),
+		TREND_SMOOTHING_DAYS
+	);
 }
 
 /** Local-date key for grouping sessions into "days". */

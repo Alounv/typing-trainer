@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { RECENT_WINDOW } from '$lib/support/core';
 	import type { SessionSummary } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
 	import { summarizeBigrams } from '$lib/skill';
@@ -8,7 +7,8 @@
 		buildBigramProgressSeries,
 		buildDailyWpmSeries,
 		buildBigramRows,
-		tallyClassificationMix
+		tallyClassificationMix,
+		TREND_SMOOTHING_DAYS
 	} from '../metrics';
 	import SessionTrendChart from './SessionTrendChart.svelte';
 	import BigramTable from './BigramTable.svelte';
@@ -61,8 +61,8 @@
 	</div>
 	<p class="text-xs text-base-content/55">
 		Dots are the daily median across sessions. On days with several sessions, a vertical whisker
-		shows the day's full range. The line is a {RECENT_WINDOW}-day rolling average; the shaded band
-		is ±1σ around that average.
+		shows the day's full range. The line is a {TREND_SMOOTHING_DAYS}-day rolling average; the shaded
+		band is ±1σ around that average.
 	</p>
 </section>
 
@@ -83,7 +83,7 @@
 	<p class="text-xs text-base-content/55">
 		Daily median of the per-session error rate (fraction of keystrokes that were first-input
 		errors), with the day's full range shown as a vertical whisker on multi-session days. The line
-		smooths across {RECENT_WINDOW} days.
+		smooths across {TREND_SMOOTHING_DAYS} days.
 	</p>
 </section>
 

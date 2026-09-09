@@ -32,12 +32,16 @@ export const ERROR_TIME_BUDGET_MS = 600;
 export const PRIORITY_FREQUENCY_EXPONENT = 0.5;
 
 /**
- * What counts as "lately": the last 7 sessions, or the last 7 days for a
- * daily-bucketed series. One constant because two of them ended up on the same
- * screen — the milestone banner quoting one window and the pacing banner
- * another read as a single number contradicting itself.
+ * How many recent sessions count as "lately". Shared by the pacing baseline and
+ * the milestone average because both are quoted on the summary page, where two
+ * different windows read as one number contradicting itself.
+ *
+ * Twenty rather than a handful because a passage is short: 25 words is about
+ * 19 seconds and 125 characters at 80 WPM, so a seven-session baseline averages
+ * barely two minutes of typing and one awkward word moves it. Costs nothing at
+ * cold start for pacing, which averages whatever history exists up to this cap.
  */
-export const RECENT_WINDOW = 7;
+export const RECENT_WINDOW = 20;
 
 /**
  * Separate from {@link DEFAULT_HIGH_ERROR_THRESHOLD} despite the equal value:

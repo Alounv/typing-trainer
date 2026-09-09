@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { summarizeBigrams } from '$lib/skill';
-import { DEFAULT_THRESHOLDS } from '$lib/support/core';
+import { DEFAULT_THRESHOLDS, RECENT_WINDOW } from '$lib/support/core';
 import type { SessionSummary, BigramAggregate, BigramSample } from '$lib/support/core';
 import type { FrequencyTable } from '$lib/corpus';
 // One level in: movement detection is what the summary page is built around,
@@ -80,36 +80,42 @@ const wpmSession = (i: number, wpm: number) =>
 	}) as SessionSummary;
 
 describe('detectMilestone', () => {
-	// Eight slow sessions then three fast ones: the 7-session rolling average
-	// steps 59.3 -> 66.4 at index 10, so session 10 is the one that earns 60.
-	const history = [
-		...Array.from({ length: 8 }, (_, i) => wpmSession(i, 45)),
-		wpmSession(8, 95),
-		wpmSession(9, 95),
-		wpmSession(10, 95)
-	];
+	const W = RECENT_WINDOW;
+	const SLOW = 45;
+	const FAST = 95;
+
+	// W slow sessions, then fast ones. Each fast session entering the window
+	// lifts the mean by (FAST - SLOW)/W, so the mean reaches 60 once k fast
+	// sessions are in it:  (SLOW(W-k) + FAST·k)/W = 60  →  k = 0.3W.
+	// That happens at index W + k - 1.
+	const CROSSES_AT = Math.round(W * 1.3) - 1;
+
+	const climb = (n: number) =>
+		Array.from({ length: n }, (_, i) => wpmSession(i, i < W ? SLOW : FAST));
+
+	const history = climb(CROSSES_AT + 1);
 
 	it('awards the badge to the session that earned it', () => {
-		expect(detectMilestone(history[10], history)?.threshold).toBe(60);
+		expect(detectMilestone(history[CROSSES_AT], history)?.threshold).toBe(60);
 	});
 
 	// The series is chronological, so reading its last point reports on the
 	// newest session on file rather than the one whose summary is open.
 	it('awards nothing when an older, unremarkable session is opened', () => {
-		expect(detectMilestone(history[3], history)).toBeNull();
+		expect(detectMilestone(history[2], history)).toBeNull();
 	});
 
 	it('awards a threshold once, even if the average dips back under and recovers', () => {
-		// Same run, then a slump that drags the average below 60, then a recovery
-		// that lifts it back over. The badge belongs to the first crossing only.
+		// A slump long enough to drag the mean under 60, then a recovery long
+		// enough to lift it back over. The badge belongs to the first crossing.
+		const next = (from: number, n: number, wpm: number) =>
+			Array.from({ length: n }, (_, i) => wpmSession(from + i, wpm));
 		const dipAndRecover = [
 			...history,
-			...Array.from({ length: 8 }, (_, i) => wpmSession(11 + i, 30)),
-			...Array.from({ length: 8 }, (_, i) => wpmSession(19 + i, 95))
+			...next(history.length, W, 20),
+			...next(history.length + W, W, FAST)
 		];
-		const recrossed = dipAndRecover.filter(
-			(s) => detectMilestone(s, dipAndRecover)?.threshold === 60
-		);
-		expect(recrossed.map((s) => s.id)).toEqual(['s10']);
+		const earned = dipAndRecover.filter((s) => detectMilestone(s, dipAndRecover)?.threshold === 60);
+		expect(earned.map((s) => s.id)).toEqual([`s${CROSSES_AT}`]);
 	});
 });
