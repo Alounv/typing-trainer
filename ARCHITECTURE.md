@@ -37,9 +37,10 @@ layers**; routes compose domains through a thin route-local `loader.ts`.
   thresholds, …). Type-only; no runtime; no `$lib/*` imports. The DAG leaf.
 - **`support/storage`** — Dexie wrapper, and it stays dumb: it reads and writes
   `StoredSession` rows and derives nothing.
-- **`support/async`** — `loadable()`, the loading/ready/error rune every route
-  needs. Data lives in IndexedDB, so loading is client-side and can't move into
-  SvelteKit's `load`.
+- **`support/loadable.svelte.ts`** — `loadable()`, the loading/ready/error rune
+  every route needs. Data lives in IndexedDB, so loading is client-side and
+  can't move into SvelteKit's `load`. One function with four call sites, so it
+  is a file rather than a folder with a barrel.
 - **`support/theme`** — Theme selector component + store.
 
 ## Dependency graph
@@ -74,7 +75,7 @@ Every edge points down. Nothing below reaches back up.
                │            │                         │
                ▼            ▼                         ▼
         ┌──────────────────────────────────────────────────┐
-        │  support/storage      support/async              │
+        │  support/storage      support/loadable.svelte    │
         │            └──────────┬───────────┘              │
         │                 support/core                     │
         └──────────────────────────────────────────────────┘
@@ -88,6 +89,12 @@ Notes on the less obvious edges:
   (the session write) and `tint` (the one read the tint needs). Its components
   take everything else as props.
 - **Skill → Corpus and Progress → Corpus are type-only** (`FrequencyTable`).
+- **Session and Progress have no `index.ts`.** Their entire public surface is
+  Svelte components, and re-exporting components through a `.ts` barrel costs
+  HMR granularity for no gain. The lint rule exempts `.svelte` paths, so this is
+  allowed — but it also means nothing stops a route importing one of their
+  _internal_ components. That trade is deliberate: both are called by `routes`
+  and by nobody else, so the boundary has one consumer to protect it from.
 
 ## The training loop
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Analytics from '$lib/progress/components/Analytics.svelte';
-	import { loadable } from '$lib/support/async';
+	import { loadable } from '$lib/support/loadable.svelte';
 	import { VERSION } from '$lib/version';
 	import { loadAnalyticsInputs } from './loader';
 

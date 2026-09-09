@@ -10,7 +10,7 @@
 	 */
 	import { resolve } from '$app/paths';
 	import { VERSION } from '$lib/version';
-	import { loadable } from '$lib/support/async';
+	import { loadable } from '$lib/support/loadable.svelte';
 	import PacingBadge from '$lib/progress/components/PacingBadge.svelte';
 	import { loadDashboard } from './loader';
 

@@ -13,7 +13,9 @@ const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 // Import-path boundary: imports must go through a lib barrel. Allow:
 // - `$lib/<lib>` (barrel, e.g. `$lib/corpus`)
 // - `$lib/support/<lib>` (support barrel, e.g. `$lib/support/core`)
-// - `.svelte` files anywhere under `$lib/<lib>/...` (components don't re-export through .ts barrels)
+// - `.svelte` files anywhere under `$lib/<lib>/...` (components don't re-export
+//   through .ts barrels — `session` and `progress` are components-only and have
+//   no barrel at all, so this exemption is their whole public surface)
 // - `$lib/<lib>/components` (component sub-folder)
 // - `$lib/assets/**` (static assets)
 // Ban deep paths into library internals: `$lib/<lib>/<file>`, `$lib/support/<lib>/<file>`.

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { loadable } from '$lib/support/async';
+	import { loadable } from '$lib/support/loadable.svelte';
 	import type { SessionSummary } from '$lib/support/core';
 	import Summary from '$lib/progress/components/Summary.svelte';
 	import { loadSummaryContext } from './loader';

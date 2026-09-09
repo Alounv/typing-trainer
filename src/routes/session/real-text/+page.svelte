@@ -4,7 +4,7 @@
 	 * typist's outstanding bigram debt it can repay.
 	 */
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
-	import { loadable } from '$lib/support/async';
+	import { loadable } from '$lib/support/loadable.svelte';
 	import { prepareRealTextSession } from './loader';
 
 	const passage = loadable(prepareRealTextSession, 'Failed to build passage.');
