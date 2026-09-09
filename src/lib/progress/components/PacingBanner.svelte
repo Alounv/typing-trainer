@@ -7,7 +7,7 @@
 	 * the eye off what it should be reading. The judgement lands once, here.
 	 */
 	import type { PacingAssessment } from '$lib/skill';
-	import { PACING_COMPARISON_WINDOW } from '$lib/support/core';
+	import { RECENT_WINDOW } from '$lib/support/core';
 	import { PACING_COPY, PACING_TONE_CLASSES, pacingDetail } from '../pacingDisplay';
 
 	interface Props {
@@ -33,11 +33,11 @@
 		{detail}
 	</p>
 	{#if assessment.recentWpm !== undefined}
-		<!-- Says which window, because the milestone banner above quotes a
-		     7-session average that includes this session — two honest numbers
-		     that read as one contradicting itself when neither is labelled. -->
+		<!-- Same window as the milestone banner, but excluding this session:
+		     a baseline this session is measured against cannot contain it. The
+		     two numbers are close, never equal, so both stay labelled. -->
 		<p class="font-mono text-xs whitespace-nowrap text-base-content/50 tabular-nums">
-			{assessment.wpm.toFixed(1)} vs {assessment.recentWpm.toFixed(1)} over last {PACING_COMPARISON_WINDOW}
+			{assessment.wpm.toFixed(1)} vs {assessment.recentWpm.toFixed(1)} over previous {RECENT_WINDOW}
 		</p>
 	{/if}
 </section>

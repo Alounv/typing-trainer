@@ -9,7 +9,7 @@
 import { assessPacing, hydrateSessions, summarizeBigrams, type BigramSummary } from '$lib/skill';
 import { getRecentSessions } from '$lib/support/storage';
 import { buildDefaultProfile, getProfile } from '$lib/settings';
-import { PACING_COMPARISON_WINDOW } from '$lib/support/core';
+import { RECENT_WINDOW } from '$lib/support/core';
 
 export type DifficultyMode = 'errors' | 'speed';
 
@@ -52,7 +52,7 @@ function openingMode(
 	if (!enabled) return null;
 	const last = recent[0];
 	if (!last) return 'errors';
-	const window = recent.slice(0, PACING_COMPARISON_WINDOW + 1);
+	const window = recent.slice(0, RECENT_WINDOW + 1);
 	return assessPacing(last, window).verdict === 'room-to-push' ? 'speed' : 'errors';
 }
 

@@ -1,9 +1,5 @@
 import type { SessionSummary } from '../support/core';
-import {
-	PACING_COMPARISON_WINDOW,
-	PACING_SLOW_MARGIN,
-	PACING_TARGET_ERROR_RATE
-} from '../support/core';
+import { PACING_SLOW_MARGIN, PACING_TARGET_ERROR_RATE, RECENT_WINDOW } from '../support/core';
 
 /** `room-to-push` is the one the app acts on — it flips the in-session tint
  *  from error-prone pairs to draggy ones. */
@@ -67,7 +63,7 @@ function recentAverageWpm(
 			(s) => s.id !== session.id && s.type === session.type && s.timestamp < session.timestamp
 		)
 		.sort((a, b) => b.timestamp - a.timestamp)
-		.slice(0, PACING_COMPARISON_WINDOW);
+		.slice(0, RECENT_WINDOW);
 
 	if (comparable.length === 0) return undefined;
 	return comparable.reduce((sum, s) => sum + s.wpm, 0) / comparable.length;

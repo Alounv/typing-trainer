@@ -1,6 +1,7 @@
 import {
 	BIGRAM_CLASSIFICATION_WINDOW,
 	DEFAULT_THRESHOLDS,
+	RECENT_WINDOW,
 	type BigramClassification,
 	type BigramSample,
 	type ClassificationThresholds,
@@ -50,8 +51,6 @@ function rollingStdDev(values: readonly number[], window: number): (number | nul
 	return out;
 }
 
-/** Smoothing window for WPM trend. Spec §10.6 calls for a 7-session average. */
-const WPM_ROLLING_WINDOW = 7;
 /** Sparkline width matches the classifier window so the rightmost point equals the
  *  table cell, and the depth shows the same number of windows of history. */
 const BIGRAM_SPARKLINE_WINDOW = BIGRAM_CLASSIFICATION_WINDOW;
@@ -92,8 +91,8 @@ interface Bucket {
  *  per-session series never shows one. */
 function buildSeries(buckets: readonly Bucket[]): TrendPoint[] {
 	const values = buckets.map((b) => median(b.values));
-	const rolling = rollingAverage(values, WPM_ROLLING_WINDOW);
-	const sigmas = rollingStdDev(values, WPM_ROLLING_WINDOW);
+	const rolling = rollingAverage(values, RECENT_WINDOW);
+	const sigmas = rollingStdDev(values, RECENT_WINDOW);
 
 	return buckets.map((bucket, i) => {
 		const mean = rolling[i];

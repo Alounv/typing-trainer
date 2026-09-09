@@ -32,6 +32,14 @@ export const ERROR_TIME_BUDGET_MS = 600;
 export const PRIORITY_FREQUENCY_EXPONENT = 0.5;
 
 /**
+ * What counts as "lately": the last 7 sessions, or the last 7 days for a
+ * daily-bucketed series. One constant because two of them ended up on the same
+ * screen — the milestone banner quoting one window and the pacing banner
+ * another read as a single number contradicting itself.
+ */
+export const RECENT_WINDOW = 7;
+
+/**
  * Separate from {@link DEFAULT_HIGH_ERROR_THRESHOLD} despite the equal value:
  * that one judges a bigram over a rolling window, this one judges a session
  * against how hard the typist pushed. They are free to diverge.
@@ -44,8 +52,6 @@ export const PACING_TARGET_ERROR_RATE = 0.05;
  * stops being read.
  */
 export const PACING_SLOW_MARGIN = 0.05;
-
-export const PACING_COMPARISON_WINDOW = 10;
 
 /** 5 chars ≈ 1 word, the usual WPM convention. */
 export const CHARS_PER_WORD = 5;

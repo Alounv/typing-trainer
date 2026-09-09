@@ -21,7 +21,7 @@ import {
 	DEFAULT_THRESHOLDS,
 	ERROR_TIME_BUDGET_MS,
 	MIN_OCCURRENCES_FOR_CLASSIFICATION,
-	PACING_COMPARISON_WINDOW
+	RECENT_WINDOW
 } from '../support/core';
 import type {
 	BigramAggregate,
@@ -630,7 +630,7 @@ describe('assessPacing', () => {
 		// One ancient slow session must not drag the baseline down forever.
 		const history: PacingInput[] = [
 			paced({ id: 'ancient', timestamp: 1, wpm: 0 }),
-			...Array.from({ length: PACING_COMPARISON_WINDOW }, (_, i) =>
+			...Array.from({ length: RECENT_WINDOW }, (_, i) =>
 				paced({ id: `w${i}`, timestamp: 1_000 + i, wpm: 60 })
 			)
 		];

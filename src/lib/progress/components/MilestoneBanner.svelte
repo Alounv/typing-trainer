@@ -1,14 +1,7 @@
 <script lang="ts">
-	/**
-	 * WPM milestone banner (Phase 8.4).
-	 *
-	 * Prominent inline card at the top of the summary page when the user's
-	 * 7-session rolling average has just crossed a round-number threshold.
-	 * Not a modal / not full-screen — per the "one page, inline" constraint.
-	 *
-	 * Renders nothing when `event` is null, so the summary page can mount it
-	 * unconditionally.
-	 */
+	/** Renders nothing when `event` is null, so the summary can mount it
+	 *  unconditionally. */
+	import { RECENT_WINDOW } from '$lib/support/core';
 	import type { MilestoneEvent } from '../celebrations';
 
 	interface Props {
@@ -36,7 +29,7 @@
 				Crossed {event.threshold} WPM
 			</h2>
 			<p class="text-sm text-base-content/70">
-				Your 7-session average is now
+				Your {RECENT_WINDOW}-session average is now
 				<span class="font-mono tabular-nums">{event.rollingWpm.toFixed(1)}</span> — above the
 				<span class="font-mono tabular-nums">{event.threshold}</span> threshold.
 			</p>
