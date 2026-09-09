@@ -106,15 +106,12 @@ function pick(
 	if (debts) return selectQuoteByDebt(bank, { debts, used, remainingGap, rng });
 
 	const maxLength = remainingGap * MAX_OVERSHOOT_RATIO;
-	let overlong: Quote | null = null;
 	for (let i = 0; i < 30; i++) {
 		const quote = bank.quotes[Math.floor(rng() * bank.quotes.length)];
-		if (!quote || used.has(quote.id)) continue;
-		if (quote.text.length <= maxLength) return quote;
-		overlong ??= quote;
+		if (!quote || used.has(quote.id) || quote.text.length > maxLength) continue;
+		return quote;
 	}
-	if (overlong) return overlong;
-	// Sampling missed every unused quote (a nearly exhausted bank). Scan.
+	// Nothing sampled fit — see `selectQuoteByDebt`, which falls back the same way.
 	for (const quote of bank.quotes) if (!used.has(quote.id)) return quote;
 	return null;
 }

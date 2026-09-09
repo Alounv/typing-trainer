@@ -73,15 +73,10 @@ export function selectQuoteByDebt(bank: QuoteBank, options: DebtSelectionOptions
 
 	let best: Quote | null = null;
 	let bestScore = -1;
-	// Any unused quote, ignoring the length cap. Keeps a passage finishable when
-	// every remaining quote overshoots.
-	let anyUnused: Quote | null = null;
 
 	for (let i = 0; i < sampleSize; i++) {
 		const quote = bank.quotes[Math.floor(rng() * bank.quotes.length)];
-		if (!quote || options.used.has(quote.id)) continue;
-		if (!anyUnused) anyUnused = quote;
-		if (quote.text.length > maxLength) continue;
+		if (!quote || options.used.has(quote.id) || quote.text.length > maxLength) continue;
 
 		const score = scoreQuoteByDebt(quote.text, options.debts);
 		if (score > bestScore) {
@@ -91,8 +86,10 @@ export function selectQuoteByDebt(bank: QuoteBank, options: DebtSelectionOptions
 	}
 
 	if (best) return best;
-	if (anyUnused) return anyUnused;
-	// Sampling missed every unused quote (a nearly exhausted bank). Scan.
+	// Nothing sampled fit: either every remaining quote overshoots the gap, or
+	// the bank is near-exhausted and the sample kept landing on used ids. Both
+	// want the same answer — any unused quote, overshoot included, because one
+	// quote too long beats a passage that cannot be finished.
 	for (const quote of bank.quotes) if (!options.used.has(quote.id)) return quote;
 	return null;
 }
