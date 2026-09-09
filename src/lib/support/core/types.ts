@@ -43,27 +43,11 @@ export interface BigramAggregate {
 	samples?: BigramSample[];
 }
 
-/** One entry in the diagnostic priority list. */
-export interface PriorityBigram {
-	bigram: string;
-	/** badness × corpus frequency — higher means higher priority. */
-	score: number;
-	meanTime: number;
-	errorRate: number;
-	/**
-	 * Class this bigram falls into. `healthy` never appears (no need to drill).
-	 * `unclassified` is allowed so the accuracy drill can pick up under-observed
-	 * but error-prone bigrams; the planner routes hasty/acquisition/unclassified
-	 * → accuracy-drill and fluency → speed-drill.
-	 */
-	classification: Exclude<BigramClassification, 'healthy'>;
-}
-
 /**
  * `real-text` is the only type produced now. `diagnostic` and `bigram-drill`
  * remain because stored rows carry them — history has to stay readable.
  */
-export type SessionType = 'diagnostic' | 'bigram-drill' | 'real-text';
+type SessionType = 'diagnostic' | 'bigram-drill' | 'real-text';
 
 /**
  * A session's keystroke log in compact columnar form.

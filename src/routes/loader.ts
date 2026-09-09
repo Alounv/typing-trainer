@@ -13,7 +13,7 @@ interface DashboardSession {
 	verdict: PacingVerdict;
 }
 
-export interface DashboardData {
+interface DashboardData {
 	/** Newest first. Empty on a first visit. */
 	recent: DashboardSession[];
 }

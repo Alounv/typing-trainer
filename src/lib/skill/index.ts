@@ -4,23 +4,21 @@
  *
  * Owns the whole path from keystrokes to judgement: the stream codec, first-input
  * post-processing, per-bigram extraction and classification (slow/fast,
- * accurate/error-prone), the end-of-session pacing verdict, and the live views
- * the planner reads (priority targets, undertrained).
+ * accurate/error-prone), the end-of-session pacing verdict, and the rolling-window
+ * view every consumer reads.
  *
- * Stored rows hold the keystroke stream; the aggregates every consumer reads are
- * measured here on read (`hydrateSession`), so a stored row and a threshold change
- * are all it takes to re-score history. Does not persist anything — `session` writes
- * the stream, `support/storage` hosts it.
+ * Stored rows hold the keystroke stream; the aggregates are measured here on read
+ * (`hydrateSession`), so a stored row and a threshold change are all it takes to
+ * re-score history. Does not persist anything — `session` writes the stream,
+ * `support/storage` hosts it.
  */
-export { extractBigramAggregates } from './extraction';
 export { annotateFirstInputs } from './postprocess';
-export type { AnnotatedKeystrokeEvent } from './postprocess';
-export { encodeStream, decodeStream } from './stream-codec';
+export { encodeStream } from './stream-codec';
 export { buildWordIndex } from './word-index';
 export { hydrateSession, hydrateSessions } from './hydrate';
-export { summarizeBigrams, buildLivePriorityTargets, buildLiveUndertrained } from './assessment';
+export { summarizeBigrams } from './assessment';
 export type { BigramSummary } from './assessment';
 export { classifyBigram, summarizeSamples } from './classification';
-export { computeBigramDebts, computeAllBigramDebts } from './debt';
+export { computeAllBigramDebts } from './debt';
 export { assessPacing } from './pacing';
 export type { PacingAssessment, PacingInput, PacingVerdict } from './pacing';

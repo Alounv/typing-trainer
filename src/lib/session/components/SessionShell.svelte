@@ -1,19 +1,14 @@
 <script lang="ts">
 	/**
-	 * One-stop shell for any session type. Composes:
-	 *   - a title + lede (per session type)
-	 *   - a thin progress bar above the drill
-	 *   - the typing surface with live error / corrected-state tracking
+	 * The session surface: a header, a thin progress bar, and the typing area
+	 * with live error / corrected-state tracking.
 	 *
-	 * Live elapsed / error readouts are deliberately omitted — those are
-	 * shown on the post-session summary so the eye stays on the text
-	 * during typing. The progress bar, and on accuracy drills the target
-	 * chips + clean-credit meter, are the only ambient signals.
+	 * Live elapsed / error readouts are deliberately omitted — those are shown
+	 * on the post-session summary so the eye stays on the text while typing.
+	 * The progress bar and the tint are the only ambient signals.
 	 *
-	 * Wiring: we build a {@link SessionRunner} from the supplied config and
-	 * feed every keystroke event into it. Once the text is fully typed we
-	 * finalize, persist, and redirect. Keeps all three session routes
-	 * (diagnostic, bigram-drill, real-text) from duplicating the same ~100 lines.
+	 * Wiring: a {@link SessionRunner} takes every keystroke event; once the text
+	 * is fully typed we finalize, persist, and redirect.
 	 */
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -22,24 +17,19 @@
 	import TypingSurface from './TypingSurface.svelte';
 	import TintToggle from './TintToggle.svelte';
 	import type { KeystrokeEvent } from '$lib/support/core';
-	import type { SessionType, StoredSession } from '$lib/support/core';
+	import type { StoredSession } from '$lib/support/core';
 	import { SessionRunner } from '../runner';
-	import type { DifficultyMode } from '../bigramDifficulty';
-	import { resolveInitialTint } from '../initialTint';
+	import { loadTintContext, type DifficultyMode, type TintContext } from '../tint';
 	import { saveSession } from '../persistence';
 
 	interface Props {
-		/** Session kind — drives the persisted summary's `type` field. */
-		type: SessionType;
 		text: string;
 		title: string;
-		/** One-sentence explanation of what this session actually does. */
-		what?: string;
 		/** One-sentence guidance on how the user should type through it. */
-		approach?: string;
+		approach: string;
 	}
 
-	let { type, text, title, what, approach }: Props = $props();
+	let { text, title, approach }: Props = $props();
 
 	// Word count for the eyebrow micro-label, so the passage's size is legible
 	// before the first keystroke.
@@ -70,10 +60,7 @@
 	// initial values is noise in this context; the runner instance is
 	// deliberately tied to the first-mount snapshot.
 	// svelte-ignore state_referenced_locally
-	const runner = new SessionRunner({
-		type,
-		text
-	});
+	const runner = new SessionRunner(text);
 
 	const progressPct = $derived(Math.round((position / text.length) * 100));
 
@@ -82,12 +69,17 @@
 	// off. `tintChosen` stops the async default from landing on top of a choice
 	// the user already made while it was in flight.
 	let difficultyMode = $state<DifficultyMode | null>(null);
+	let tint = $state<TintContext | null>(null);
 	let tintChosen = false;
 
 	onMount(async () => {
-		const suggested = await resolveInitialTint();
-		if (!tintChosen) difficultyMode = suggested;
+		const context = await loadTintContext();
+		tint = context;
+		if (!tintChosen) difficultyMode = context.opening;
 	});
+
+	// Flipping the toggle is a pure recompute off the summaries loaded above.
+	const difficultyMap = $derived(tint && difficultyMode ? tint.scores(difficultyMode) : null);
 
 	function chooseTint(next: DifficultyMode | null) {
 		tintChosen = true;
@@ -161,30 +153,14 @@
 			</p>
 			<h1 class="text-4xl font-semibold tracking-tight">{title}</h1>
 		</div>
-		{#if what || approach}
-			<dl class="max-w-xl space-y-3 text-sm">
-				{#if what}
-					<div class="grid grid-cols-[5rem_1fr] gap-x-4">
-						<dt
-							class="pt-0.5 text-[11px] font-medium tracking-[0.18em] text-base-content/40 uppercase"
-						>
-							What
-						</dt>
-						<dd class="text-base-content/70">{what}</dd>
-					</div>
-				{/if}
-				{#if approach}
-					<div class="grid grid-cols-[5rem_1fr] gap-x-4">
-						<dt
-							class="pt-0.5 text-[11px] font-medium tracking-[0.18em] text-base-content/40 uppercase"
-						>
-							How
-						</dt>
-						<dd class="text-base-content/70">{approach}</dd>
-					</div>
-				{/if}
-			</dl>
-		{/if}
+		<dl class="max-w-xl text-sm">
+			<div class="grid grid-cols-[5rem_1fr] gap-x-4">
+				<dt class="pt-0.5 text-[11px] font-medium tracking-[0.18em] text-base-content/40 uppercase">
+					How
+				</dt>
+				<dd class="text-base-content/70">{approach}</dd>
+			</div>
+		</dl>
 
 		<TintToggle value={difficultyMode} onChange={chooseTint} />
 	</header>
@@ -214,6 +190,7 @@
 			bind:position
 			{errorPositions}
 			{correctedPositions}
+			{difficultyMap}
 			{difficultyMode}
 			{onEvent}
 		/>

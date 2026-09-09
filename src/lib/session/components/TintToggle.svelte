@@ -11,7 +11,7 @@
 	 * the typing input. Tab still reaches the buttons for keyboard users, where
 	 * moving focus is the point.
 	 */
-	import type { DifficultyMode } from '../bigramDifficulty';
+	import type { DifficultyMode } from '../tint';
 
 	interface Props {
 		value: DifficultyMode | null;

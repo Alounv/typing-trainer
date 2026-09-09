@@ -1,19 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import {
-	generateText,
-	hasQuoteBank,
-	isBuiltinCorpusId,
-	loadBuiltinCorpus,
-	loadQuoteBank,
-	scoreQuoteByDebt,
-	selectQuoteByDebt
-} from './index';
+import { buildPassage, hasCorpus, loadBigramFrequencies, loadQuoteBank } from './index';
+// One level in: debt scoring is the domain's core algorithm and is worth
+// testing directly, but production only ever reaches it through `buildPassage`.
+import { scoreQuoteByDebt, selectQuoteByDebt } from './debt-selection';
 import type { QuoteBank } from './types';
 
 function fixtureQuoteBank(): QuoteBank {
 	return {
 		language: 'en',
-		groups: [[0, 1000]],
 		quotes: [
 			{ id: 1, text: 'The quick brown fox jumps over the lazy dog.', source: 't', length: 44 },
 			{ id: 2, text: 'A stitch in time saves nine and then some.', source: 't', length: 42 },
@@ -25,7 +19,6 @@ function fixtureQuoteBank(): QuoteBank {
 function fixtureSecondaryBank(): QuoteBank {
 	return {
 		language: 'fr',
-		groups: [[0, 1000]],
 		quotes: [
 			{
 				id: 1,
@@ -44,45 +37,40 @@ function fixtureSecondaryBank(): QuoteBank {
 }
 
 describe('registry', () => {
-	it('narrows ids that ship as built-in corpora', () => {
-		expect(isBuiltinCorpusId('en')).toBe(true);
-		expect(isBuiltinCorpusId('fr')).toBe(true);
-		expect(isBuiltinCorpusId('klingon')).toBe(false);
+	it('narrows languages that ship a corpus', () => {
+		expect(hasCorpus('en')).toBe(true);
+		expect(hasCorpus('fr')).toBe(true);
+		expect(hasCorpus('klingon')).toBe(false);
 	});
 
-	it('narrows languages that ship a quote bank', () => {
-		expect(hasQuoteBank('en')).toBe(true);
-		expect(hasQuoteBank('de')).toBe(false);
-	});
-
-	it('loads en with its word frequencies and bigram table', async () => {
-		const c = await loadBuiltinCorpus('en');
-		expect(c.config.language).toBe('en');
-		expect(c.wordFrequencies['the']).toBeDefined();
-		expect(Object.keys(c.bigramFrequencies).length).toBeGreaterThanOrEqual(100);
+	it('loads the en bigram table', async () => {
+		const freq = await loadBigramFrequencies('en');
+		expect(Object.keys(freq!).length).toBeGreaterThanOrEqual(100);
 	});
 
 	it('populates word-boundary bigrams on the same scale as interior bigrams', async () => {
-		const c = await loadBuiltinCorpus('en');
+		const freq = (await loadBigramFrequencies('en'))!;
 		// "the" is the top word → " t" and "e " should beat the corpus floor by orders of
-		// magnitude; otherwise priority drills bury them (assessment.ts:127).
-		expect(c.bigramFrequencies[' t']).toBeGreaterThan(0);
-		expect(c.bigramFrequencies['e ']).toBeGreaterThan(0);
-		const interiorTop = c.bigramFrequencies['th'];
-		expect(c.bigramFrequencies[' t']).toBeGreaterThan(interiorTop / 100);
+		// magnitude; otherwise priority ranking buries them (see `summarizeBigrams`).
+		expect(freq[' t']).toBeGreaterThan(0);
+		expect(freq['e ']).toBeGreaterThan(0);
+		expect(freq[' t']).toBeGreaterThan(freq['th'] / 100);
 	});
 
-	it('loads the en quote bank with quotes and length groups', async () => {
+	it('reports no frequencies for a language that ships none', async () => {
+		expect(await loadBigramFrequencies('de')).toBeUndefined();
+	});
+
+	it('loads the en quote bank', async () => {
 		const bank = await loadQuoteBank('en');
 		expect(bank.quotes.length).toBeGreaterThan(50);
-		expect(bank.groups.length).toBeGreaterThan(0);
 	});
 });
 
-describe('generateText', () => {
+describe('buildPassage', () => {
 	it('assembles the passage from the bank verbatim', () => {
 		const bank = fixtureQuoteBank();
-		const { text } = generateText({ quoteBank: bank, targetLengthChars: 40 });
+		const text = buildPassage({ bank, targetLengthChars: 40 });
 		// The output must reproduce at least one quote's text verbatim — we don't
 		// care which, just that real prose is the source and nothing rewrites it.
 		expect(bank.quotes.some((q) => text.includes(q.text))).toBe(true);
@@ -91,14 +79,13 @@ describe('generateText', () => {
 	it('prefers quotes that repay debt', () => {
 		const bank: QuoteBank = {
 			language: 'en',
-			groups: [[0, 1000]],
 			quotes: [
 				{ id: 1, text: 'zzz zzz zzz zzz zzz zzz.', source: 't', length: 24 },
 				{ id: 2, text: 'abab abab abab abab abab.', source: 't', length: 25 }
 			]
 		};
-		const { text } = generateText({
-			quoteBank: bank,
+		const text = buildPassage({
+			bank,
 			targetLengthChars: 20,
 			bigramDebts: new Map([['ab', 10]])
 		});
@@ -114,9 +101,9 @@ describe('generateText', () => {
 		] as const)('mix=$mix draws from the $expected bank', ({ mix, expected, forbidden }) => {
 			const primary = fixtureQuoteBank();
 			const secondary = fixtureSecondaryBank();
-			const { text } = generateText({
-				quoteBank: primary,
-				secondaryQuoteBank: secondary,
+			const text = buildPassage({
+				bank: primary,
+				secondaryBank: secondary,
 				secondaryMix: mix,
 				targetLengthChars: 40
 			});
@@ -126,17 +113,58 @@ describe('generateText', () => {
 			expect(unwanted.quotes.some((q) => text.includes(q.text))).toBe(false);
 		});
 
-		it('ignores secondary bank when secondaryMix is omitted', () => {
+		it('ignores the secondary bank when secondaryMix is omitted', () => {
 			const primary = fixtureQuoteBank();
 			const secondary = fixtureSecondaryBank();
-			const { text } = generateText({
-				quoteBank: primary,
-				secondaryQuoteBank: secondary,
+			const text = buildPassage({
+				bank: primary,
+				secondaryBank: secondary,
 				targetLengthChars: 40
 			});
 			expect(primary.quotes.some((q) => text.includes(q.text))).toBe(true);
 			expect(secondary.quotes.some((q) => text.includes(q.text))).toBe(false);
 		});
+
+		it('does not fall back to the secondary bank at mix 0, even once the primary runs dry', () => {
+			// The fallback exists so an exhausted bank doesn't truncate a passage —
+			// but at mix 0 the second language was never opted into, and slipping
+			// French in because English ran out is worse than a short passage.
+			const primary = fixtureQuoteBank();
+			const secondary = fixtureSecondaryBank();
+			const text = buildPassage({
+				bank: primary,
+				secondaryBank: secondary,
+				secondaryMix: 0,
+				targetLengthChars: 10_000
+			});
+			expect(secondary.quotes.some((q) => text.includes(q.text))).toBe(false);
+		});
+
+		it('spends the two banks independently, since ids only mean something within a bank', () => {
+			// Both fixtures number their quotes from 1. One shared used-set would
+			// let an English id-1 draw silently retire the French id-1.
+			const primary = fixtureQuoteBank();
+			const secondary = fixtureSecondaryBank();
+			const text = buildPassage({
+				bank: primary,
+				secondaryBank: secondary,
+				secondaryMix: 50,
+				targetLengthChars: 10_000
+			});
+			for (const quote of [...primary.quotes, ...secondary.quotes]) {
+				expect(text).toContain(quote.text);
+			}
+		});
+	});
+
+	it('never repeats a quote within one passage', () => {
+		const bank = fixtureQuoteBank();
+		// Far past what three quotes can cover, so the assembler is forced to
+		// either repeat or stop. It must stop.
+		const text = buildPassage({ bank, targetLengthChars: 10_000 });
+		for (const quote of bank.quotes) {
+			expect(text.split(quote.text).length - 1).toBeLessThanOrEqual(1);
+		}
 	});
 });
 
@@ -185,7 +213,6 @@ describe('scoreQuoteByDebt', () => {
 describe('selectQuoteByDebt', () => {
 	const bank: QuoteBank = {
 		language: 'en',
-		groups: [[0, 1000]],
 		quotes: [
 			{ id: 1, text: 'zzz zzz zzz', source: 't', length: 11 },
 			{ id: 2, text: 'abab abab ab', source: 't', length: 12 },
@@ -200,9 +227,8 @@ describe('selectQuoteByDebt', () => {
 	}
 
 	it('picks the quote that repays the most per keystroke', () => {
-		const debts = new Map([['ab', 10]]);
 		const picked = selectQuoteByDebt(bank, {
-			debts,
+			debts: new Map([['ab', 10]]),
 			used: new Set(),
 			remainingGap: 100,
 			rng: cyclingRng()
@@ -211,9 +237,8 @@ describe('selectQuoteByDebt', () => {
 	});
 
 	it('never returns a quote already used in this passage', () => {
-		const debts = new Map([['ab', 10]]);
 		const picked = selectQuoteByDebt(bank, {
-			debts,
+			debts: new Map([['ab', 10]]),
 			used: new Set([2]),
 			remainingGap: 100,
 			rng: cyclingRng()

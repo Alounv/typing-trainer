@@ -1,34 +1,10 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { loadAnalyticsInputs } from './loader';
 	import Analytics from '$lib/progress/components/Analytics.svelte';
-	import type { ClassificationThresholds, SessionSummary } from '$lib/support/core';
-	import type { FrequencyTable } from '$lib/corpus';
+	import { loadable } from '$lib/support/async';
 	import { VERSION } from '$lib/version';
+	import { loadAnalyticsInputs } from './loader';
 
-	type LoadState =
-		| { status: 'loading' }
-		| {
-				status: 'ready';
-				sessions: SessionSummary[];
-				corpusFrequencies: FrequencyTable | undefined;
-				thresholds: ClassificationThresholds;
-		  }
-		| { status: 'error'; message: string };
-
-	let state = $state<LoadState>({ status: 'loading' });
-
-	onMount(async () => {
-		try {
-			const { sessions, corpusFrequencies, thresholds } = await loadAnalyticsInputs();
-			state = { status: 'ready', sessions, corpusFrequencies, thresholds };
-		} catch (err) {
-			state = {
-				status: 'error',
-				message: err instanceof Error ? err.message : 'Failed to load analytics.'
-			};
-		}
-	});
+	const analytics = loadable(loadAnalyticsInputs, 'Failed to load analytics.');
 </script>
 
 <div class="mx-auto max-w-4xl space-y-10">
@@ -40,15 +16,11 @@
 		<p class="text-base-content/65">WPM trend, error rate, and where each bigram stands.</p>
 	</header>
 
-	{#if state.status === 'loading'}
+	{#if analytics.current.status === 'loading'}
 		<p class="text-base-content/60">Loading…</p>
-	{:else if state.status === 'error'}
-		<p class="text-error" role="alert">{state.message}</p>
+	{:else if analytics.current.status === 'error'}
+		<p class="text-error" role="alert">{analytics.current.message}</p>
 	{:else}
-		<Analytics
-			sessions={state.sessions}
-			corpusFrequencies={state.corpusFrequencies}
-			thresholds={state.thresholds}
-		/>
+		<Analytics {...analytics.current.data} />
 	{/if}
 </div>

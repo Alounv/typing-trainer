@@ -6,7 +6,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearAll, getRecentSessions, getSession } from './service';
 import { saveProfile } from '../../settings/profile';
-import { saveSessionFixture as saveSession } from '../../test-utils/fixtures';
+import { saveSession } from '../../session/persistence';
 import type { StoredSession } from '../core/types';
 
 /** A current row: the text plus its keystroke stream, and nothing derived. */

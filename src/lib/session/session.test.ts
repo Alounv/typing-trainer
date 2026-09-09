@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SessionRunner } from './runner';
-import { buildDifficultyMap } from './bigramDifficulty';
+import { buildDifficultyMap } from './tint';
 import type { BigramSummary } from '../skill';
 import type { KeystrokeEvent } from '../support/core';
 
@@ -15,9 +15,7 @@ function event(
 
 /** Types `typed` against `expected`, one event per position, 100ms apart. */
 function run(expected: string, typed: string, elapsedMs = 60_000) {
-	const runner = new SessionRunner({
-		type: 'real-text',
-		text: expected,
+	const runner = new SessionRunner(expected, {
 		idGenerator: () => 'fixed-id',
 		timestampProvider: () => 1_000
 	});
@@ -49,7 +47,7 @@ describe('SessionRunner', () => {
 	});
 
 	it('counts an error once, however many times the position is retyped', () => {
-		const runner = new SessionRunner({ type: 'real-text', text: 'ab' });
+		const runner = new SessionRunner('ab');
 		runner.recordEvent(event(0, 'a', 'x', 0)); // wrong
 		runner.recordEvent(event(0, 'a', 'a', 100)); // retyped correctly
 		runner.recordEvent(event(1, 'b', 'b', 200));
@@ -59,7 +57,7 @@ describe('SessionRunner', () => {
 	});
 
 	it('completes on the last position, not on the event count', () => {
-		const runner = new SessionRunner({ type: 'real-text', text: 'ab' });
+		const runner = new SessionRunner('ab');
 		runner.recordEvent(event(0, 'a', 'x', 0));
 		runner.recordEvent(event(0, 'a', 'a', 100));
 		expect(runner.isComplete()).toBe(false);
@@ -80,7 +78,7 @@ describe('buildDifficultyMap', () => {
 			meanTime: 150,
 			errorRate: 0,
 			occurrences: 20,
-			timeLostPerOccurrence: 0,
+			timeLossMs: 0,
 			...overrides
 		} as BigramSummary;
 	}

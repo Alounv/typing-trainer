@@ -113,6 +113,12 @@
 	/** Default secondary share when the user first picks a second language. */
 	const DEFAULT_SECONDARY_MIX = 30;
 
+	const LANGUAGE_LABEL: Record<'off' | Language, string> = {
+		off: 'Off',
+		en: 'English',
+		fr: 'French'
+	};
+
 	function setPrimary(value: Language) {
 		form.language = value;
 		// Collision: silently demote the secondary so the two never agree.
@@ -165,7 +171,7 @@
 				{#each ['en', 'fr'] as lang (lang)}
 					{@const typedLang = lang as Language}
 					{@const selected = form.language === typedLang}
-					{@const label = typedLang === 'en' ? 'English' : 'French'}
+					{@const label = LANGUAGE_LABEL[typedLang]}
 					<div class="flex items-center justify-between gap-6 py-4">
 						<dt>
 							<label class="flex cursor-pointer items-center gap-3">
@@ -207,8 +213,7 @@
 					{@const typedChoice = choice as SecondaryChoice}
 					{@const isPrimary = typedChoice !== 'off' && typedChoice === form.language}
 					{@const selected = !isPrimary && currentSecondary() === typedChoice}
-					{@const label =
-						typedChoice === 'off' ? 'Off' : typedChoice === 'en' ? 'English' : 'French'}
+					{@const label = LANGUAGE_LABEL[typedChoice]}
 					<div class="flex items-center justify-between gap-6 py-4" class:opacity-40={isPrimary}>
 						<dt>
 							<label

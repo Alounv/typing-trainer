@@ -19,16 +19,7 @@
 	 */
 	import TextDisplay from './TextDisplay.svelte';
 	import { keystrokeCapture, type CaptureCallbacks } from '../capture';
-	import type { KeystrokeEvent } from '../../support/core';
-	import { getProfile } from '$lib/settings';
-	import { getRecentSessions } from '$lib/support/storage';
-	import { summarizeBigrams, hydrateSessions } from '$lib/skill';
-	import { DEFAULT_THRESHOLDS } from '$lib/support/core';
-	import {
-		buildDifficultyMap,
-		highlightVarForMode,
-		type DifficultyMode
-	} from '../bigramDifficulty';
+	import { highlightVarForMode, type DifficultyMode } from '../tint';
 
 	interface Props {
 		text: string;
@@ -36,20 +27,11 @@
 		position?: number;
 		errorPositions?: ReadonlySet<number>;
 		correctedPositions?: ReadonlySet<number>;
-		/** Forwarded to TextDisplay; highlights pending chars inside target bigrams. */
-		targetBigrams?: readonly string[];
-		/** Bigram metric for difficulty coloring; `null` disables it. */
+		/** Per-bigram difficulty in [0, 1]; `null` disables the tint. */
+		difficultyMap?: Map<string, number> | null;
+		/** Which tint is active — picks the color the gradient lerps toward. */
 		difficultyMode?: DifficultyMode | null;
-		/** Auto-focus the surface on mount. Default: true. */
-		autoFocus?: boolean;
-		/**
-		 * Opt-in: announce wrong keystrokes via an ARIA live region. Off by
-		 * default — announcements during timed drills are disruptive for
-		 * most users, including SR users who are practicing speed.
-		 */
-		announceErrors?: boolean;
 		onEvent?: CaptureCallbacks['onEvent'];
-		onComplete?: CaptureCallbacks['onComplete'];
 	}
 
 	let {
@@ -57,51 +39,10 @@
 		position = $bindable(0),
 		errorPositions,
 		correctedPositions,
-		targetBigrams,
+		difficultyMap = null,
 		difficultyMode = null,
-		autoFocus = true,
-		announceErrors = false,
-		onEvent,
-		onComplete
+		onEvent
 	}: Props = $props();
-
-	let liveMessage = $state('');
-
-	let bigramDifficultyMap = $state<Map<string, number> | null>(null);
-
-	$effect(() => {
-		if (difficultyMode === null) {
-			bigramDifficultyMap = null;
-			return;
-		}
-		const mode = difficultyMode;
-		let cancelled = false;
-		void (async () => {
-			// No profile gate here: `colorizeBigramDifficulty` decides which tint a
-			// session *opens* with (see `session/initialTint`). Once the user has a
-			// toggle, a request for a tint is a request for a tint.
-			const profile = await getProfile();
-			if (cancelled) return;
-			// Recent-window pool, not lifetime: keeps reveal cost bounded as history grows
-			// and feeds `summarizeBigrams` so the tint shares `BIGRAM_CLASSIFICATION_WINDOW`
-			// with the rolling-window classifier.
-			const thresholds = profile?.thresholds ?? DEFAULT_THRESHOLDS;
-			const recent = hydrateSessions(await getRecentSessions(), thresholds);
-			if (cancelled) return;
-			const summaries = summarizeBigrams(recent, undefined, thresholds);
-			bigramDifficultyMap = buildDifficultyMap(summaries, mode);
-		})();
-		return () => {
-			cancelled = true;
-		};
-	});
-
-	function handleEvent(e: KeystrokeEvent) {
-		if (announceErrors && e.actual !== e.expected) {
-			liveMessage = `Expected ${e.expected}, typed ${e.actual}`;
-		}
-		onEvent?.(e);
-	}
 
 	function handlePosition(p: number) {
 		position = p;
@@ -110,7 +51,7 @@
 	// Attachment-based auto-focus — cleaner than `bind:this` + $effect since
 	// it colocates the DOM reference and the side effect.
 	function focusOnMount(node: HTMLElement) {
-		if (autoFocus) node.focus();
+		node.focus();
 	}
 </script>
 
@@ -125,8 +66,7 @@
 			{position}
 			{errorPositions}
 			{correctedPositions}
-			targetBigrams={bigramDifficultyMap ? undefined : targetBigrams}
-			{bigramDifficultyMap}
+			bigramDifficultyMap={difficultyMap}
 			difficultyHighlightVar={difficultyMode ? highlightVarForMode(difficultyMode) : null}
 		/>
 	</div>
@@ -148,12 +88,6 @@
 		autocorrect="off"
 		spellcheck="false"
 		{@attach focusOnMount}
-		{@attach keystrokeCapture(
-			{ text },
-			{ onEvent: handleEvent, onPositionChange: handlePosition, onComplete }
-		)}
+		{@attach keystrokeCapture({ text }, { onEvent, onPositionChange: handlePosition })}
 	/>
 </label>
-
-<!-- Visually hidden live region. Populated only when `announceErrors` is true. -->
-<div role="status" aria-live="polite" class="sr-only">{liveMessage}</div>

@@ -3,21 +3,16 @@ import type {
 	BigramClassification,
 	BigramSample,
 	ClassificationThresholds,
-	PriorityBigram,
 	SessionSummary
 } from '../support/core';
 import {
 	BIGRAM_CLASSIFICATION_WINDOW,
-	DEFAULT_THRESHOLDS,
 	ERROR_TIME_BUDGET_MS,
 	MIN_OCCURRENCES_FOR_CLASSIFICATION,
 	PRIORITY_FREQUENCY_EXPONENT
 } from '../support/core';
 import type { FrequencyTable } from '../corpus';
 import { classifyBigram, summarizeSamples } from './classification';
-
-/** Priority target cap — mirrors the diagnostic engine's `PRIORITY_TARGETS_TOP_N`. */
-const LIVE_PRIORITY_TARGETS_TOP_N = 10;
 
 export interface BigramSummary {
 	bigram: string;
@@ -215,91 +210,13 @@ function timeLossPerOccurrence(
 
 	// Legacy aggregates carry no samples, so the per-occurrence excess degrades to
 	// the excess of the stored mean — the very approximation described above.
-	const cleanExcess =
-		timed > 0
-			? excessSum / timed
-			: Number.isFinite(meanTime)
-				? Math.max(0, meanTime - baselineMs)
-				: 0;
+	const cleanExcess = (() => {
+		if (timed > 0) return excessSum / timed;
+		if (Number.isFinite(meanTime)) return Math.max(0, meanTime - baselineMs);
+		return 0;
+	})();
 
 	return ((1 - errorRate) * cleanExcess + errorCost) * confidence;
-}
-
-/**
- * `PriorityBigram[]` built from the live rolling-window classification. Drill target
- * selection uses this instead of a frozen diagnostic snapshot.
- *
- * Pass `classifications` to scope the top-N: a cross-class ranking lets one failure
- * mode crowd out the other, so each drill mode asks for the classes it treats.
- * Accuracy callers pass `['hasty', 'acquisition', 'unclassified']` (under-observed
- * bigrams that already look error-prone are worth drilling); speed callers pass
- * `['fluency']`.
- *
- * Healthy bigrams are excluded here rather than zeroed in `summarizeBigrams` —
- * `priorityScore` is now a measured cost, and forcing it to 0 would hide real time
- * loss from the analytics table. Note the consequence: a bigram that is usually
- * fast but occasionally slow still classifies as `healthy`, so it surfaces in the
- * table yet is never drilled. Closing that gap needs the classifier to look at the
- * spread, not just the mean.
- */
-export function buildLivePriorityTargets(
-	sessions: readonly SessionSummary[],
-	corpus?: FrequencyTable,
-	thresholds: ClassificationThresholds = DEFAULT_THRESHOLDS,
-	limit: number = LIVE_PRIORITY_TARGETS_TOP_N,
-	classifications?: readonly BigramClassification[]
-): PriorityBigram[] {
-	const rows = summarizeBigrams(sessions, corpus, thresholds);
-	const allowed = classifications ? new Set<BigramClassification>(classifications) : undefined;
-	const out: PriorityBigram[] = [];
-	for (const r of rows) {
-		if (r.classification === 'healthy') continue;
-		if (allowed) {
-			if (!allowed.has(r.classification)) continue;
-		} else if (r.classification === 'unclassified') {
-			continue;
-		}
-		out.push({
-			bigram: r.bigram,
-			score: r.priorityScore,
-			meanTime: r.meanTime,
-			errorRate: r.errorRate,
-			classification: r.classification
-		});
-		if (out.length >= limit) break;
-	}
-	return out;
-}
-
-/**
- * Corpus bigrams with lifetime occurrences below `minOccurrences`, sorted by corpus
- * frequency desc. Live counterpart to `corpusFit.undertrained` from the diagnostic
- * engine — reads session history, not a frozen snapshot.
- */
-export function buildLiveUndertrained(
-	sessions: readonly SessionSummary[],
-	corpus: FrequencyTable | undefined,
-	minOccurrences: number = MIN_OCCURRENCES_FOR_CLASSIFICATION
-): string[] {
-	if (!corpus) return [];
-	const corpusKeys = Object.keys(corpus);
-	if (corpusKeys.length === 0) return [];
-
-	const observed = new Map<string, number>();
-	for (const s of sessions) {
-		for (const agg of s.bigramAggregates) {
-			observed.set(agg.bigram, (observed.get(agg.bigram) ?? 0) + agg.occurrences);
-		}
-	}
-
-	const under: { bigram: string; freq: number }[] = [];
-	for (const key of corpusKeys) {
-		if ((observed.get(key) ?? 0) < minOccurrences) {
-			under.push({ bigram: key, freq: corpus[key] });
-		}
-	}
-	under.sort((a, b) => b.freq - a.freq);
-	return under.map((u) => u.bigram);
 }
 
 function minPositive(table: FrequencyTable): number {

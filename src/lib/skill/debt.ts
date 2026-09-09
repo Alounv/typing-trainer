@@ -12,7 +12,7 @@ import { BIGRAM_CLASSIFICATION_WINDOW, DEFAULT_THRESHOLDS } from '../support/cor
  * Occurrence count is deliberately ignored: an `unclassified` bigram (under
  * `MIN_OCCURRENCES_FOR_CLASSIFICATION`) still owes the repeats it owes.
  */
-export function computeBigramDebts(
+function computeBigramDebts(
 	sessions: readonly SessionSummary[],
 	bigrams: readonly string[],
 	thresholds: ClassificationThresholds = DEFAULT_THRESHOLDS,

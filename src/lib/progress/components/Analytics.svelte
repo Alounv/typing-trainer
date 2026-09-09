@@ -6,13 +6,9 @@
 		buildDailyErrorRateSeries,
 		buildBigramProgressSeries,
 		buildDailyWpmSeries,
-		buildBigramTrendFromSamples,
-		buildRecentSamplesIndex,
-		BIGRAM_SPARKLINE_SAMPLE_LIMIT,
+		buildBigramRows,
 		tallyClassificationMix
 	} from '../metrics';
-	import WpmChart from './WpmChart.svelte';
-	import ErrorRateChart from './ErrorRateChart.svelte';
 	import SessionTrendChart from './SessionTrendChart.svelte';
 	import BigramTable from './BigramTable.svelte';
 	import ClassificationBar from './ClassificationBar.svelte';
@@ -30,20 +26,19 @@
 	// covering everything typed.
 	const wpm = $derived(buildDailyWpmSeries(sessions));
 	const errorRate = $derived(buildDailyErrorRateSeries(sessions));
-	const bigramProgress = $derived(
-		buildBigramProgressSeries(sessions, corpusFrequencies, thresholds)
-	);
-	const bigrams = $derived(summarizeBigrams(sessions, corpusFrequencies, thresholds));
-	const trendSamplesIdx = $derived(
-		buildRecentSamplesIndex(sessions, BIGRAM_SPARKLINE_SAMPLE_LIMIT)
-	);
+	const bigramProgress = $derived(buildBigramProgressSeries(sessions, thresholds));
 	const bigramRows = $derived(
-		bigrams.map((row) => ({
-			...row,
-			trend: buildBigramTrendFromSamples(trendSamplesIdx.get(row.bigram) ?? [])
-		}))
+		buildBigramRows(sessions, summarizeBigrams(sessions, corpusFrequencies, thresholds))
 	);
-	const liveClassification = $derived(tallyClassificationMix(bigrams));
+	const liveClassification = $derived(tallyClassificationMix(bigramRows));
+
+	// Nice-tick axis lands on whole-percent steps in the common case, so drop the
+	// decimal when it would be `.0`. A sub-percent range still gets one decimal so
+	// the ticks stay distinct.
+	function formatPercent(v: number): string {
+		const pct = Math.round(v * 1000) / 10;
+		return Number.isInteger(pct) ? `${pct}%` : `${pct.toFixed(1)}%`;
+	}
 
 	const classifiedCount = $derived(
 		liveClassification.counts.healthy +
@@ -62,7 +57,7 @@
 		</p>
 	</div>
 	<div class="rounded-lg border border-base-300 bg-base-100 p-4">
-		<WpmChart points={wpm} />
+		<SessionTrendChart points={wpm} ariaLabel="Words-per-minute trend across sessions" />
 	</div>
 	<p class="text-xs text-base-content/55">
 		Dots are the daily median across sessions. On days with several sessions, a vertical whisker
@@ -77,7 +72,13 @@
 		<p class="text-sm text-base-content/55">Per day (median)</p>
 	</div>
 	<div class="rounded-lg border border-base-300 bg-base-100 p-4">
-		<ErrorRateChart points={errorRate} />
+		<SessionTrendChart
+			points={errorRate}
+			ariaLabel="Error-rate trend across sessions"
+			variant="warning"
+			yFloor={0}
+			formatY={formatPercent}
+		/>
 	</div>
 	<p class="text-xs text-base-content/55">
 		Daily median of the per-session error rate (fraction of keystrokes that were first-input
@@ -160,8 +161,8 @@
 	<div class="flex items-baseline justify-between">
 		<h2 class="text-xl font-semibold">Bigram breakdown</h2>
 		<p class="text-sm text-base-content/55">
-			{bigrams.length}
-			{bigrams.length === 1 ? 'bigram observed' : 'bigrams observed'}
+			{bigramRows.length}
+			{bigramRows.length === 1 ? 'bigram observed' : 'bigrams observed'}
 		</p>
 	</div>
 	<BigramTable rows={bigramRows} />

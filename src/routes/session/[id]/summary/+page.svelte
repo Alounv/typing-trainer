@@ -1,32 +1,22 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { loadSummaryContext, type SummaryViewModel } from './loader';
+	import { loadable } from '$lib/support/async';
 	import type { SessionSummary } from '$lib/support/core';
 	import Summary from '$lib/progress/components/Summary.svelte';
+	import { loadSummaryContext } from './loader';
 
-	type LoadState = { status: 'loading' } | { status: 'error'; message: string } | SummaryViewModel;
-
-	let state = $state<LoadState>({ status: 'loading' });
-
-	onMount(async () => {
-		try {
-			state = await loadSummaryContext(page.params.id!);
-		} catch (err) {
-			state = {
-				status: 'error',
-				message: err instanceof Error ? err.message : 'Unknown error'
-			};
-		}
-	});
+	const summary = loadable(
+		() => loadSummaryContext(page.params.id!),
+		'Failed to load this session.'
+	);
 
 	/**
 	 * Enter starts the next passage. We skip form fields and modifier combos so
 	 * we don't hijack native inputs or OS shortcuts.
 	 */
 	function onWindowKeydown(event: KeyboardEvent) {
-		if (state.status !== 'ready') return;
+		if (summary.current.status !== 'ready' || !summary.current.data) return;
 		if (event.key !== 'Enter' && event.code !== 'Enter') return;
 		if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
 
@@ -50,8 +40,6 @@
 	function sessionTypeLabel(s: SessionSummary): string {
 		if (s.type === 'real-text') return 'Real text';
 		if (s.type === 'diagnostic') return 'Diagnostic';
-		if (s.drillMode === 'accuracy') return 'Accuracy drill';
-		if (s.drillMode === 'speed') return 'Speed drill';
 		return 'Bigram drill';
 	}
 </script>
@@ -62,16 +50,16 @@
 	<header class="flex items-baseline justify-between gap-4">
 		<div class="space-y-1">
 			<h1 class="text-4xl font-semibold tracking-tight text-base-content">Session summary</h1>
-			{#if state.status === 'ready'}
+			{#if summary.current.status === 'ready' && summary.current.data}
 				<p
 					class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase"
 					data-testid="session-type-label"
 				>
-					{sessionTypeLabel(state.session)}
+					{sessionTypeLabel(summary.current.data.session)}
 				</p>
 			{/if}
 		</div>
-		{#if state.status === 'ready'}
+		{#if summary.current.status === 'ready' && summary.current.data}
 			<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
 				<kbd
 					class="rounded-sm border border-base-300 bg-base-200 px-1.5 py-0.5 font-mono text-[0.65rem] tracking-normal text-base-content/70"
@@ -82,21 +70,16 @@
 		{/if}
 	</header>
 
-	{#if state.status === 'loading'}
+	{#if summary.current.status === 'loading'}
 		<p class="text-base-content/70">Loading…</p>
-	{:else if state.status === 'missing'}
+	{:else if summary.current.status === 'error'}
+		<p class="text-error" role="alert">Couldn't load session: {summary.current.message}</p>
+	{:else if summary.current.data === null}
 		<p class="text-base-content/70" role="alert">
 			No session found for this id. It may have been cleared.
 		</p>
-	{:else if state.status === 'error'}
-		<p class="text-error" role="alert">Couldn't load session: {state.message}</p>
 	{:else}
-		<Summary
-			session={state.session}
-			statsSessions={state.statsSessions}
-			corpusFrequencies={state.corpusFrequencies}
-			thresholds={state.thresholds}
-		/>
+		<Summary {...summary.current.data} />
 
 		<div class="flex flex-wrap items-center gap-6 pt-2">
 			<a

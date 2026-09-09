@@ -1,16 +1,11 @@
-import { loadQuoteBank, hasQuoteBank, generateText } from '$lib/corpus';
+import { loadQuoteBank, hasCorpus, buildPassage } from '$lib/corpus';
 import { CHARS_PER_WORD, DEFAULT_PASSAGE_WORDS, DEFAULT_THRESHOLDS } from '$lib/support/core';
 import { getProfile } from '$lib/settings';
 import { getRecentSessions } from '$lib/support/storage';
 import { computeAllBigramDebts, hydrateSessions } from '$lib/skill';
 
-interface RealTextSessionInputs {
-	text: string;
-}
-
-export async function prepareRealTextSession(): Promise<RealTextSessionInputs> {
+export async function prepareRealTextSession(): Promise<{ text: string }> {
 	const profile = await getProfile();
-	const passageWords = profile?.passageWords ?? DEFAULT_PASSAGE_WORDS;
 	const language = profile?.language ?? 'en';
 	const secondaryMix = profile?.secondaryMix ?? 0;
 	const secondaryLanguage =
@@ -21,15 +16,15 @@ export async function prepareRealTextSession(): Promise<RealTextSessionInputs> {
 
 	// Real prose is the only material, so a language with no bank has nothing to
 	// offer — better to say so than to fall back to synthesised text.
-	if (!hasQuoteBank(language)) {
+	if (!hasCorpus(language)) {
 		throw new Error(`No quote bank for ${language}, so there is no prose to type.`);
 	}
 
 	const [bank, secondaryBank, recentRows] = await Promise.all([
 		loadQuoteBank(language),
-		secondaryLanguage && hasQuoteBank(secondaryLanguage)
+		secondaryLanguage && hasCorpus(secondaryLanguage)
 			? loadQuoteBank(secondaryLanguage)
-			: Promise.resolve(undefined),
+			: undefined,
 		getRecentSessions()
 	]);
 
@@ -38,12 +33,13 @@ export async function prepareRealTextSession(): Promise<RealTextSessionInputs> {
 	// leaves the assembler on uniform sampling.
 	const bigramDebts = computeAllBigramDebts(hydrateSessions(recentRows, thresholds), thresholds);
 
-	const seq = generateText({
-		quoteBank: bank,
-		secondaryQuoteBank: secondaryBank,
-		secondaryMix,
-		targetLengthChars: passageWords * CHARS_PER_WORD,
-		bigramDebts
-	});
-	return { text: seq.text };
+	return {
+		text: buildPassage({
+			bank,
+			secondaryBank,
+			secondaryMix,
+			targetLengthChars: (profile?.passageWords ?? DEFAULT_PASSAGE_WORDS) * CHARS_PER_WORD,
+			bigramDebts
+		})
+	};
 }

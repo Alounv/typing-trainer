@@ -1,48 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { annotateFirstInputs, encodeStream } from '../skill';
-import type { KeystrokeEvent, StoredSession, SessionType } from '../support/core';
-
-/**
- * Inputs for turning a finished capture into a persistable row.
- * `events` is the raw log, retypes included — that log *is* what gets stored.
- */
-interface BuildStoredSessionInput {
-	events: readonly KeystrokeEvent[];
-	type: SessionType;
-	/** The prompt. Stored alongside the stream, and the denominator for WPM — event count would let an abandoned run inflate the rate. */
-	text: string;
-	/** `performance.now()` relative duration of the session in ms. */
-	durationMs: number;
-	/** Injectable for tests; defaults to `uuid()` + `Date.now()`. */
-	idGenerator?: () => string;
-	timestampProvider?: () => number;
-}
-
-/**
- * Pure transform: raw keystroke log → persistable row. Id and timestamp are the
- * only non-determinism, both injectable for tests.
- *
- * No bigram aggregates: the row carries the text and the encoded keystroke
- * stream, and `skill/hydrate` measures bigrams from those on read. `wpm` and
- * `errorRate` are kept as stored scalars only because every list view sorts and
- * charts on them — everything else is derived.
- */
-function buildStoredSession(input: BuildStoredSessionInput): StoredSession {
-	const id = (input.idGenerator ?? uuid)();
-	const timestamp = (input.timestampProvider ?? Date.now)();
-	const annotated = annotateFirstInputs(input.events);
-
-	return {
-		id,
-		timestamp,
-		type: input.type,
-		durationMs: input.durationMs,
-		wpm: computeWPM(input.text.length, input.durationMs),
-		errorRate: computeErrorRate(annotated),
-		text: input.text,
-		stream: encodeStream(input.events)
-	};
-}
+import type { KeystrokeEvent, StoredSession } from '../support/core';
 
 /**
  * Raw WPM — smoothing lives in `progress/`. 5 chars = 1 word. Uses `textLength`
@@ -63,12 +21,9 @@ function computeErrorRate(annotated: readonly { expected: string; actual: string
 	return errors / annotated.length;
 }
 
-interface SessionRunnerConfig {
-	type: SessionType;
-	text: string;
-	/** Injectable so tests get deterministic ids. */
+/** Injectable non-determinism. Both default to real ones; tests pass their own. */
+interface SessionRunnerClock {
 	idGenerator?: () => string;
-	/** Injectable so tests get deterministic timestamps for `finalize`. */
 	timestampProvider?: () => number;
 }
 
@@ -79,13 +34,13 @@ interface SessionRunnerConfig {
  * Sessions run until the text is fully typed; there's no in-session early-out.
  */
 export class SessionRunner {
-	private readonly config: SessionRunnerConfig;
 	private readonly events_: KeystrokeEvent[] = [];
 	private position_ = 0;
 
-	constructor(config: SessionRunnerConfig) {
-		this.config = config;
-	}
+	constructor(
+		private readonly text: string,
+		private readonly clock: SessionRunnerClock = {}
+	) {}
 
 	recordEvent(event: KeystrokeEvent): void {
 		this.events_.push(event);
@@ -94,22 +49,29 @@ export class SessionRunner {
 	}
 
 	isComplete(): boolean {
-		return this.position_ >= this.config.text.length;
+		return this.position_ >= this.text.length;
 	}
 
+	/**
+	 * Raw keystroke log → persistable row. Id and timestamp are the only
+	 * non-determinism.
+	 *
+	 * No bigram aggregates: the row carries the text and the encoded keystroke
+	 * stream, and `skill/hydrate` measures bigrams from those on read. `wpm` and
+	 * `errorRate` are kept as stored scalars only because every list view sorts
+	 * and charts on them — everything else is derived.
+	 */
 	finalize(elapsedMs: number): StoredSession {
-		return buildStoredSession({
-			events: this.events_,
-			type: this.config.type,
-			text: this.config.text,
+		return {
+			id: (this.clock.idGenerator ?? uuid)(),
+			timestamp: (this.clock.timestampProvider ?? Date.now)(),
+			type: 'real-text',
 			durationMs: elapsedMs,
-			idGenerator: this.config.idGenerator,
-			timestampProvider: this.config.timestampProvider
-		});
-	}
-
-	get events(): readonly KeystrokeEvent[] {
-		return this.events_;
+			wpm: computeWPM(this.text.length, elapsedMs),
+			errorRate: computeErrorRate(annotateFirstInputs(this.events_)),
+			text: this.text,
+			stream: encodeStream(this.events_)
+		};
 	}
 
 	get position(): number {

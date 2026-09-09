@@ -72,9 +72,14 @@
 		if (range <= 0 || !Number.isFinite(range)) return 1;
 		const rough = range / Math.max(1, targetCount);
 		const pow10 = Math.pow(10, Math.floor(Math.log10(rough)));
-		const norm = rough / pow10;
-		const nice = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
-		return nice * pow10;
+		return roundToNice(rough / pow10) * pow10;
+	}
+
+	function roundToNice(norm: number): number {
+		if (norm < 1.5) return 1;
+		if (norm < 3) return 2;
+		if (norm < 7) return 5;
+		return 10;
 	}
 
 	function buildNiceTicks(min: number, max: number, targetCount = 4) {
@@ -184,23 +189,16 @@
 		];
 	});
 
-	// Map variant → Tailwind classes. Done as runtime derived values (not
-	// class-string interpolation) so the Tailwind JIT sees the full class
-	// literals and doesn't tree-shake them.
-	const strokeClass = $derived(
-		variant === 'warning'
-			? 'stroke-warning'
-			: variant === 'success'
-				? 'stroke-success'
-				: 'stroke-primary'
-	);
-	const fillClass = $derived(
-		variant === 'warning'
-			? 'fill-warning/10'
-			: variant === 'success'
-				? 'fill-success/10'
-				: 'fill-primary/10'
-	);
+	// Full class literals in a lookup, not interpolated strings, so the Tailwind
+	// JIT sees them and doesn't tree-shake them out.
+	const VARIANT_CLASSES = {
+		primary: { stroke: 'stroke-primary', fill: 'fill-primary/10' },
+		warning: { stroke: 'stroke-warning', fill: 'fill-warning/10' },
+		success: { stroke: 'stroke-success', fill: 'fill-success/10' }
+	} as const;
+
+	const strokeClass = $derived(VARIANT_CLASSES[variant].stroke);
+	const fillClass = $derived(VARIANT_CLASSES[variant].fill);
 </script>
 
 <div bind:this={containerEl} class="w-full">

@@ -5,8 +5,7 @@ import {
 	type ClassificationThresholds,
 	type SessionSummary
 } from '../support/core';
-import type { FrequencyTable } from '../corpus';
-import { classifyBigram, summarizeSamples } from '../skill';
+import { classifyBigram, summarizeSamples, type BigramSummary } from '../skill';
 
 /**
  * Rolling average with a trailing window. For positions before the window is full, returns
@@ -57,7 +56,7 @@ const WPM_ROLLING_WINDOW = 7;
 const BIGRAM_SPARKLINE_WINDOW = BIGRAM_CLASSIFICATION_WINDOW;
 const BIGRAM_SPARKLINE_DEPTH = BIGRAM_CLASSIFICATION_WINDOW;
 /** Total samples per bigram needed to render a full sparkline. */
-export const BIGRAM_SPARKLINE_SAMPLE_LIMIT = BIGRAM_SPARKLINE_WINDOW + BIGRAM_SPARKLINE_DEPTH - 1;
+const BIGRAM_SPARKLINE_SAMPLE_LIMIT = BIGRAM_SPARKLINE_WINDOW + BIGRAM_SPARKLINE_DEPTH - 1;
 
 /**
  * Single point on a per-session trend chart. Shared shape across metrics so one chart
@@ -169,14 +168,13 @@ export function buildDailyErrorRateSeries(sessions: readonly SessionSummary[]): 
 }
 
 /**
- * Sibling pair to `buildHealthyBigramSeries`: in one pass, also emits a "beyond
- * acquisition" series counting healthy + fluency + hasty — every classified
- * bigram that's past the initial-learning phase. Lets the chart show both as
- * an envelope so the gap (in-progress practice) is visible.
+ * Two cumulative counts in one pass, one point per day: bigrams currently
+ * classified `healthy`, and every bigram past the initial-learning phase
+ * (healthy + fluency + hasty). The chart draws both, so the gap between them
+ * reads as in-progress practice.
  */
 export function buildBigramProgressSeries(
 	sessions: readonly SessionSummary[],
-	_corpus: FrequencyTable | undefined,
 	thresholds: ClassificationThresholds
 ): { healthy: TrendPoint[]; beyondAcquisition: TrendPoint[] } {
 	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
@@ -249,7 +247,7 @@ export interface BigramTrendPoint {
 
 /** Per-bigram buffer of the most recent `limit` samples (oldest→newest). One pass over
  *  sessions; used to batch trend computation for many bigrams. */
-export function buildRecentSamplesIndex(
+function buildRecentSamplesIndex(
 	sessions: readonly SessionSummary[],
 	limit: number
 ): Map<string, BigramSample[]> {
@@ -270,9 +268,8 @@ export function buildRecentSamplesIndex(
 	return out;
 }
 
-/** Sliding-window trend from a pre-built sample buffer. Use when deriving trends for
- *  many bigrams; pair with `buildRecentSamplesIndex`. */
-export function buildBigramTrendFromSamples(
+/** Sliding-window trend from a pre-built sample buffer. */
+function buildBigramTrendFromSamples(
 	samples: readonly BigramSample[],
 	window: number = BIGRAM_SPARKLINE_WINDOW
 ): BigramTrendPoint[] {
@@ -298,19 +295,23 @@ export function buildBigramTrendFromSamples(
 	return points;
 }
 
+/** A table row: skill's per-bigram assessment plus the sparkline trend. */
+export type BigramRow = BigramSummary & { trend: BigramTrendPoint[] };
+
 /**
- * Sliding-window trend for one bigram. Returns `[]` when the pool can't fill a single
- * window. For many bigrams off the same session set, call `buildRecentSamplesIndex`
- * once and feed `buildBigramTrendFromSamples` instead.
+ * Attach a sparkline trend to each summary. The sample index is built once for
+ * the whole set rather than per row — the pool is the same for every bigram, and
+ * rebuilding it per row is quadratic in the number of bigrams observed.
  */
-export function buildBigramTrend(
+export function buildBigramRows(
 	sessions: readonly SessionSummary[],
-	bigram: string,
-	window: number = BIGRAM_SPARKLINE_WINDOW,
-	depth: number = BIGRAM_SPARKLINE_DEPTH
-): BigramTrendPoint[] {
-	const idx = buildRecentSamplesIndex(sessions, window + depth - 1);
-	return buildBigramTrendFromSamples(idx.get(bigram) ?? [], window);
+	summaries: readonly BigramSummary[]
+): BigramRow[] {
+	const index = buildRecentSamplesIndex(sessions, BIGRAM_SPARKLINE_SAMPLE_LIMIT);
+	return summaries.map((row) => ({
+		...row,
+		trend: buildBigramTrendFromSamples(index.get(row.bigram) ?? [])
+	}));
 }
 
 /**

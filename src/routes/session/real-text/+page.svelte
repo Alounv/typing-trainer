@@ -3,38 +3,20 @@
 	 * The session route. Picks a passage from the quote bank by how much of the
 	 * typist's outstanding bigram debt it can repay.
 	 */
-	import { onMount } from 'svelte';
 	import SessionShell from '$lib/session/components/SessionShell.svelte';
+	import { loadable } from '$lib/support/async';
 	import { prepareRealTextSession } from './loader';
 
-	type LoadState =
-		| { status: 'loading' }
-		| { status: 'ready'; text: string }
-		| { status: 'error'; message: string };
-
-	let state = $state<LoadState>({ status: 'loading' });
-
-	onMount(async () => {
-		try {
-			const { text } = await prepareRealTextSession();
-			state = { status: 'ready', text };
-		} catch (err) {
-			state = {
-				status: 'error',
-				message: err instanceof Error ? err.message : 'Failed to build passage.'
-			};
-		}
-	});
+	const passage = loadable(prepareRealTextSession, 'Failed to build passage.');
 </script>
 
-{#if state.status === 'loading'}
+{#if passage.current.status === 'loading'}
 	<p class="mx-auto max-w-3xl text-base-content/70">Loading passage…</p>
-{:else if state.status === 'error'}
-	<p class="mx-auto max-w-3xl text-error" role="alert">{state.message}</p>
+{:else if passage.current.status === 'error'}
+	<p class="mx-auto max-w-3xl text-error" role="alert">{passage.current.message}</p>
 {:else}
 	<SessionShell
-		type="real-text"
-		text={state.text}
+		text={passage.current.data.text}
 		title="Real text"
 		approach="Push until errors show, then hold there — 5% is the ceiling. Keep moving; nothing here blocks you, and the verdict comes at the end."
 	/>

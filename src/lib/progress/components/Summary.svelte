@@ -4,7 +4,7 @@
 	import type { FrequencyTable } from '$lib/corpus';
 	import { assessPacing, summarizeBigrams } from '$lib/skill';
 	import { detectWindowedMovements, detectMilestone } from '../celebrations';
-	import { buildBigramTrend } from '../metrics';
+	import { buildBigramRows } from '../metrics';
 	import BigramMovements from './BigramMovements.svelte';
 	import PacingBanner from './PacingBanner.svelte';
 	import MilestoneBanner from './MilestoneBanner.svelte';
@@ -30,23 +30,17 @@
 	// Compare windowed classifications before vs. after this session so movements
 	// reflect the user's overall standing — same view as the bigram table — rather
 	// than a single noisy session's per-session classification.
-	const allMovements = $derived(detectWindowedMovements(statsSessions, session.id, thresholds));
-
-	// Every movement shows. The drill-era filtering by trained axis is gone with
-	// the drills — a real-text session trains both, so hiding either half would
-	// hide half of what changed.
-	const movements = $derived(allMovements);
+	// Every movement shows: a real-text session trains speed and accuracy at
+	// once, so there is no axis to filter down to.
+	const movements = $derived(detectWindowedMovements(statsSessions, session.id, thresholds));
 
 	const sessionRows = $derived.by(() => {
-		const include = new Set<string>([
-			...movements.map((m) => m.bigram),
-			...(session.bigramsTargeted ?? [])
-		]);
-		if (include.size === 0) return [];
-		const summaries = summarizeBigrams(statsSessions, corpusFrequencies, thresholds);
-		return summaries
-			.filter((row) => include.has(row.bigram))
-			.map((row) => ({ ...row, trend: buildBigramTrend(statsSessions, row.bigram) }));
+		if (movements.length === 0) return [];
+		const moved = new Set(movements.map((m) => m.bigram));
+		const summaries = summarizeBigrams(statsSessions, corpusFrequencies, thresholds).filter((row) =>
+			moved.has(row.bigram)
+		);
+		return buildBigramRows(statsSessions, summaries);
 	});
 
 	const ERROR_WARN_THRESHOLD = DEFAULT_HIGH_ERROR_THRESHOLD / 2;
@@ -86,12 +80,7 @@
 	</dl>
 </section>
 
-<BigramMovements
-	events={movements}
-	axisLabel={session.drillMode === 'accuracy' || session.drillMode === 'speed'
-		? session.drillMode
-		: undefined}
-/>
+<BigramMovements events={movements} />
 
 {#if sessionRows.length > 0}
 	<section class="space-y-3" data-testid="moved-bigrams-table">
@@ -102,7 +91,7 @@
 				{sessionRows.length === 1 ? 'bigram' : 'bigrams'}
 			</p>
 		</div>
-		<BigramTable rows={sessionRows} focus={session.drillMode} />
+		<BigramTable rows={sessionRows} />
 		<p class="text-xs text-base-content/55">
 			Stats span the last 10 occurrences across all sessions — same as the Analytics page.
 		</p>

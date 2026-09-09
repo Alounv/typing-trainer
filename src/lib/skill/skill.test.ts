@@ -3,18 +3,19 @@ import {
 	annotateFirstInputs,
 	assessPacing,
 	computeAllBigramDebts,
-	buildLivePriorityTargets,
-	buildLiveUndertrained,
-	computeBigramDebts,
-	decodeStream,
 	encodeStream,
-	extractBigramAggregates,
 	hydrateSession,
 	summarizeBigrams,
-	type AnnotatedKeystrokeEvent,
 	type PacingInput,
 	type PacingVerdict
 } from './index';
+// One level in. `decodeStream` is only ever called by `hydrateSession`, and
+// `extractBigramAggregates` only by that — but the codec round-trip and the
+// aggregate arithmetic are the two things every statistic in the app rests on,
+// so they are worth pinning directly rather than through a stored row.
+import { decodeStream } from './stream-codec';
+import { extractBigramAggregates } from './extraction';
+import type { AnnotatedKeystrokeEvent } from './postprocess';
 import {
 	BIGRAM_CLASSIFICATION_WINDOW,
 	DEFAULT_THRESHOLDS,
@@ -323,6 +324,8 @@ describe('summarizeBigrams', () => {
 	});
 
 	it('keeps a measured cost on healthy bigrams instead of zeroing it', () => {
+		// A healthy bigram still loses real time, and the analytics table shows
+		// it. Forcing the score to 0 would hide that.
 		const rows = summarizeBigrams(
 			acquisitionVsHealthyFixture(),
 			{ th: 10, er: 10 },
@@ -331,69 +334,10 @@ describe('summarizeBigrams', () => {
 		const er = rows.find((r) => r.bigram === 'er')!;
 		expect(er.classification).toBe('healthy');
 		expect(er.timeLossMs).toBeGreaterThanOrEqual(0);
-		// ...but drill selection still filters it out.
-		expect(
-			buildLivePriorityTargets(acquisitionVsHealthyFixture(), { th: 10, er: 10 }).map(
-				(t) => t.bigram
-			)
-		).toEqual(['th']);
 	});
 });
 
-describe('buildLivePriorityTargets', () => {
-	it('excludes healthy and unclassified bigrams', () => {
-		const targets = buildLivePriorityTargets(acquisitionVsHealthyFixture(), { th: 10, er: 10 });
-		expect(targets.map((t) => t.bigram)).toEqual(['th']);
-	});
-
-	it('scopes by classification filter when supplied', () => {
-		const sessions = [
-			session('s1', 100, [
-				agg('th', 's1', {
-					meanTime: 100,
-					errorRate: 0.2,
-					classification: 'hasty',
-					samples: Array.from({ length: 20 }, () => ({ correct: false, timing: 100 }))
-				}),
-				agg('er', 's1', {
-					meanTime: 400,
-					errorRate: 0,
-					classification: 'fluency',
-					samples: cleanSamples(20, 400)
-				})
-			])
-		];
-		const accuracyTargets = buildLivePriorityTargets(
-			sessions,
-			{ th: 10, er: 10 },
-			undefined,
-			undefined,
-			['hasty', 'acquisition']
-		);
-		expect(accuracyTargets.map((t) => t.bigram)).toEqual(['th']);
-	});
-});
-
-describe('buildLiveUndertrained', () => {
-	it('returns corpus bigrams with fewer than the minimum lifetime occurrences', () => {
-		// th has 5 occurrences (< 10); er has 20 (≥ 10); zz has 0.
-		const sessions = [
-			session('s1', 100, [
-				agg('th', 's1', { occurrences: 5 }),
-				agg('er', 's1', { occurrences: 20 })
-			])
-		];
-		const under = buildLiveUndertrained(sessions, { th: 10, er: 8, zz: 1 });
-		// Sorted by frequency desc: th (10) > zz (1). er is well-trained.
-		expect(under).toEqual(['th', 'zz']);
-	});
-
-	it('returns empty when no corpus is supplied', () => {
-		expect(buildLiveUndertrained([], undefined)).toEqual([]);
-	});
-});
-
-describe('computeBigramDebts', () => {
+describe('computeAllBigramDebts', () => {
 	/** `samples` reads oldest-first, matching how a session records them. */
 	function withSamples(bigram: string, pattern: string): SessionSummary[] {
 		const samples: BigramSample[] = [...pattern].map((c) => ({
@@ -403,32 +347,24 @@ describe('computeBigramDebts', () => {
 		return [session('s1', 100, [agg(bigram, 's1', { samples })])];
 	}
 
-	it('owes nothing for a bigram with a clean window', () => {
-		const debts = computeBigramDebts(withSamples('th', '.'.repeat(20)), ['th']);
-		expect(debts.get('th')).toBe(0);
+	/** Settled bigrams are dropped from the map, so absent reads as zero owed. */
+	function debtFor(sessions: SessionSummary[], bigram: string): number {
+		return computeAllBigramDebts(sessions).get(bigram) ?? 0;
+	}
+
+	it.each([
+		['a clean window', '.'.repeat(20), 0],
+		['the newest sample being the error', '.'.repeat(19) + 'x', BIGRAM_CLASSIFICATION_WINDOW],
+		['the error about to age out', 'x' + '.'.repeat(19), 1],
+		// Two errors; the newer one is the sixth-newest sample, so it takes 15
+		// more clean repeats to push it out of a twenty-sample window.
+		['two errors, the newer one setting the price', 'x' + '.'.repeat(13) + 'x' + '.....', 15]
+	])('owes %i repeats after %s', (_label, pattern, expected) => {
+		expect(debtFor(withSamples('th', pattern), 'th')).toBe(expected);
 	});
 
 	it('owes nothing for a bigram with no history at all', () => {
-		expect(computeBigramDebts([], ['th']).get('th')).toBe(0);
-	});
-
-	it('owes a full window when the newest sample is the error', () => {
-		const debts = computeBigramDebts(withSamples('th', '.'.repeat(19) + 'x'), ['th']);
-		expect(debts.get('th')).toBe(BIGRAM_CLASSIFICATION_WINDOW);
-	});
-
-	it('owes one repeat when the error is about to age out', () => {
-		const debts = computeBigramDebts(withSamples('th', 'x' + '.'.repeat(19)), ['th']);
-		expect(debts.get('th')).toBe(1);
-	});
-
-	it('is set by the newest error, not by how many errors there are', () => {
-		// Two errors; the newer one is the sixth-newest sample, so it takes 15
-		// more clean repeats to push it out of a twenty-sample window.
-		const debts = computeBigramDebts(withSamples('th', 'x' + '.'.repeat(13) + 'x' + '.....'), [
-			'th'
-		]);
-		expect(debts.get('th')).toBe(15);
+		expect(debtFor([], 'th')).toBe(0);
 	});
 
 	it('pools the window across sessions, newest first', () => {
@@ -437,25 +373,19 @@ describe('computeBigramDebts', () => {
 			session('new', 200, [agg('th', 'new', { samples: cleanSamples(19, 100) })])
 		];
 		// 19 clean on top of the old error: one more repeat pushes it out.
-		expect(computeBigramDebts(sessions, ['th']).get('th')).toBe(1);
+		expect(debtFor(sessions, 'th')).toBe(1);
 	});
-});
 
-describe('computeAllBigramDebts', () => {
 	it('discovers its own universe from history and drops what is settled', () => {
 		// No bigram list to pass: the whole point is that the caller does not
-		// have to know which pairs exist. Settled pairs are dropped so the map
-		// holds only what is actually owed.
+		// have to know which pairs exist.
 		const sessions = [
 			session('s1', 100, [
 				agg('th', 's1', { samples: cleanSamples(20, 100) }),
 				agg('er', 's1', { samples: [...cleanSamples(19, 100), { correct: false, timing: null }] })
 			])
 		];
-
-		const debts = computeAllBigramDebts(sessions);
-		expect([...debts.keys()]).toEqual(['er']);
-		expect(debts.get('er')).toBe(BIGRAM_CLASSIFICATION_WINDOW);
+		expect([...computeAllBigramDebts(sessions).keys()]).toEqual(['er']);
 	});
 
 	it('returns an empty map with no history', () => {

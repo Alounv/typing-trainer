@@ -8,29 +8,13 @@
 	 * outstanding debt when the session loads. So the page answers "how has it
 	 * been going" instead of "what now", and trends still live on `/analytics`.
 	 */
-	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { VERSION } from '$lib/version';
+	import { loadable } from '$lib/support/async';
 	import PacingBadge from '$lib/progress/components/PacingBadge.svelte';
-	import { loadDashboard, type DashboardData } from './loader';
+	import { loadDashboard } from './loader';
 
-	type LoadState =
-		| { status: 'loading' }
-		| { status: 'ready'; data: DashboardData }
-		| { status: 'error'; message: string };
-
-	let state = $state<LoadState>({ status: 'loading' });
-
-	onMount(async () => {
-		try {
-			state = { status: 'ready', data: await loadDashboard() };
-		} catch (err) {
-			state = {
-				status: 'error',
-				message: err instanceof Error ? err.message : 'Failed to load dashboard.'
-			};
-		}
-	});
+	const dashboard = loadable(loadDashboard, 'Failed to load dashboard.');
 
 	const dateFormat = new Intl.DateTimeFormat(undefined, {
 		month: 'short',
@@ -61,11 +45,11 @@
 		</a>
 	</section>
 
-	{#if state.status === 'loading'}
+	{#if dashboard.current.status === 'loading'}
 		<p class="text-base-content/60">Loading…</p>
-	{:else if state.status === 'error'}
-		<p class="text-error" role="alert">{state.message}</p>
-	{:else if state.data.recent.length === 0}
+	{:else if dashboard.current.status === 'error'}
+		<p class="text-error" role="alert">{dashboard.current.message}</p>
+	{:else if dashboard.current.data.recent.length === 0}
 		<section class="border-t border-base-300 pt-6" data-testid="no-history">
 			<p class="text-sm text-base-content/55">
 				No sessions yet. The first few passages are chosen at random — there is nothing owed to
@@ -78,7 +62,7 @@
 				Recent sessions
 			</h2>
 			<ul class="divide-y divide-base-300" data-testid="recent-sessions">
-				{#each state.data.recent as session (session.id)}
+				{#each dashboard.current.data.recent as session (session.id)}
 					<li class="flex flex-wrap items-baseline gap-x-6 gap-y-1 py-3 text-sm">
 						<span class="w-32 shrink-0 text-base-content/50">
 							{dateFormat.format(new Date(session.timestamp))}

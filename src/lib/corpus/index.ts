@@ -2,14 +2,12 @@
  * Corpus
  * Produces the text the user will type.
  *
- * Owns the built-in wordlists and quote banks, language-level bigram
- * frequency tables, and the generators that assemble them into drill
- * passages (bigram drills, real text, diagnostic samples). Also scores
- * candidate passages against outstanding bigram debt — real-text sessions
- * select prose rather than generate it. Does not decide *which* drill to run
- * — that's `plan`'s job.
+ * Owns the shipped quote banks and the language-level bigram frequency tables,
+ * and assembles a passage out of them. Real-text sessions *select* prose rather
+ * than generate it, so the lever this domain offers is which quotes come next —
+ * scored, when there is history, by how much outstanding bigram debt each one
+ * repays per keystroke.
  */
-export { isBuiltinCorpusId, loadBuiltinCorpus, hasQuoteBank, loadQuoteBank } from './registry';
+export { hasCorpus, loadQuoteBank, loadBigramFrequencies } from './registry';
+export { buildPassage } from './passage';
 export type { FrequencyTable } from './types';
-export { generateText } from './generate-text';
-export { scoreQuoteByDebt, selectQuoteByDebt } from './debt-selection';

@@ -1,19 +1,14 @@
-<!-- Sortable bigram table. Default sort matches diagnostic priority-list criterion (priorityScore desc). -->
+<!-- Sortable bigram table. Default sort: priorityScore desc. -->
 <script lang="ts">
-	import type { BigramSummary } from '$lib/skill';
 	import type { BigramClassification } from '../../support/core';
-	import type { BigramTrendPoint } from '../metrics';
+	import type { BigramRow } from '../metrics';
 	import BigramSparkline from './BigramSparkline.svelte';
 
 	interface Props {
-		/** Skill's per-bigram assessment plus the sparkline trend from Progress. */
-		rows: (BigramSummary & { trend: BigramTrendPoint[] })[];
-		focus?: 'accuracy' | 'speed';
+		rows: BigramRow[];
 	}
 
-	let { rows, focus }: Props = $props();
-	const showSpeed = $derived(focus !== 'accuracy');
-	const showErrors = $derived(focus !== 'speed');
+	let { rows }: Props = $props();
 
 	/**
 	 * Render whitespace as the open-box glyph (U+2423). Bigrams involving
@@ -38,8 +33,7 @@
 	let sortKey = $state<SortKey>('priority');
 	let sortDir = $state<SortDir>('desc');
 
-	/** Classification ordering for display: worst → best. Mirrors the drill
-	 * prescription order in `bigram/types`. */
+	/** Classification ordering for display: worst → best. */
 	const CLASS_ORDER: Record<BigramClassification, number> = {
 		acquisition: 0,
 		hasty: 1,
@@ -97,8 +91,7 @@
 		return sortDir === 'asc' ? ' ▲' : ' ▼';
 	}
 
-	/** DaisyUI badge class for a classification — picks a semantic color per
-	 * prescription severity, not the raw classification name. */
+	/** DaisyUI badge class for a classification — semantic color by severity. */
 	function badgeClass(c: BigramClassification): string {
 		switch (c) {
 			case 'acquisition':
@@ -153,7 +146,7 @@
 
 {#if rows.length === 0}
 	<p class="text-sm text-base-content/60">
-		No bigram data yet — run a diagnostic session to populate this table.
+		No bigram data yet — type a passage to populate this table.
 	</p>
 {:else}
 	<div class="overflow-x-auto rounded-lg border border-base-300">
@@ -184,22 +177,18 @@
 							Occ.{sortIndicator('occurrences')}
 						</button>
 					</th>
-					{#if showSpeed}
-						<th class="text-right">
-							<button type="button" class="table-sort-btn" onclick={() => toggleSort('meanTime')}>
-								Speed{sortIndicator('meanTime')}
-							</button>
-						</th>
-						<th></th>
-					{/if}
-					{#if showErrors}
-						<th class="text-right">
-							<button type="button" class="table-sort-btn" onclick={() => toggleSort('errorRate')}>
-								Errors{sortIndicator('errorRate')}
-							</button>
-						</th>
-						<th></th>
-					{/if}
+					<th class="text-right">
+						<button type="button" class="table-sort-btn" onclick={() => toggleSort('meanTime')}>
+							Speed{sortIndicator('meanTime')}
+						</button>
+					</th>
+					<th></th>
+					<th class="text-right">
+						<button type="button" class="table-sort-btn" onclick={() => toggleSort('errorRate')}>
+							Errors{sortIndicator('errorRate')}
+						</button>
+					</th>
+					<th></th>
 					<!--
 						Time loss and frequency are the two factors the priority score
 						multiplies. Shown as their own columns because the product alone
@@ -235,14 +224,10 @@
 							</span>
 						</td>
 						<td class="text-right font-mono tabular-nums">{fmtOccurrences(row.occurrences)}</td>
-						{#if showSpeed}
-							<td class="text-right font-mono tabular-nums">{fmtWpm(row.meanTime)}</td>
-							<td><BigramSparkline points={row.trend} metric="meanTime" /></td>
-						{/if}
-						{#if showErrors}
-							<td class="text-right font-mono tabular-nums">{fmtPct(row.errorRate)}</td>
-							<td><BigramSparkline points={row.trend} metric="errorRate" /></td>
-						{/if}
+						<td class="text-right font-mono tabular-nums">{fmtWpm(row.meanTime)}</td>
+						<td><BigramSparkline points={row.trend} metric="meanTime" /></td>
+						<td class="text-right font-mono tabular-nums">{fmtPct(row.errorRate)}</td>
+						<td><BigramSparkline points={row.trend} metric="errorRate" /></td>
 						<td class="text-right font-mono tabular-nums">{fmtTimeLoss(row.timeLossMs)}</td>
 						<td class="text-right font-mono tabular-nums">{fmtFrequency(row.frequency)}</td>
 						<td class="text-right font-mono tabular-nums">{row.priorityScore.toFixed(2)}</td>

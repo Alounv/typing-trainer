@@ -1,13 +1,12 @@
 import { getRecentSessions } from '$lib/support/storage';
 import { getProfile } from '$lib/settings';
 import { hydrateSessions } from '$lib/skill';
-import { loadBuiltinCorpus, type FrequencyTable } from '$lib/corpus';
+import { loadBigramFrequencies, type FrequencyTable } from '$lib/corpus';
 import { DEFAULT_THRESHOLDS } from '$lib/support/core';
-import type { ClassificationThresholds, SessionSummary, UserSettings } from '$lib/support/core';
+import type { ClassificationThresholds, SessionSummary } from '$lib/support/core';
 
 interface AnalyticsInputs {
 	sessions: SessionSummary[];
-	profile: UserSettings | undefined;
 	/** `undefined` when the corpus chunk failed to load — consumers treat it as "no frequency weighting". */
 	corpusFrequencies: FrequencyTable | undefined;
 	thresholds: ClassificationThresholds;
@@ -25,21 +24,10 @@ export async function loadAnalyticsInputs(): Promise<AnalyticsInputs> {
 	// the charts reflect the thresholds in force now rather than whatever was
 	// configured on the day each session was typed.
 	const thresholds = profile?.thresholds ?? DEFAULT_THRESHOLDS;
-	const sessions = hydrateSessions(sessionRows, thresholds);
-
-	// Best-effort: corpus failures still render the chart (summarizeBigrams falls back to freq=1).
-	let corpusFrequencies: FrequencyTable | undefined;
-	try {
-		const corpus = await loadBuiltinCorpus(profile?.language ?? 'en');
-		corpusFrequencies = corpus.bigramFrequencies;
-	} catch {
-		corpusFrequencies = undefined;
-	}
 
 	return {
-		sessions,
-		profile,
-		corpusFrequencies,
+		sessions: hydrateSessions(sessionRows, thresholds),
+		corpusFrequencies: await loadBigramFrequencies(profile?.language ?? 'en'),
 		thresholds
 	};
 }
