@@ -17,12 +17,9 @@
 		ariaLabel: string;
 		/** Format a y-axis tick value. Defaults to integer. */
 		formatY?: (v: number) => string;
-		/**
-		 * Color variant. Maps to a DaisyUI semantic color so the chart can
-		 * visually separate metrics ("primary" = WPM, "warning" = errors)
-		 * without hardcoding hex. Keep in sync with `ClassificationBar` if
-		 * you add more variants.
-		 */
+		/** DaisyUI semantic color, so the chart separates metrics visually
+		 *  without hardcoding hex: primary = WPM, warning = errors,
+		 *  success = bigram progress. */
 		variant?: 'primary' | 'warning' | 'success';
 		/** Override message shown when there's no data. */
 		emptyLabel?: string;

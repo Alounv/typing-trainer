@@ -10,15 +10,15 @@
 	interface Props {
 		points: BigramTrendPoint[];
 		/** Which metric to plot. */
-		metric?: 'meanTime' | 'errorRate';
-		/** Outer width in CSS pixels. Table column = ~80px, standalone = larger. */
-		width?: number;
-		height?: number;
+		metric: 'meanTime' | 'errorRate';
 	}
 
-	let { points, metric = 'meanTime', width = 80, height = 24 }: Props = $props();
+	let { points, metric }: Props = $props();
 
-	// 1px inset so stroke endpoints + last dot don't clip at the edges.
+	/** Sized for a table column. 1px inset keeps stroke ends and the last dot
+	 *  from clipping at the edges. */
+	const WIDTH = 80;
+	const HEIGHT = 24;
 	const INSET = 2;
 
 	const ariaLabel = $derived(
@@ -44,10 +44,12 @@
 		if (points.length < 2) return null;
 		const yMin = Math.min(...values);
 		const yMax = Math.max(...values);
-		const yRange = yMax === yMin ? null : yMax - yMin;
-		const innerW = width - INSET * 2;
-		const innerH = height - INSET * 2;
-		return { yMin, yRange, innerW, innerH };
+		return {
+			yMin,
+			yRange: yMax === yMin ? null : yMax - yMin,
+			innerW: WIDTH - INSET * 2,
+			innerH: HEIGHT - INSET * 2
+		};
 	});
 
 	const path = $derived.by(() => {
@@ -77,7 +79,13 @@
 {#if points.length < 2}
 	<span class="text-xs text-base-content/40">—</span>
 {:else}
-	<svg {width} {height} role="img" aria-label={ariaLabel} class="inline-block align-middle">
+	<svg
+		width={WIDTH}
+		height={HEIGHT}
+		role="img"
+		aria-label={ariaLabel}
+		class="inline-block align-middle"
+	>
 		<path
 			d={path}
 			fill="none"

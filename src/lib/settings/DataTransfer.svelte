@@ -87,16 +87,14 @@
 			confirmDialog?.showModal();
 		} catch (err) {
 			pendingImport = null;
-			status = {
-				kind: 'error',
-				message:
-					err instanceof SyntaxError
-						? 'File is not valid JSON.'
-						: err instanceof Error
-							? err.message
-							: 'Could not read file.'
-			};
+			status = { kind: 'error', message: readFailureMessage(err) };
 		}
+	}
+
+	function readFailureMessage(err: unknown): string {
+		if (err instanceof SyntaxError) return 'File is not valid JSON.';
+		if (err instanceof Error) return err.message;
+		return 'Could not read file.';
 	}
 
 	async function confirmImport() {

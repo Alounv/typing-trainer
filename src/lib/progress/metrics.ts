@@ -77,35 +77,88 @@ export interface TrendPoint {
 	high: number | null;
 }
 
-function buildMetricSeries(
-	sessions: readonly SessionSummary[],
-	accessor: (s: SessionSummary) => number
-): TrendPoint[] {
-	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
-	const values = ordered.map(accessor);
+/** What collapses into one plotted point. Per-session buckets hold one value;
+ *  per-day buckets hold however many sessions that day held. `id` is the chart
+ *  key — the day's last session, when bucketing by day. */
+interface Bucket {
+	id: string;
+	timestamp: number;
+	values: number[];
+}
+
+/** Buckets → points: median per bucket, then a trailing rolling mean and ±1σ
+ *  across them. Only multi-sample buckets get a whisker, which is why the
+ *  per-session series never shows one. */
+function buildSeries(buckets: readonly Bucket[]): TrendPoint[] {
+	const values = buckets.map((b) => median(b.values));
 	const rolling = rollingAverage(values, WPM_ROLLING_WINDOW);
 	const sigmas = rollingStdDev(values, WPM_ROLLING_WINDOW);
-	return ordered.map((s, i) => {
+
+	return buckets.map((bucket, i) => {
 		const mean = rolling[i];
 		const sd = sigmas[i];
+		const spread = mean !== null && sd !== null;
+		const multi = bucket.values.length > 1;
 		return {
-			sessionId: s.id,
-			timestamp: s.timestamp,
+			sessionId: bucket.id,
+			timestamp: bucket.timestamp,
 			value: values[i],
 			rolling: mean,
-			plus1Sigma: mean !== null && sd !== null ? mean + sd : null,
-			minus1Sigma: mean !== null && sd !== null ? mean - sd : null,
-			low: null,
-			high: null
+			plus1Sigma: spread ? mean + sd : null,
+			minus1Sigma: spread ? mean - sd : null,
+			low: multi ? Math.min(...bucket.values) : null,
+			high: multi ? Math.max(...bucket.values) : null
 		};
 	});
 }
 
-export function buildWpmSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
-	return buildMetricSeries(sessions, (s) => s.wpm);
+function chronological(sessions: readonly SessionSummary[]): SessionSummary[] {
+	return [...sessions].sort((a, b) => a.timestamp - b.timestamp);
 }
 
-/** Local-date key (YYYY-MM-DD) for grouping sessions into "days". */
+function perSession(
+	sessions: readonly SessionSummary[],
+	accessor: (s: SessionSummary) => number
+): Bucket[] {
+	return chronological(sessions).map((s) => ({
+		id: s.id,
+		timestamp: s.timestamp,
+		values: [accessor(s)]
+	}));
+}
+
+/** One bucket per local day — the median suppresses intra-day noise without
+ *  flattening real progress. */
+function perDay(
+	sessions: readonly SessionSummary[],
+	accessor: (s: SessionSummary) => number
+): Bucket[] {
+	const byDay = new Map<string, SessionSummary[]>();
+	for (const s of chronological(sessions)) {
+		const key = localDateKey(s.timestamp);
+		const bucket = byDay.get(key);
+		if (bucket) bucket.push(s);
+		else byDay.set(key, [s]);
+	}
+	return [...byDay.values()].map((day) => {
+		const last = day[day.length - 1];
+		return { id: last.id, timestamp: last.timestamp, values: day.map(accessor) };
+	});
+}
+
+export function buildWpmSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
+	return buildSeries(perSession(sessions, (s) => s.wpm));
+}
+
+export function buildDailyWpmSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
+	return buildSeries(perDay(sessions, (s) => s.wpm));
+}
+
+export function buildDailyErrorRateSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
+	return buildSeries(perDay(sessions, (s) => s.errorRate));
+}
+
+/** Local-date key for grouping sessions into "days". */
 function localDateKey(timestamp: number): string {
 	const d = new Date(timestamp);
 	return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -118,56 +171,6 @@ function median(values: readonly number[]): number {
 }
 
 /**
- * Collapse sessions into one point per local day, taking the median of the chosen
- * scalar across the day's sessions. The day's last session supplies the timestamp
- * and id (stable key, chronological position). Used by the analytics charts to
- * suppress intra-day noise without flattening real progress.
- */
-function buildDailyMedianSeries(
-	sessions: readonly SessionSummary[],
-	accessor: (s: SessionSummary) => number
-): TrendPoint[] {
-	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
-	const byDay = new Map<string, SessionSummary[]>();
-	for (const s of ordered) {
-		const key = localDateKey(s.timestamp);
-		const bucket = byDay.get(key);
-		if (bucket) bucket.push(s);
-		else byDay.set(key, [s]);
-	}
-	const days = [...byDay.values()];
-	const dayValues = days.map((bucket) => bucket.map(accessor));
-	const values = dayValues.map((vs) => median(vs));
-	const rolling = rollingAverage(values, WPM_ROLLING_WINDOW);
-	const sigmas = rollingStdDev(values, WPM_ROLLING_WINDOW);
-	return days.map((bucket, i) => {
-		const last = bucket[bucket.length - 1];
-		const mean = rolling[i];
-		const sd = sigmas[i];
-		const vs = dayValues[i];
-		const multi = vs.length > 1;
-		return {
-			sessionId: last.id,
-			timestamp: last.timestamp,
-			value: values[i],
-			rolling: mean,
-			plus1Sigma: mean !== null && sd !== null ? mean + sd : null,
-			minus1Sigma: mean !== null && sd !== null ? mean - sd : null,
-			low: multi ? Math.min(...vs) : null,
-			high: multi ? Math.max(...vs) : null
-		};
-	});
-}
-
-export function buildDailyWpmSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
-	return buildDailyMedianSeries(sessions, (s) => s.wpm);
-}
-
-export function buildDailyErrorRateSeries(sessions: readonly SessionSummary[]): TrendPoint[] {
-	return buildDailyMedianSeries(sessions, (s) => s.errorRate);
-}
-
-/**
  * Two cumulative counts in one pass, one point per day: bigrams currently
  * classified `healthy`, and every bigram past the initial-learning phase
  * (healthy + fluency + hasty). The chart draws both, so the gap between them
@@ -177,7 +180,7 @@ export function buildBigramProgressSeries(
 	sessions: readonly SessionSummary[],
 	thresholds: ClassificationThresholds
 ): { healthy: TrendPoint[]; beyondAcquisition: TrendPoint[] } {
-	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
+	const ordered = chronological(sessions);
 	const lastOfDayIdx = new Map<string, number>();
 	for (let i = 0; i < ordered.length; i++) {
 		lastOfDayIdx.set(localDateKey(ordered[i].timestamp), i);
@@ -251,9 +254,8 @@ function buildRecentSamplesIndex(
 	sessions: readonly SessionSummary[],
 	limit: number
 ): Map<string, BigramSample[]> {
-	const ordered = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
 	const out = new Map<string, BigramSample[]>();
-	for (const s of ordered) {
+	for (const s of chronological(sessions)) {
 		for (const agg of s.bigramAggregates) {
 			if (!agg.samples || agg.samples.length === 0) continue;
 			let buf = out.get(agg.bigram);

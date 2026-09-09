@@ -5,9 +5,8 @@
  *
  * "System" is a virtual choice: we don't store "system" as the `data-theme`
  * value (daisyUI wouldn't know what to do). Instead we store the literal
- * string "system" in localStorage and resolve it to `typewriter` (dark) or
- * `light` on apply, tracking the OS preference going forward via a
- * `matchMedia` listener.
+ * string "system" in localStorage and resolve it to `dark` or `light` on
+ * apply, tracking the OS preference going forward via a `matchMedia` listener.
  */
 
 export const THEMES = [
@@ -56,13 +55,11 @@ const DARK_FALLBACK: Theme = 'dark';
 const LIGHT_FALLBACK: Theme = 'light';
 
 /**
- * User's persisted choice. This is what the dropdown shows — the actual
- * rendered theme is `resolvedTheme` below.
+ * User's persisted choice — what the dropdown shows. The theme actually
+ * rendered lives on `<html data-theme>`, which is the single output; nothing
+ * needs it mirrored back into state.
  */
-export const themeStore = $state<{ choice: ThemeChoice; resolved: Theme }>({
-	choice: 'system',
-	resolved: DARK_FALLBACK
-});
+export const themeStore = $state<{ choice: ThemeChoice }>({ choice: 'system' });
 
 /** Convert "system" into a concrete theme based on current OS preference. */
 function resolveSystemTheme(): Theme {
@@ -88,15 +85,9 @@ function isTheme(value: string): value is Theme {
  */
 export function initThemeStore(): () => void {
 	const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-
-	if (stored === 'system' || stored === null) {
-		themeStore.choice = 'system';
-	} else if (isTheme(stored)) {
-		themeStore.choice = stored;
-	} else {
-		// Corrupted value — reset quietly.
-		themeStore.choice = 'system';
-	}
+	// Anything that isn't a known theme — "system", absent, or corrupted —
+	// falls back to following the OS.
+	themeStore.choice = stored !== null && isTheme(stored) ? stored : 'system';
 
 	applyResolvedTheme();
 
@@ -120,14 +111,12 @@ export function setTheme(choice: ThemeChoice): void {
 }
 
 /**
- * Resolve current `choice` → concrete theme, mutate `resolved`, and write
- * `data-theme` on `<html>`. Keeping this the single write-site means the
- * inline FOUC script (in app.html) and this module agree on semantics.
+ * Resolve current `choice` → concrete theme and write `data-theme` on `<html>`.
+ * Keeping this the single write-site means the inline FOUC script (in
+ * app.html) and this module agree on semantics.
  */
 function applyResolvedTheme(): void {
-	const resolved = themeStore.choice === 'system' ? resolveSystemTheme() : themeStore.choice;
-	themeStore.resolved = resolved;
-	if (typeof document !== 'undefined') {
-		document.documentElement.dataset.theme = resolved;
-	}
+	if (typeof document === 'undefined') return;
+	document.documentElement.dataset.theme =
+		themeStore.choice === 'system' ? resolveSystemTheme() : themeStore.choice;
 }

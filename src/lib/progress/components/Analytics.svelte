@@ -130,13 +130,7 @@
 	</div>
 	{#if classifiedCount > 0}
 		<div class="rounded-lg border border-base-300 bg-base-100 p-4">
-			<ClassificationBar
-				current={{
-					label: 'Current classification',
-					counts: liveClassification.counts,
-					meta: 'Now'
-				}}
-			/>
+			<ClassificationBar counts={liveClassification.counts} />
 		</div>
 		{#if liveClassification.unclassified > 0}
 			<p class="text-xs text-base-content/55">

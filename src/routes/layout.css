@@ -30,12 +30,3 @@ html {
 	   disabled on mono (Spline Sans ligatures don't affect code). */
 	font-feature-settings: 'ss01', 'cv01';
 }
-
-/* Tabular numerals wherever numbers need to stay put — applied inline
-   via Tailwind's `tabular-nums` utility on metric nodes. Defined here
-   as a reusable alias so mono numerics in prose can opt in too. */
-.num-tabular {
-	font-feature-settings:
-		'tnum' 1,
-		'lnum' 1;
-}

@@ -10,60 +10,32 @@
 		type DisplayedClassification
 	} from '../classificationDisplay';
 
-	/** `label` and optional `meta` (shown right-aligned, e.g. a date) caption the bar. */
-	export interface ClassificationBarRow {
-		label: string;
-		counts: {
-			healthy: number;
-			fluency: number;
-			hasty: number;
-			acquisition: number;
-		};
-		/** Optional right-aligned caption (e.g. a formatted date). Omit for live/"now" rows. */
-		meta?: string;
-	}
-
 	interface Props {
-		current: ClassificationBarRow;
+		counts: Record<DisplayedClassification, number>;
 	}
 
-	let { current }: Props = $props();
+	let { counts }: Props = $props();
 
-	interface Segment {
-		label: DisplayedClassification;
-		count: number;
-		percent: number;
-	}
-
-	function segments(row: ClassificationBarRow): Segment[] {
-		const total = ORDER.reduce((sum, k) => sum + row.counts[k], 0);
+	const segments = $derived.by(() => {
+		const total = ORDER.reduce((sum, k) => sum + counts[k], 0);
 		return ORDER.map((k) => ({
 			label: k,
-			count: row.counts[k],
-			// Divide-by-zero guard: an all-zero input (nothing classified yet)
-			// would render a flat bar, which is fine — the caller decides
-			// whether to show it at all via an empty-state branch.
-			percent: total === 0 ? 0 : (row.counts[k] / total) * 100
+			count: counts[k],
+			// An all-zero input renders a flat bar, which is fine — the caller
+			// decides whether to show it at all via its empty-state branch.
+			percent: total === 0 ? 0 : (counts[k] / total) * 100
 		}));
-	}
-
-	const currentSegments = $derived(segments(current));
+	});
 </script>
 
 <div class="space-y-4">
 	<div class="space-y-2" data-testid="classification-current">
-		<div class="flex items-baseline justify-between text-sm">
-			<span class="font-medium">{current.label}</span>
-			{#if current.meta}
-				<span class="text-base-content/50">{current.meta}</span>
-			{/if}
-		</div>
 		<div
 			class="flex h-6 w-full overflow-hidden rounded-md border border-base-300"
 			role="img"
-			aria-label="Classification distribution, {current.label}"
+			aria-label="Current classification distribution"
 		>
-			{#each currentSegments as seg (seg.label)}
+			{#each segments as seg (seg.label)}
 				{#if seg.percent > 0}
 					<div
 						class="{COLOR[

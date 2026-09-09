@@ -113,6 +113,12 @@
 	/** Default secondary share when the user first picks a second language. */
 	const DEFAULT_SECONDARY_MIX = 30;
 
+	// Long Tailwind strings, named once. Full literals so the JIT still sees them.
+	const PIP =
+		'inline-block h-3.5 w-3.5 rounded-[2px] border border-base-content/35 transition-colors peer-checked:border-primary peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-base-100';
+	const NUMBER_INPUT =
+		'w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden';
+
 	const LANGUAGE_LABEL: Record<'off' | Language, string> = {
 		off: 'Off',
 		en: 'English',
@@ -143,6 +149,48 @@
 		}
 	}
 </script>
+
+<!--
+	Every tunable number reads the same way: what it is, what it defaults to, the
+	value, its unit. One snippet so the three of them can't drift apart.
+-->
+{#snippet numberRow(row: {
+	id: string;
+	label: string;
+	fallback: string | number;
+	value: string | number;
+	unit: string;
+	onInput: (value: number) => void;
+	min?: string;
+	max?: string;
+	step?: string;
+})}
+	<div class="flex items-center justify-between gap-6 py-4">
+		<dt class="text-sm">
+			<label for={row.id} class="cursor-pointer">{row.label}</label>
+			<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
+				>default {row.fallback}</span
+			>
+		</dt>
+		<dd class="flex items-baseline gap-2">
+			<input
+				id={row.id}
+				type="number"
+				min={row.min ?? '1'}
+				max={row.max}
+				step={row.step}
+				class={NUMBER_INPUT}
+				value={row.value}
+				oninput={(e) => {
+					const parsed = Number((e.target as HTMLInputElement).value);
+					if (Number.isFinite(parsed)) row.onInput(parsed);
+				}}
+				data-testid={row.id}
+			/>
+			<span class="font-mono text-xs text-base-content/40">{row.unit}</span>
+		</dd>
+	</div>
+{/snippet}
 
 <div class="mx-auto max-w-3xl space-y-14">
 	<header class="space-y-3">
@@ -185,10 +233,7 @@
 									data-testid={`lang-${typedLang}`}
 								/>
 								<!-- Custom square pip; tonal match with the drill surface. -->
-								<span
-									class="inline-block h-3.5 w-3.5 rounded-[2px] border border-base-content/35 transition-colors peer-checked:border-primary peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-base-100"
-									aria-hidden="true"
-								></span>
+								<span class={PIP} aria-hidden="true"></span>
 								<span class="text-sm font-medium">{label}</span>
 							</label>
 						</dt>
@@ -231,10 +276,7 @@
 									onchange={() => setSecondary(typedChoice)}
 									data-testid={`secondary-${typedChoice}`}
 								/>
-								<span
-									class="inline-block h-3.5 w-3.5 rounded-[2px] border border-base-content/35 transition-colors peer-checked:border-primary peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-base-100"
-									aria-hidden="true"
-								></span>
+								<span class={PIP} aria-hidden="true"></span>
 								<span class="text-sm font-medium">{label}</span>
 								{#if isPrimary}
 									<span class="font-mono text-xs text-base-content/40">primary</span>
@@ -291,25 +333,16 @@
 			</p>
 
 			<dl class="divide-y divide-base-300 border-y border-base-300">
-				<div class="flex items-center justify-between gap-6 py-4">
-					<dt class="text-sm">
-						<label for="passage-words" class="cursor-pointer">Passage</label>
-						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
-							>default {DEFAULT_PASSAGE_WORDS}</span
-						>
-					</dt>
-					<dd class="flex items-baseline gap-2">
-						<input
-							id="passage-words"
-							type="number"
-							min="1"
-							class="w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
-							bind:value={form.passageWords}
-							data-testid="passage-words"
-						/>
-						<span class="font-mono text-xs text-base-content/40">words</span>
-					</dd>
-				</div>
+				{@render numberRow({
+					id: 'passage-words',
+					label: 'Passage',
+					fallback: DEFAULT_PASSAGE_WORDS,
+					value: form.passageWords ?? DEFAULT_PASSAGE_WORDS,
+					unit: 'words',
+					onInput: (words) => {
+						if (words >= 1) form.passageWords = words;
+					}
+				})}
 			</dl>
 		</section>
 
@@ -323,56 +356,28 @@
 			</p>
 
 			<dl class="divide-y divide-base-300 border-y border-base-300">
-				<div class="flex items-center justify-between gap-6 py-4">
-					<dt class="text-sm">
-						<label for="threshold-speed" class="cursor-pointer">Speed</label>
-						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
-							>default {Math.round(12000 / DEFAULT_SPEED_THRESHOLD_MS)}</span
-						>
-					</dt>
-					<dd class="flex items-baseline gap-2">
-						<input
-							id="threshold-speed"
-							type="number"
-							min="1"
-							class="w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
-							value={Math.round(12000 / form.thresholds!.speedMs)}
-							oninput={(e) => {
-								const wpm = Number((e.target as HTMLInputElement).value);
-								if (Number.isFinite(wpm) && wpm > 0) {
-									form.thresholds!.speedMs = Math.round(12000 / wpm);
-								}
-							}}
-							data-testid="threshold-speed"
-						/>
-						<span class="font-mono text-xs text-base-content/40">WPM</span>
-					</dd>
-				</div>
-				<div class="flex items-center justify-between gap-6 py-4">
-					<dt class="text-sm">
-						<label for="threshold-errorrate" class="cursor-pointer">Error rate</label>
-						<span class="ml-2 font-mono text-xs text-base-content/40 tabular-nums"
-							>default {(DEFAULT_HIGH_ERROR_THRESHOLD * 100).toFixed(1)}</span
-						>
-					</dt>
-					<dd class="flex items-baseline gap-2">
-						<input
-							id="threshold-errorrate"
-							type="number"
-							min="0"
-							max="100"
-							step="0.1"
-							class="w-20 [appearance:textfield] border-b border-base-content/20 bg-transparent py-1 text-right font-mono text-sm tabular-nums outline-none focus:border-primary [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
-							value={(form.thresholds!.errorRate * 100).toFixed(1)}
-							oninput={(e) => {
-								const pct = Number((e.target as HTMLInputElement).value);
-								if (Number.isFinite(pct)) form.thresholds!.errorRate = pct / 100;
-							}}
-							data-testid="threshold-errorrate"
-						/>
-						<span class="font-mono text-xs text-base-content/40">%</span>
-					</dd>
-				</div>
+				<!-- Stored as ms per transition, shown as WPM: 12000 = 60000 ms/min ÷ 5 chars/word. -->
+				{@render numberRow({
+					id: 'threshold-speed',
+					label: 'Speed',
+					fallback: Math.round(12000 / DEFAULT_SPEED_THRESHOLD_MS),
+					value: Math.round(12000 / form.thresholds!.speedMs),
+					unit: 'WPM',
+					onInput: (wpm) => {
+						if (wpm > 0) form.thresholds!.speedMs = Math.round(12000 / wpm);
+					}
+				})}
+				{@render numberRow({
+					id: 'threshold-errorrate',
+					label: 'Error rate',
+					fallback: (DEFAULT_HIGH_ERROR_THRESHOLD * 100).toFixed(1),
+					value: (form.thresholds!.errorRate * 100).toFixed(1),
+					unit: '%',
+					onInput: (pct) => (form.thresholds!.errorRate = pct / 100),
+					min: '0',
+					max: '100',
+					step: '0.1'
+				})}
 			</dl>
 		</section>
 
@@ -401,10 +406,7 @@
 									(form.colorizeBigramDifficulty = (e.target as HTMLInputElement).checked)}
 								data-testid="bigramcolor-toggle"
 							/>
-							<span
-								class="inline-block h-3.5 w-3.5 rounded-[2px] border border-base-content/35 transition-colors peer-checked:border-primary peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-base-100"
-								aria-hidden="true"
-							></span>
+							<span class={PIP} aria-hidden="true"></span>
 							<span class="text-sm font-medium">Start sessions with a tint</span>
 						</label>
 					</dt>
