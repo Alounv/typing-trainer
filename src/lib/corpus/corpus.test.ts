@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPassage, hasCorpus, loadBigramFrequencies, loadQuoteBank } from './index';
+import { buildPassage, loadBigramFrequencies, loadQuoteBank } from './index';
 // One level in: debt scoring is the domain's core algorithm and is worth
 // testing directly, but production only ever reaches it through `buildPassage`.
 import { scoreQuoteByDebt, selectQuoteByDebt } from './debt-selection';
@@ -37,12 +37,6 @@ function fixtureSecondaryBank(): QuoteBank {
 }
 
 describe('registry', () => {
-	it('narrows languages that ship a corpus', () => {
-		expect(hasCorpus('en')).toBe(true);
-		expect(hasCorpus('fr')).toBe(true);
-		expect(hasCorpus('klingon')).toBe(false);
-	});
-
 	it('loads the en bigram table', async () => {
 		const freq = await loadBigramFrequencies('en');
 		expect(Object.keys(freq!).length).toBeGreaterThanOrEqual(100);
@@ -157,11 +151,18 @@ describe('buildPassage', () => {
 		});
 	});
 
-	it('never repeats a quote within one passage', () => {
+	// Both draw paths — random and debt-scored — keep their own used-set and
+	// their own exhaustion handling, so each case has to run through both.
+	const bothDrawPaths = [
+		{ path: 'random', bigramDebts: undefined },
+		{ path: 'debt-scored', bigramDebts: new Map([['ab', 10]]) }
+	] as const;
+
+	it.each(bothDrawPaths)('never repeats a quote within one passage ($path)', ({ bigramDebts }) => {
 		const bank = fixtureQuoteBank();
 		// Far past what three quotes can cover, so the assembler is forced to
 		// either repeat or stop. It must stop.
-		const text = buildPassage({ bank, targetLengthChars: 10_000 });
+		const text = buildPassage({ bank, targetLengthChars: 10_000, bigramDebts });
 		for (const quote of bank.quotes) {
 			expect(text.split(quote.text).length - 1).toBeLessThanOrEqual(1);
 		}
@@ -211,66 +212,18 @@ describe('scoreQuoteByDebt', () => {
 });
 
 describe('selectQuoteByDebt', () => {
-	const bank: QuoteBank = {
-		language: 'en',
-		quotes: [
-			{ id: 1, text: 'zzz zzz zzz', source: 't', length: 11 },
-			{ id: 2, text: 'abab abab ab', source: 't', length: 12 },
-			{ id: 3, text: 'qqq qqq qqq', source: 't', length: 11 }
-		]
-	};
-
-	/** Walks the bank in order and repeats, so every quote gets sampled. */
-	function cyclingRng(): () => number {
-		let i = 0;
-		return () => (i++ % bank.quotes.length) / bank.quotes.length;
-	}
-
-	it('picks the quote that repays the most per keystroke', () => {
-		const picked = selectQuoteByDebt(bank, {
-			debts: new Map([['ab', 10]]),
-			used: new Set(),
-			remainingGap: 100,
-			rng: cyclingRng()
-		});
-		expect(picked?.id).toBe(2);
-	});
-
-	it('never returns a quote already used in this passage', () => {
-		const picked = selectQuoteByDebt(bank, {
-			debts: new Map([['ab', 10]]),
-			used: new Set([2]),
-			remainingGap: 100,
-			rng: cyclingRng()
-		});
-		expect(picked?.id).not.toBe(2);
-	});
-
-	it('returns an overshooting quote rather than nothing', () => {
-		// A tiny remaining gap must not starve the passage — better one quote too
-		// long than a session that cannot be built.
-		const picked = selectQuoteByDebt(bank, {
-			debts: new Map([['ab', 10]]),
-			used: new Set(),
-			remainingGap: 1,
-			rng: cyclingRng()
-		});
-		expect(picked).not.toBeNull();
-	});
-
-	it('returns null only when every quote is used', () => {
-		const picked = selectQuoteByDebt(bank, {
-			debts: new Map([['ab', 10]]),
-			used: new Set([1, 2, 3]),
-			remainingGap: 100,
-			rng: cyclingRng()
-		});
-		expect(picked).toBeNull();
-	});
-
-	it('finds an unused quote the sample missed', () => {
-		// A near-exhausted bank with an rng that keeps landing on used quotes:
-		// the linear scan is what keeps the passage buildable.
+	// The one branch `buildPassage` cannot reach: sampling needs an rng that
+	// keeps landing on used quotes, and the frontier does not inject one.
+	// Without the scan below it, a near-exhausted bank truncates the passage.
+	it('scans for an unused quote when the sample keeps missing', () => {
+		const bank: QuoteBank = {
+			language: 'en',
+			quotes: [
+				{ id: 1, text: 'zzz zzz zzz', source: 't', length: 11 },
+				{ id: 2, text: 'abab abab ab', source: 't', length: 12 },
+				{ id: 3, text: 'qqq qqq qqq', source: 't', length: 11 }
+			]
+		};
 		const picked = selectQuoteByDebt(bank, {
 			debts: new Map([['ab', 10]]),
 			used: new Set([1, 2]),

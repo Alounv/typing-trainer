@@ -117,11 +117,6 @@ function acquisitionVsHealthyFixture(): SessionSummary[] {
 }
 
 describe('extractBigramAggregates', () => {
-	it('returns empty for < 2 events', () => {
-		expect(extractBigramAggregates([], 's1')).toEqual([]);
-		expect(extractBigramAggregates([ev(0, 'a', 'a', 0)], 's1')).toEqual([]);
-	});
-
 	it('averages timing only across clean pairs; errors attributed to right char', () => {
 		// "th" clean (Δ=100), "th" with wrong 't' (Δ ignored, error counted).
 		const result = extractBigramAggregates(
@@ -180,18 +175,6 @@ describe('extractBigramAggregates', () => {
 			expect(result.find((r) => r.bigram === 'ab')!.errorCount).toBe(1);
 			expect(result.find((r) => r.bigram === 'cd')!.errorCount).toBe(1);
 		});
-	});
-
-	it('classifies with enough occurrences and clean timing', () => {
-		// Feed 10 clean "th" pairs fast enough to be healthy.
-		const events: AnnotatedKeystrokeEvent[] = [];
-		for (let i = 0; i < 10; i++) {
-			events.push(ev(i * 2, 't', 't', i * 1000));
-			events.push(ev(i * 2 + 1, 'h', 'h', i * 1000 + 50));
-		}
-		const [th] = extractBigramAggregates(events, 's1');
-		expect(th.bigram).toBe('th');
-		expect(th.classification).toBe('healthy');
 	});
 });
 

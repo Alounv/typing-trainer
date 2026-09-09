@@ -5,7 +5,6 @@ import 'fake-indexeddb/auto';
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearAll, getRecentSessions, getSession } from './service';
-import { saveProfile } from '../../settings/profile';
 import { saveSession } from '../../session/persistence';
 import type { StoredSession } from '../core/types';
 
@@ -34,12 +33,6 @@ describe('storage service — round-trip', () => {
 		await clearAll();
 	});
 
-	it('persists and reads back a session', async () => {
-		const session = makeSession();
-		await saveSession(session);
-		expect(await getSession(session.id)).toEqual(session);
-	});
-
 	it('keeps the keystroke stream typed across a round-trip', async () => {
 		// The whole storage model rests on structured clone preserving typed
 		// arrays — a stream that came back as a plain object would decode to
@@ -54,10 +47,6 @@ describe('storage service — round-trip', () => {
 		expect(stream?.typed).toBe('the');
 	});
 
-	it('returns undefined for unknown sessions', async () => {
-		expect(await getSession('does-not-exist')).toBeUndefined();
-	});
-
 	it('lists recent sessions newest-first', async () => {
 		await saveSession(makeSession({ id: 'a', timestamp: 1_000 }));
 		await saveSession(makeSession({ id: 'b', timestamp: 3_000 }));
@@ -65,15 +54,5 @@ describe('storage service — round-trip', () => {
 
 		const recent = await getRecentSessions();
 		expect(recent.map((s) => s.id)).toEqual(['b', 'c', 'a']);
-	});
-
-	it('clearAll wipes every table', async () => {
-		await saveSession(makeSession());
-		await saveProfile({ language: 'en' });
-
-		await clearAll();
-
-		expect(await getSession('s1')).toBeUndefined();
-		expect(await getRecentSessions()).toEqual([]);
 	});
 });

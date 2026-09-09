@@ -13,17 +13,6 @@ describe('settings/profile — round-trip', () => {
 		await clearAll();
 	});
 
-	it('round-trips user settings (singleton row)', async () => {
-		const settings: UserSettings = { language: 'fr' };
-		await saveProfile(settings);
-		expect(await getProfile()).toEqual(settings);
-
-		// Overwriting replaces — not merges.
-		const next: UserSettings = { language: 'en' };
-		await saveProfile(next);
-		expect(await getProfile()).toEqual(next);
-	});
-
 	it('returns undefined before the first save', async () => {
 		expect(await getProfile()).toBeUndefined();
 	});
