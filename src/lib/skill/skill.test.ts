@@ -544,7 +544,9 @@ describe('assessPacing', () => {
 			timestamp: 10_000,
 			type: 'real-text',
 			wpm: 60,
-			errorRate: 0.03,
+			// Error-free by default so `correctedWpm` is the identity here and
+			// these cases read as written. Corrections get their own case below.
+			errorRate: 0,
 			...overrides
 		};
 	}
@@ -568,7 +570,7 @@ describe('assessPacing', () => {
 	])('%s', (_label, errorRate, wpm, expected) => {
 		const result = assessPacing(paced({ errorRate, wpm }), sixtyWpmHistory);
 		expect(result.verdict).toBe(expected);
-		expect(result.recentWpm).toBe(60);
+		expect(result.recentCleanWpm).toBe(60);
 	});
 
 	// The one error threshold left, pinned on both sides.
@@ -587,21 +589,21 @@ describe('assessPacing', () => {
 		['just past the margin', 56.9, 'room-to-push'],
 		['clearly short', 50, 'room-to-push']
 	])('%s (%f vs a 60 average)', (_label, wpm, expected) => {
-		expect(assessPacing(paced({ errorRate: 0.01, wpm }), sixtyWpmHistory).verdict).toBe(expected);
+		expect(assessPacing(paced({ wpm }), sixtyWpmHistory).verdict).toBe(expected);
 	});
 
 	it('reports no baseline on a first session and assumes the pace was fine', () => {
 		// Without history there is nothing to be slower than, so a first session
 		// must not be told it left speed on the table.
 		const result = assessPacing(paced({ errorRate: 0.01, wpm: 5 }), []);
-		expect(result.recentWpm).toBeUndefined();
+		expect(result.recentCleanWpm).toBeUndefined();
 		expect(result.verdict).toBe('well-paced');
 	});
 
 	it('ignores the session itself when it appears in its own history', () => {
 		// The summary page reads recent sessions after the current one is saved.
 		const session = paced({ id: 'now', errorRate: 0.01, wpm: 50 });
-		expect(assessPacing(session, [...sixtyWpmHistory, session]).recentWpm).toBe(60);
+		expect(assessPacing(session, [...sixtyWpmHistory, session]).recentCleanWpm).toBe(60);
 	});
 
 	it('compares against its own session type only', () => {
@@ -615,7 +617,7 @@ describe('assessPacing', () => {
 			...sixtyWpmHistory,
 			...drills
 		]);
-		expect(result.recentWpm).toBe(60);
+		expect(result.recentCleanWpm).toBe(60);
 		expect(result.verdict).toBe('room-to-push');
 	});
 
@@ -623,7 +625,7 @@ describe('assessPacing', () => {
 		// Re-opening an old summary must give the verdict that session earned,
 		// not one coloured by everything typed since.
 		const later = paced({ id: 'later', timestamp: 99_000, wpm: 200 });
-		expect(assessPacing(paced(), [...sixtyWpmHistory, later]).recentWpm).toBe(60);
+		expect(assessPacing(paced(), [...sixtyWpmHistory, later]).recentCleanWpm).toBe(60);
 	});
 
 	it('averages only the most recent window', () => {
@@ -634,7 +636,25 @@ describe('assessPacing', () => {
 				paced({ id: `w${i}`, timestamp: 1_000 + i, wpm: 60 })
 			)
 		];
-		expect(assessPacing(paced(), history).recentWpm).toBe(60);
+		expect(assessPacing(paced(), history).recentCleanWpm).toBe(60);
+	});
+
+	it('does not read extra mistakes as unspent speed', () => {
+		// Identical finger speed on both days — 150ms per character — but today
+		// had 4% first-input errors against a 2% baseline. Stored WPM divides by
+		// wall-clock, so today is credited 69.0 against 74.1: a 6.9% shortfall
+		// that clears the 5% margin without a single keystroke being slower.
+		// Charging the corrections back out has to make the two equal.
+		const observed = (cleanMs: number, e: number) => 12000 / (cleanMs + e * ERROR_TIME_BUDGET_MS);
+		const CLEAN = 150;
+		const history = Array.from({ length: RECENT_WINDOW }, (_, i) =>
+			paced({ id: `b${i}`, timestamp: 1_000 + i, wpm: observed(CLEAN, 0.02), errorRate: 0.02 })
+		);
+		const today = paced({ id: 'today', wpm: observed(CLEAN, 0.04), errorRate: 0.04 });
+
+		const result = assessPacing(today, [...history, today]);
+		expect(result.cleanWpm).toBeCloseTo(result.recentCleanWpm!, 6);
+		expect(result.verdict).toBe('well-paced');
 	});
 
 	it('treats exactly matching the recent average as keeping pace', () => {

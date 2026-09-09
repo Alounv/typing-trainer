@@ -32,12 +32,23 @@
 	<p class="min-w-0 flex-1 text-sm text-base-content/70">
 		{detail}
 	</p>
-	{#if assessment.recentWpm !== undefined}
-		<!-- Same window as the milestone banner, but excluding this session:
-		     a baseline this session is measured against cannot contain it. The
-		     two numbers are close, never equal, so both stay labelled. -->
-		<p class="font-mono text-xs whitespace-nowrap text-base-content/50 tabular-nums">
-			{assessment.wpm.toFixed(1)} vs {assessment.recentWpm.toFixed(1)} over previous {RECENT_WINDOW}
+	{#if assessment.recentCleanWpm !== undefined}
+		<!--
+			Both figures have correction time removed, because that is what the
+			verdict compares — raw WPM here would show a gap the verdict did not
+			act on. They read higher than the headline WPM above for the same
+			reason, so the label has to say so.
+
+			Same window as the milestone banner, but excluding this session: a
+			baseline this session is measured against cannot contain it.
+		-->
+		<p
+			class="text-right font-mono text-xs whitespace-nowrap text-base-content/50 tabular-nums"
+			title="Words per minute with the estimated correction time removed, so the comparison is finger speed rather than time spent fixing mistakes."
+		>
+			{assessment.cleanWpm.toFixed(1)} vs {assessment.recentCleanWpm.toFixed(1)}
+			<br />
+			<span class="tracking-tight">between corrections, previous {RECENT_WINDOW}</span>
 		</p>
 	{/if}
 </section>

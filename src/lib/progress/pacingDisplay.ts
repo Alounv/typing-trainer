@@ -55,14 +55,18 @@ export function pacingDetail(assessment: PacingAssessment): string {
 	}
 	// No baseline yet — there is no "usual speed" to have matched, so don't
 	// claim one.
-	if (assessment.recentWpm === undefined) {
+	if (assessment.recentCleanWpm === undefined) {
 		return `${errorPct}% errors — under the 5% ceiling. A few more sessions and this can be read against your own pace.`;
 	}
 	return `${errorPct}% errors at your usual speed — under the 5% ceiling, with the pace to show for it.`;
 }
 
-/** How far under the recent average, as a whole percent. `null` with no baseline. */
+/**
+ * How far under the recent average, as a whole percent. Measured on the
+ * correction-adjusted figures, so it agrees with the verdict it explains
+ * rather than quoting a gap that includes time spent fixing mistakes.
+ */
 function shortfallPct(assessment: PacingAssessment): number | null {
-	if (assessment.recentWpm === undefined || assessment.recentWpm <= 0) return null;
-	return Math.round((1 - assessment.wpm / assessment.recentWpm) * 100);
+	if (assessment.recentCleanWpm === undefined || assessment.recentCleanWpm <= 0) return null;
+	return Math.round((1 - assessment.cleanWpm / assessment.recentCleanWpm) * 100);
 }
