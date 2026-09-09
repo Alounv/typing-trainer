@@ -148,22 +148,22 @@ export function detectMilestone(
 	// recent one. Locate `current`, or an old summary reports a badge a later
 	// session earned.
 	const at = series.findIndex((p) => p.sessionId === current.id);
-	if (at < 1) return null; // absent, or nothing before it to compare against
+	if (at < 0) return null;
 
-	const last = series[at];
-	const prev = series[at - 1];
-	if (last.rolling === null) return null; // window not yet full
-	if (prev.rolling === null) return null; // no comparable baseline
+	const here = series[at];
+	if (here.rolling === null) return null; // window not yet full
 
-	// Find the highest threshold newly crossed. "Newly" = prev.rolling was
-	// below it, last.rolling is at or above it. Strictly-less on the prior side
-	// avoids re-firing when the series drifts around the threshold.
+	// "Reached for the first time", compared against every earlier point rather
+	// than just the one before. Comparing with the predecessor alone awards the
+	// badge again every time the average drifts back down across the line and
+	// returns, and nothing records that it was already given.
+	const reachedBefore = (t: number) =>
+		series.slice(0, at).some((p) => p.rolling !== null && p.rolling >= t);
+
 	let crossed: WpmMilestone | null = null;
 	for (const t of WPM_MILESTONES) {
-		if (prev.rolling < t && last.rolling >= t) {
-			crossed = t;
-		}
+		if (here.rolling >= t && !reachedBefore(t)) crossed = t;
 	}
 	if (crossed === null) return null;
-	return { threshold: crossed, rollingWpm: last.rolling };
+	return { threshold: crossed, rollingWpm: here.rolling };
 }

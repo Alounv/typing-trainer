@@ -98,4 +98,18 @@ describe('detectMilestone', () => {
 	it('awards nothing when an older, unremarkable session is opened', () => {
 		expect(detectMilestone(history[3], history)).toBeNull();
 	});
+
+	it('awards a threshold once, even if the average dips back under and recovers', () => {
+		// Same run, then a slump that drags the average below 60, then a recovery
+		// that lifts it back over. The badge belongs to the first crossing only.
+		const dipAndRecover = [
+			...history,
+			...Array.from({ length: 8 }, (_, i) => wpmSession(11 + i, 30)),
+			...Array.from({ length: 8 }, (_, i) => wpmSession(19 + i, 95))
+		];
+		const recrossed = dipAndRecover.filter(
+			(s) => detectMilestone(s, dipAndRecover)?.threshold === 60
+		);
+		expect(recrossed.map((s) => s.id)).toEqual(['s10']);
+	});
 });
