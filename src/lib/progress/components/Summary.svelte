@@ -32,15 +32,20 @@
 	// than a single noisy session's per-session classification.
 	// Every movement shows: a real-text session trains speed and accuracy at
 	// once, so there is no axis to filter down to.
-	const movements = $derived(detectWindowedMovements(statsSessions, session.id, thresholds));
+	// One pass over history, shared by the movement diff and the table below it.
+	const summaries = $derived(summarizeBigrams(statsSessions, corpusFrequencies, thresholds));
+
+	const movements = $derived(
+		detectWindowedMovements(summaries, statsSessions, session.id, thresholds)
+	);
 
 	const sessionRows = $derived.by(() => {
 		if (movements.length === 0) return [];
 		const moved = new Set(movements.map((m) => m.bigram));
-		const summaries = summarizeBigrams(statsSessions, corpusFrequencies, thresholds).filter((row) =>
-			moved.has(row.bigram)
+		return buildBigramRows(
+			statsSessions,
+			summaries.filter((row) => moved.has(row.bigram))
 		);
-		return buildBigramRows(statsSessions, summaries);
 	});
 
 	const ERROR_WARN_THRESHOLD = DEFAULT_HIGH_ERROR_THRESHOLD / 2;

@@ -12,27 +12,6 @@
 	);
 
 	/**
-	 * Enter starts the next passage. We skip form fields and modifier combos so
-	 * we don't hijack native inputs or OS shortcuts.
-	 */
-	function onWindowKeydown(event: KeyboardEvent) {
-		if (summary.current.status !== 'ready' || !summary.current.data) return;
-		if (event.key !== 'Enter' && event.code !== 'Enter') return;
-		if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
-
-		const el = document.activeElement;
-		if (el instanceof HTMLElement) {
-			const tag = el.tagName;
-			if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable) {
-				return;
-			}
-		}
-
-		event.preventDefault();
-		window.location.href = resolve('/session/real-text');
-	}
-
-	/**
 	 * Only `real-text` is produced now; the rest are historical rows whose
 	 * session types no longer exist. They still have to render — a summary the
 	 * user can open must say what it was.
@@ -43,8 +22,6 @@
 		return 'Bigram drill';
 	}
 </script>
-
-<svelte:window onkeydown={onWindowKeydown} />
 
 <div class="mx-auto max-w-3xl space-y-10">
 	<header class="flex items-baseline justify-between gap-4">
@@ -59,15 +36,6 @@
 				</p>
 			{/if}
 		</div>
-		{#if summary.current.status === 'ready' && summary.current.data}
-			<p class="text-xs font-medium tracking-[0.18em] text-base-content/50 uppercase">
-				<kbd
-					class="rounded-sm border border-base-300 bg-base-200 px-1.5 py-0.5 font-mono text-[0.65rem] tracking-normal text-base-content/70"
-					>Enter</kbd
-				>
-				next passage
-			</p>
-		{/if}
 	</header>
 
 	{#if summary.current.status === 'loading'}
@@ -82,18 +50,8 @@
 		<Summary {...summary.current.data} />
 
 		<div class="flex flex-wrap items-center gap-6 pt-2">
-			<a
-				href={resolve('/session/real-text')}
-				class="btn btn-lg btn-primary"
-				data-testid="next-session"
-			>
-				Next passage →
-			</a>
-			<a
-				href={resolve('/')}
-				class="text-sm text-base-content/60 underline-offset-4 hover:text-base-content hover:underline"
-			>
-				Back to practice
+			<a href={resolve('/')} class="btn btn-lg btn-primary" data-testid="back-to-practice">
+				Back to practice →
 			</a>
 		</div>
 	{/if}

@@ -3,7 +3,7 @@ import type {
 	ClassificationThresholds,
 	SessionSummary
 } from '../support/core';
-import { summarizeBigrams } from '$lib/skill';
+import { summarizeBigrams, type BigramSummary } from '$lib/skill';
 import { buildWpmSeries } from './metrics';
 
 type MovementDirection = 'up' | 'down';
@@ -62,18 +62,24 @@ const RANK: Record<RankedClass, number> = {
  * `unclassified` on either side is skipped as noise.
  */
 export function detectWindowedMovements(
+	/**
+	 * The windowed summary *including* the current session — the same rows the
+	 * bigram table renders. Taken as an argument rather than recomputed: the
+	 * caller already has it, and only `bigram` and `classification` are read
+	 * here, neither of which depends on how the caller weighted it.
+	 */
+	after: readonly BigramSummary[],
 	allSessions: readonly SessionSummary[],
 	currentSessionId: string,
 	thresholds: ClassificationThresholds
 ): MovementEvent[] {
 	const before = allSessions.filter((s) => s.id !== currentSessionId);
 	const beforeRows = summarizeBigrams(before, undefined, thresholds);
-	const afterRows = summarizeBigrams(allSessions, undefined, thresholds);
 	const prevClass = new Map<string, BigramClassification>();
 	for (const r of beforeRows) prevClass.set(r.bigram, r.classification);
 
 	const events: MovementEvent[] = [];
-	for (const { bigram, classification: to } of afterRows) {
+	for (const { bigram, classification: to } of after) {
 		const from = prevClass.get(bigram) ?? null;
 		if (to === 'unclassified' || from === 'unclassified') continue;
 		if (from === to) continue;
