@@ -178,7 +178,8 @@ Two consequences worth knowing:
 
 - **Thresholds apply retroactively.** Classifications are computed on read, so
   changing what "clean" means re-scores the whole history rather than only
-  future sessions.
+  future sessions. That is also why they are not on the settings page: a number
+  input that silently rewrites every past verdict is a trap.
 - **Reads must hydrate.** `support/storage` hands back `StoredSession` (no
   aggregates); consumers read `SessionSummary` (aggregates required). The type
   gap is deliberate — a caller that forgets to hydrate fails to compile.
@@ -210,13 +211,17 @@ reads it, and it survives so exporting an old database doesn't drop history.
 ## Testing
 
 Each domain has **one test file at its frontier**. Logic domains (`corpus`,
-`skill`, `session`) are exercised through their public functions; component
-domains (`progress`, settings' `<DataTransfer>`) lean on the `e2e/` Playwright
-suite as the outermost frontier. `settings/profile.test.ts` is kept because
-`profile` is a public surface.
+`skill`, `session`) are exercised through their public functions;
+settings' `<DataTransfer>` leans on the `e2e/` Playwright suite as its outermost
+frontier. `settings/profile.test.ts` is kept because `profile` is a public
+surface.
+
+`progress` exposes only components, so it has no barrel to test through.
+`progress.test.ts` covers the arithmetic the summary page is built around —
+movement detection and milestones — and nothing else; the rendering is e2e's.
 
 A domain's own test file may reach one level past the barrel — `scoreQuoteByDebt`,
-`decodeStream`, `buildDifficultyMap` — where the function is the domain's core
-arithmetic and driving it through the public surface would test the setup
-instead of the maths. That is the only exception, and it stays inside the
-domain's single test file.
+`selectQuoteByDebt`, `decodeStream`, `buildDifficultyMap` — where the function is
+the domain's core arithmetic and driving it through the public surface would test
+the setup instead of the maths. That is the only exception, and it stays inside
+the domain's single test file.
