@@ -138,17 +138,22 @@ export function detectMilestone(
 	current: SessionSummary,
 	history: readonly SessionSummary[]
 ): MilestoneEvent | null {
-	// Ensure `current` is in the series so the last point reflects it. buildWpmSeries
-	// de-dupes by timestamp-sort, not id, so including a duplicate would skew the
-	// rolling mean — filter first.
+	// `history` often already contains `current`; including it twice would skew
+	// the rolling mean, since the series de-dupes by timestamp order and not id.
 	const merged = [...history.filter((s) => s.id !== current.id), current];
 	const series = buildWpmSeries(merged);
-	if (series.length === 0) return null;
 
-	const last = series[series.length - 1];
-	const prev = series[series.length - 2];
+	// The series is chronological, so its last point is the newest session on
+	// file — which is `current` only when the summary being viewed is the most
+	// recent one. Locate `current`, or an old summary reports a badge a later
+	// session earned.
+	const at = series.findIndex((p) => p.sessionId === current.id);
+	if (at < 1) return null; // absent, or nothing before it to compare against
+
+	const last = series[at];
+	const prev = series[at - 1];
 	if (last.rolling === null) return null; // window not yet full
-	if (!prev || prev.rolling === null) return null; // no comparable baseline
+	if (prev.rolling === null) return null; // no comparable baseline
 
 	// Find the highest threshold newly crossed. "Newly" = prev.rolling was
 	// below it, last.rolling is at or above it. Strictly-less on the prior side

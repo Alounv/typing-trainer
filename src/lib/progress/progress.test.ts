@@ -5,7 +5,7 @@ import type { SessionSummary, BigramAggregate, BigramSample } from '$lib/support
 import type { FrequencyTable } from '$lib/corpus';
 // One level in: movement detection is what the summary page is built around,
 // and `progress` exposes only components, so there is no barrel to go through.
-import { detectWindowedMovements } from './celebrations';
+import { detectMilestone, detectWindowedMovements } from './celebrations';
 
 const PAIRS = ['th', 'he', 'in', 'er', 'an', 're', 'on', 'at', 'en', 'nd'];
 
@@ -65,5 +65,37 @@ describe('detectWindowedMovements', () => {
 
 		expect(before.length).toBeGreaterThan(0); // else the comparison proves nothing
 		expect(after).toEqual(before);
+	});
+});
+
+const wpmSession = (i: number, wpm: number) =>
+	({
+		id: `s${i}`,
+		timestamp: i * 1000,
+		type: 'real-text',
+		durationMs: 60_000,
+		wpm,
+		errorRate: 0.02,
+		bigramAggregates: []
+	}) as SessionSummary;
+
+describe('detectMilestone', () => {
+	// Eight slow sessions then three fast ones: the 7-session rolling average
+	// steps 59.3 -> 66.4 at index 10, so session 10 is the one that earns 60.
+	const history = [
+		...Array.from({ length: 8 }, (_, i) => wpmSession(i, 45)),
+		wpmSession(8, 95),
+		wpmSession(9, 95),
+		wpmSession(10, 95)
+	];
+
+	it('awards the badge to the session that earned it', () => {
+		expect(detectMilestone(history[10], history)?.threshold).toBe(60);
+	});
+
+	// The series is chronological, so reading its last point reports on the
+	// newest session on file rather than the one whose summary is open.
+	it('awards nothing when an older, unremarkable session is opened', () => {
+		expect(detectMilestone(history[3], history)).toBeNull();
 	});
 });
