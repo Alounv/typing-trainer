@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Everything cheap enough to wait for (~6s). E2E and the build stay in Actions,
+# where a cold Playwright install belongs.
 set -e
 
 echo "▶ lint"
@@ -9,3 +11,6 @@ bun run check
 
 echo "▶ test:unit"
 bun run test:unit --run
+
+echo "▶ deadcode"
+bun run lint:deadcode

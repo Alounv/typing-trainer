@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Formatting only, and check rather than write: a hook that reformats files
+# mid-commit has to re-stage them, which silently swallows the unstaged half
+# of a `git add -p`. Failing with the fix to run is cheaper than that bug.
+set -e
+
+list=$(mktemp)
+trap 'rm -f "$list"' EXIT
+git diff --cached --name-only --diff-filter=ACMR -z > "$list"
+[ -s "$list" ] || exit 0
+
+if ! xargs -0 bunx prettier --check --ignore-unknown --log-level warn < "$list"; then
+	echo
+	echo "✗ staged files are not formatted — run: bun run format"
+	exit 1
+fi

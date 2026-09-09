@@ -27,6 +27,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run lint
       - run: bun run check
+      - run: bun run lint:deadcode
       - run: bun run test:unit --run
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
