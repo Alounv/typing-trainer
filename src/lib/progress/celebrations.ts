@@ -120,19 +120,10 @@ export interface MilestoneEvent {
 }
 
 /**
- * Detect whether the 7-session rolling average crossed a new WPM milestone
- * between the previous session and `current`.
- *
- * We fire on the **smoothed** series rather than raw WPM so a single lucky
- * session can't trigger a milestone the user can't sustain. Returns the
- * *highest* threshold crossed in a single step — if a user jumps from 58 to
- * 78 smoothed in one step (e.g., after a long layoff), we celebrate 70, not
- * both 60 and 70.
- *
- * Returns `null` when:
- * - `current` has no rolling average yet (fewer than 7 sessions including it),
- * - the prior rolling average was already ≥ the current rolling average,
- * - no new threshold was crossed.
+ * Fires on the smoothed series, not raw WPM, so one lucky session cannot earn a
+ * badge the typist cannot sustain — which also means nothing fires before the
+ * seventh session. Awards the highest threshold reached in a single step: 58 to
+ * 78 after a layoff earns 70, not both 60 and 70.
  */
 export function detectMilestone(
 	current: SessionSummary,

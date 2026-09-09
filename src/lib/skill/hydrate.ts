@@ -5,17 +5,8 @@ import { annotateFirstInputs } from './postprocess';
 import { extractBigramAggregates } from './extraction';
 
 /**
- * Stored row → the session shape the rest of the app reads.
- *
- * Rows written from the stream era on carry the keystroke log and no
- * aggregates, so their bigram statistics are measured here, on read, against
- * whatever thresholds are current. That is the point of storing evidence:
- * changing what "clean" means re-scores every session ever typed, not just
- * the next one.
- *
- * Legacy rows are returned as they were stored — aggregates with their
- * session-time classifications frozen in. They have no text, so there is
- * nothing to re-measure them from.
+ * Measures a stored row against whatever thresholds are current. Legacy rows
+ * come back exactly as stored — with no text there is nothing to re-measure.
  */
 export function hydrateSession(
 	row: StoredSession,

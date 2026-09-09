@@ -1,14 +1,8 @@
 <script lang="ts">
 	/**
-	 * The session surface: a header, a thin progress bar, and the typing area
-	 * with live error / corrected-state tracking.
-	 *
-	 * Live elapsed / error readouts are deliberately omitted — those are shown
-	 * on the post-session summary so the eye stays on the text while typing.
-	 * The progress bar and the tint are the only ambient signals.
-	 *
-	 * Wiring: a {@link SessionRunner} takes every keystroke event; once the text
-	 * is fully typed we finalize, persist, and redirect.
+	 * Live elapsed and error readouts are deliberately absent — they belong on
+	 * the summary, so the eye stays on the text. The progress bar and the tint
+	 * are the only ambient signals.
 	 */
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';

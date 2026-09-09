@@ -1,19 +1,11 @@
 <script lang="ts">
 	/**
-	 * Settings page: the knobs that live on `UserSettings` — language, passage
-	 * length, and the tint's opening state. Classification thresholds are on
-	 * `UserSettings` too but are no longer editable here: they silently re-score
-	 * every past session, which is not a thing to hand someone behind a number
-	 * input. A profile that already carries custom ones still honours them. Persists
-	 * via `saveProfile`; the session route reads back via `getProfile` and falls
-	 * back to the `DEFAULT_*` constants when fields are absent.
+	 * `UserSettings.thresholds` is deliberately absent from this page: editing it
+	 * silently re-scores every past session. A profile that already carries
+	 * custom values still honours them.
 	 *
-	 * Auto-save on edit (Phase 6.5.2): each field change kicks a short
-	 * debounced save rather than gating behind a "Save" button. The
-	 * debounce is long enough that number inputs don't write a profile
-	 * per keystroke, short enough that a user leaving the page feels
-	 * confident their changes stuck. The timestamp + error live-region
-	 * in the footer is the single source of feedback.
+	 * There is no Save button — edits debounce into `saveProfile`, and the
+	 * timestamp and error live-region in the footer are the only feedback.
 	 */
 	import { onMount } from 'svelte';
 	import { getProfile, saveProfile, buildDefaultProfile, withDefaults } from '$lib/settings';

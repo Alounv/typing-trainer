@@ -166,27 +166,22 @@ function typicalInterval(samples: readonly BigramSample[]): number {
 }
 
 /**
- * Expected ms lost on one occurrence, as a mixture over the two cases an
- * occurrence can fall into:
+ * Expected ms lost on one occurrence:
  *
  *   loss = (1 − errorRate) × E[excess | timed] + errorRate × ERROR_TIME_BUDGET_MS
  *
- * The first term averages the excess **per sample** rather than taking the excess
- * of the average, and the difference is not cosmetic: a bigram typed quickly most
- * of the time but occasionally very slowly has a mean *below* baseline, so
- * `max(0, mean − baseline)` scores it zero while it is still losing real time on
- * its tail. Averaging first discards exactly the occurrences worth training.
+ * The first term averages the excess **per sample** rather than taking the
+ * excess of the average, and the difference is not cosmetic. A bigram typed
+ * quickly most of the time but occasionally very slowly has a mean *below*
+ * baseline, so the obvious `max(0, mean − baseline)` scores it zero while it is
+ * still losing real time on its tail — discarding exactly the occurrences worth
+ * training. (`errorRate` counts incorrect samples while the average runs over
+ * timed ones, and those sets differ slightly; the mixture treats them as
+ * complementary, which is close enough for a ranking.)
  *
- * (`errorRate` counts incorrect samples while the average runs over timed ones,
- * and those sets differ slightly — a correct keystroke following a wrong one is
- * left untimed. The mixture treats them as complementary, which is close enough
- * for a ranking.)
- *
- * The result is then shrunk toward zero by `n / (n + MIN_OCCURRENCES)`. Without it
- * a bigram seen twice, once catastrophically, outranks a genuinely bad bigram seen
- * fifty times — and since the accuracy drill deliberately asks for `unclassified`
- * targets, those noise spikes would become real drills. Shrinkage scales every
- * well-observed bigram by roughly the same factor, so it demotes the
+ * Shrinking by `n / (n + MIN_OCCURRENCES)` then stops a bigram seen twice, once
+ * catastrophically, outranking a genuinely bad one seen fifty times. It scales
+ * every well-observed bigram by roughly the same factor, so it demotes the
  * under-observed without reordering the rest.
  */
 function timeLossPerOccurrence(

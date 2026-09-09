@@ -1,14 +1,5 @@
 <script lang="ts">
-	/**
-	 * Renders the drill text with per-character state: typed-correct /
-	 * typed-error / current / pending. Purely presentational — the parent
-	 * owns `position` and `errorPositions` and updates them from capture
-	 * callbacks.
-	 *
-	 * Wrapping: uses `whitespace-pre-wrap` so the browser breaks lines at
-	 * natural spaces. Drill sentences are short enough that mid-word breaks
-	 * don't occur in practice.
-	 */
+	/** Presentational only — the parent owns `position` and `errorPositions`. */
 	import { difficultyToColor } from '../tint';
 
 	type CharState =
@@ -20,9 +11,9 @@
 
 	interface Props {
 		text: string;
-		/** Index of the next character to be typed (cursor sits here). */
+		/** Next character to be typed; the cursor sits here. */
 		position: number;
-		/** Positions whose first-input was wrong (first-input sticks). */
+		/** First input was wrong. A later correction does not clear it. */
 		errorPositions?: ReadonlySet<number>;
 		/** Subset of `errorPositions` where the user later typed the correct char. */
 		correctedPositions?: ReadonlySet<number>;
@@ -41,12 +32,10 @@
 		difficultyHighlightVar = null
 	}: Props = $props();
 
-	// Per-keystroke hot path: we deliberately do NOT build a $derived array
-	// of char descriptors here. On long texts (e.g. 2k+ chars) that would
-	// allocate N objects and force Svelte's each-block to re-diff every
-	// keystroke. Instead, the template iterates `text` directly and calls
-	// `stateFor()` inline — Svelte's fine-grained reactivity
-	// then re-runs only the class expressions, with no N-wide allocation.
+	// Deliberately not a $derived array of char descriptors: on a 2k-char text
+	// that allocates N objects and re-diffs the each-block every keystroke. The
+	// template iterates `text` and calls `stateFor()` inline instead, so only
+	// the class expressions re-run.
 
 	function stateFor(
 		i: number,
@@ -60,40 +49,28 @@
 		return corrected.has(i) ? 'typed-error-corrected' : 'typed-error';
 	}
 
-	// DaisyUI semantic colors keep the drill readable across any active theme.
 	const stateClasses: Record<CharState, string> = {
 		pending: 'text-base-content/45',
 		'typed-correct': 'text-base-content/75',
 		// Uncorrected error: solid red tint — the mistake is still standing.
 		'typed-error': 'text-error-content bg-error/30 rounded-sm',
-		// Corrected error: reads like typed-correct with a thin dotted amber
-		// underline marking the stumble. Recovery, not punishment.
+		// Corrected: reads as typed-correct, with a dotted underline for the stumble.
 		'typed-error-corrected':
 			'text-base-content/75 underline decoration-dotted decoration-warning underline-offset-4',
-		// Current char: text-only inversion. The saturated primary block
-		// behind it is drawn by the animated cursor overlay below (see
-		// `cursorRect`) so motion between keystrokes is a lateral slide
-		// rather than a discrete class swap.
+		// Text-only inversion; `cursorRect` draws the block behind it, so the
+		// cursor slides between keystrokes instead of jumping class to class.
 		current: 'text-primary-content'
 	};
 
 	/**
-	 * Windowed viewport: drill text is clipped to exactly 6 lines and
-	 * line-locked-scrolled so the current line stays near the top. Keeps
-	 * long sessions (real-text, several thousand chars) from presenting
-	 * as a wall; short drills (diagnostic) fit inside the cap and render
-	 * naturally.
-	 *
-	 * We scroll the container, not the document, so the header and
-	 * stats row stay fixed in view.
+	 * Clipped to six lines so a few thousand characters do not present as a
+	 * wall. The container scrolls, not the document, so the header stays put.
 	 */
 	let viewportEl: HTMLDivElement | null = $state(null);
 
 	/**
-	 * `offsetTop` of the span on the last scroll decision. Same-line
-	 * keystrokes don't shift offsetTop (the browser only wraps on word
-	 * boundaries), so the skip avoids re-issuing `scrollTo` with the
-	 * same target on every char. Scroll fires exactly once per line.
+	 * Same-line keystrokes leave `offsetTop` unchanged, so comparing against it
+	 * fires `scrollTo` exactly once per line rather than once per character.
 	 */
 	let lastLineTop = -1;
 

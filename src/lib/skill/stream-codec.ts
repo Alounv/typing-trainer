@@ -2,19 +2,12 @@ import type { KeystrokeEvent, KeystrokeStream } from '../support/core';
 import { buildWordIndex } from './word-index';
 
 /**
- * Keystroke log ⇄ compact columnar form.
+ * `decodeStream` must reproduce exactly what `encodeStream` was handed, save
+ * for timestamps rounded to whole ms — every statistic downstream trusts it.
  *
- * The stream is a session's only stored evidence, so this codec is the
- * boundary every downstream statistic trusts: `decodeStream` must reproduce
- * exactly the events `encodeStream` was handed, save for timestamps rounded
- * to whole ms.
- *
- * `expected`, `wordIndex` and `positionInWord` are deliberately not stored —
- * each is a function of the text and the position, so persisting them would
- * write the same fact three times over.
- *
- * Retypes need no marking either: they are simply two entries at one
- * position, and their order in the stream is what distinguishes first input
+ * `expected`, `wordIndex` and `positionInWord` are not stored: each is a
+ * function of the text and the position. Retypes are not marked either — they
+ * are two entries at one position, and stream order is what tells first input
  * from correction.
  */
 

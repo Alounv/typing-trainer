@@ -13,7 +13,7 @@ export interface CaptureCallbacks {
  * (`^` + `o` → `ô`) and IME input arrive as composed characters, and so
  * OS-level edits (OPT+Backspace = delete word) come through as semantic
  * `inputType` values. CMD+Backspace is deliberately ignored — wiping the
- * whole drill in one keystroke is almost always an accident.
+ * whole passage in one keystroke is almost always an accident.
  *
  * Backspace moves the cursor but does NOT delete prior events — the first
  * input at each position is what counts; retypes are resolved in

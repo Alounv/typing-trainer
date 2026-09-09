@@ -2,21 +2,14 @@ import type { Quote, QuoteBank } from './types';
 import { selectQuoteByDebt } from './debt-selection';
 
 /**
- * Assemble a passage by concatenating quotes up to a character target.
- *
- * Two ways to pick each quote. With outstanding `bigramDebts`, by how much of
- * that debt the quote repays per keystroke. Without — a first session, nothing
- * owed yet — uniformly at random, since there is nothing to score against.
- *
- * There is no synthesised fallback: word-synth existed for the diagnostic, and
- * generated text trains transitions inside nonsense the fingers will never meet
- * again.
+ * There is no synthesised fallback when the bank runs short. Generated text
+ * trains transitions inside nonsense the fingers will never meet again, so a
+ * passage that comes up shy of target is the better failure.
  */
 
-/** Single space — double-space would look jarring between quotes. */
 const QUOTE_SEPARATOR = ' ';
 
-/** Stop adding quotes once we're within 15% of target — close enough beats overshoot. */
+/** Close enough beats overshoot: stop once within 15% of target. */
 const CLOSE_ENOUGH_RATIO = 0.85;
 
 /** Safety valve on a bank of very short quotes. */

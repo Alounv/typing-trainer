@@ -1,15 +1,10 @@
 <script lang="ts">
 	/**
-	 * The one in-session control: which pairs get tinted, or none.
+	 * `off` is a real third state, not an absence — typing unaided is how the
+	 * skill gets checked.
 	 *
-	 * Deliberately non-prescriptive — a pacer tells you what to do; this changes
-	 * what you *notice* and leaves the regulating to you. `off` is a real third
-	 * state and worth using regularly, so the skill gets checked without the
-	 * training wheels.
-	 *
-	 * `onmousedown` is prevented so a click mid-passage never pulls focus off
-	 * the typing input. Tab still reaches the buttons for keyboard users, where
-	 * moving focus is the point.
+	 * `onmousedown` is prevented so a click mid-passage never pulls focus off the
+	 * typing input. Tab still reaches the buttons, where moving focus is the point.
 	 */
 	import type { DifficultyMode } from '../tint';
 

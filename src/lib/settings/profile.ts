@@ -1,14 +1,5 @@
-/**
- * Profile domain — single owner of `UserSettings` reads/writes.
- *
- * Why this exists:
- * - Multiple consumers (settings page, session setup, analytics, scheduler)
- *   all need the profile with defaults applied. Keeping the defaults + merge
- *   logic here prevents each caller from reinventing — and drifting on —
- *   the "what does a factory-fresh profile look like" answer.
- * - Routes must not import `$lib/storage/*` directly; this module is the
- *   UI-facing boundary for anything profile-shaped.
- */
+/** Sole owner of `UserSettings` reads and writes; routes are barred from
+ *  `$lib/support/storage` by lint and come here instead. */
 import { db, SINGLETON_ID } from '$lib/support/storage';
 import {
 	DEFAULT_SPEED_THRESHOLD_MS,

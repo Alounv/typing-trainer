@@ -1,7 +1,6 @@
 /**
- * Word coordinates for every position in a text. Precomputed once so the
- * keystroke hot path does no scanning, and shared with stream replay so a
- * decoded event carries the same coordinates the live capture reported.
+ * Word coordinates per position, precomputed so the keystroke hot path does no
+ * scanning and a replayed event lands on the same coordinates live capture saw.
  *
  *   text:             t  h  e  ␣  c  a  t  ␣  s  a  t
  *   wordIndex:        0  0  0  0  1  1  1  1  2  2  2

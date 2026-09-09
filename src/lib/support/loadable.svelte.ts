@@ -6,14 +6,8 @@ type Loaded<T> =
 	| { status: 'error'; message: string };
 
 /**
- * Run a route-local loader on mount and expose the three states a page has to
- * render anyway: loading, ready, failed.
- *
- * Every route was hand-rolling this — the same `$state` union, the same
- * `onMount` try/catch, the same `err instanceof Error` unwrap. Data loading is
- * client-side (IndexedDB, and a corpus chunk that only exists in the browser),
- * so it cannot move into SvelteKit's `load`.
- *
+ * Loading lives here rather than in SvelteKit's `load` because the data is
+ * client-side only — IndexedDB, and a corpus chunk that exists in the browser.
  * Call during component initialisation, like any rune.
  */
 export function loadable<T>(

@@ -1,12 +1,7 @@
 /**
- * Theme store. Persists the user's theme choice to localStorage and keeps
- * `<html data-theme>` in sync; daisyUI reads that attribute to swap palettes
- * without a reload.
- *
- * "System" is a virtual choice: we don't store "system" as the `data-theme`
- * value (daisyUI wouldn't know what to do). Instead we store the literal
- * string "system" in localStorage and resolve it to `dark` or `light` on
- * apply, tracking the OS preference going forward via a `matchMedia` listener.
+ * "System" is a virtual choice: daisyUI would not know what to do with it as a
+ * `data-theme` value, so it is stored as the literal string "system" and
+ * resolved to `dark` or `light` on apply, tracked by a `matchMedia` listener.
  */
 
 export const THEMES = [

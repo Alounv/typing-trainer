@@ -1,16 +1,7 @@
 /**
- * Skill
- * Measures how well the user types each bigram.
- *
- * Owns the whole path from keystrokes to judgement: the stream codec, first-input
- * post-processing, per-bigram extraction and classification (slow/fast,
- * accurate/error-prone), the end-of-session pacing verdict, and the rolling-window
- * view every consumer reads.
- *
- * Stored rows hold the keystroke stream; the aggregates are measured here on read
- * (`hydrateSession`), so a stored row and a threshold change are all it takes to
- * re-score history. Does not persist anything — `session` writes the stream,
- * `support/storage` hosts it.
+ * Skill — keystrokes to judgement. Measures on read rather than storing what it
+ * measured, which is what lets a threshold change re-score history. Persists
+ * nothing itself.
  */
 export { annotateFirstInputs } from './postprocess';
 export { encodeStream } from './stream-codec';

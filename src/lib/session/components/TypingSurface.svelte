@@ -1,21 +1,11 @@
 <script lang="ts">
 	/**
-	 * Focusable typing surface. A `<label>` wraps the decorative text
-	 * rendering and a visually-hidden `<input>` that actually receives focus
-	 * and input events.
+	 * A real (visually-hidden) `<input>` takes the focus, so input arrives as
+	 * `beforeinput` — `capture.ts` says why that matters.
 	 *
-	 * Why a hidden input (not `keydown` on a div): the browser's input
-	 * pipeline resolves dead-key composition (`^` + `o` → `ô`), IME, and
-	 * OS editing shortcuts (OPT+Backspace = delete word) into semantic
-	 * `beforeinput` events. `keydown` only sees raw physical keys and
-	 * misses composed characters entirely.
-	 *
-	 * A11y: the input carries the full text as its `aria-label`, so screen
-	 * readers announce "textbox, <text>" on focus. The visual per-character
-	 * rendering is purely decorative and hidden via `aria-hidden` so SR
-	 * users aren't bombarded with 100+ character announcements. Clicking
-	 * anywhere on the label forwards focus to the input (native label
-	 * behavior).
+	 * The per-character rendering is `aria-hidden` and the input carries the
+	 * whole text as its `aria-label`, so a screen reader announces the passage
+	 * once instead of 100+ separate characters.
 	 */
 	import TextDisplay from './TextDisplay.svelte';
 	import { keystrokeCapture, type CaptureCallbacks } from '../capture';

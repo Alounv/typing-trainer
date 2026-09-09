@@ -2,15 +2,13 @@ import type { BigramSample, ClassificationThresholds, SessionSummary } from '../
 import { BIGRAM_CLASSIFICATION_WINDOW, DEFAULT_THRESHOLDS } from '../support/core';
 
 /**
- * Clean repetitions each bigram still owes before its rolling window reads as
- * clean. The window is the same one `classifyBigram` reads, so the answer is
- * the app's own definition of clean rather than a chosen penalty: with a
- * twenty-sample window and a strict `errorRate < 0.05`, a single error costs up
- * to a full window of clean repeats — exactly as many as it takes to push that
- * error out.
+ * Clean repetitions owed before the rolling window reads as clean. Measured
+ * against the same window `classifyBigram` uses, so the cost of an error is the
+ * app's own definition of clean rather than a chosen penalty — one error costs
+ * however many clean repeats it takes to push it out of the window.
  *
- * Occurrence count is deliberately ignored: an `unclassified` bigram (under
- * `MIN_OCCURRENCES_FOR_CLASSIFICATION`) still owes the repeats it owes.
+ * Occurrence count is ignored on purpose: a bigram under
+ * `MIN_OCCURRENCES_FOR_CLASSIFICATION` still owes what it owes.
  */
 function computeBigramDebts(
 	sessions: readonly SessionSummary[],

@@ -1,15 +1,7 @@
 <script lang="ts">
 	/**
-	 * Theme picker. Full daisyUI theme list plus a "System" option.
-	 *
-	 * Rendered as a `<select>` rather than a custom dropdown: native
-	 * controls are keyboard-accessible for free, work on mobile, and the
-	 * 30+ options list makes a custom panel painful to navigate anyway.
-	 * Visual treatment is just daisyUI's `select` class.
-	 *
-	 * The select is uncontrolled from Svelte's POV (no bind:value) because
-	 * the theme store is the source of truth — we read from it on change
-	 * and let the store's reactivity drive `selected`.
+	 * No `bind:value`: the theme store is the source of truth, so the select
+	 * reads from it on change and lets its reactivity drive `selected`.
 	 */
 	import { onMount } from 'svelte';
 	import { THEMES, setTheme, themeStore, type ThemeChoice } from './store.svelte';
