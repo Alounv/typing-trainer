@@ -7,6 +7,7 @@ import type {
 } from '../support/core';
 import {
 	BIGRAM_CLASSIFICATION_WINDOW,
+	DEFAULT_THRESHOLDS,
 	ERROR_TIME_BUDGET_MS,
 	MIN_OCCURRENCES_FOR_CLASSIFICATION,
 	PRIORITY_FREQUENCY_EXPONENT
@@ -44,8 +45,8 @@ export interface BigramSummary {
  */
 export function summarizeBigrams(
 	sessions: readonly SessionSummary[],
-	corpus: FrequencyTable | undefined,
-	thresholds: ClassificationThresholds,
+	corpus?: FrequencyTable,
+	thresholds: ClassificationThresholds = DEFAULT_THRESHOLDS,
 	window: number = BIGRAM_CLASSIFICATION_WINDOW
 ): BigramSummary[] {
 	if (window < 1) throw new RangeError('window must be ≥ 1');

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ClassificationThresholds, SessionSummary } from '$lib/support/core';
+	import type { SessionSummary } from '$lib/support/core';
 	import { DEFAULT_HIGH_ERROR_THRESHOLD } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
 	import { assessPacing, summarizeBigrams } from '$lib/skill';
@@ -15,10 +15,9 @@
 		/** Newest-first session list (capped at storage limit). */
 		statsSessions: readonly SessionSummary[];
 		corpusFrequencies?: FrequencyTable | undefined;
-		thresholds: ClassificationThresholds;
 	}
 
-	let { session, statsSessions, corpusFrequencies = undefined, thresholds }: Props = $props();
+	let { session, statsSessions, corpusFrequencies = undefined }: Props = $props();
 
 	const milestone = $derived(detectMilestone(session, statsSessions));
 
@@ -33,11 +32,9 @@
 	// Every movement shows: a real-text session trains speed and accuracy at
 	// once, so there is no axis to filter down to.
 	// One pass over history, shared by the movement diff and the table below it.
-	const summaries = $derived(summarizeBigrams(statsSessions, corpusFrequencies, thresholds));
+	const summaries = $derived(summarizeBigrams(statsSessions, corpusFrequencies));
 
-	const movements = $derived(
-		detectWindowedMovements(summaries, statsSessions, session.id, thresholds)
-	);
+	const movements = $derived(detectWindowedMovements(summaries, statsSessions, session.id));
 
 	const sessionRows = $derived.by(() => {
 		if (movements.length === 0) return [];

@@ -1,5 +1,6 @@
 import {
 	BIGRAM_CLASSIFICATION_WINDOW,
+	DEFAULT_THRESHOLDS,
 	type BigramClassification,
 	type BigramSample,
 	type ClassificationThresholds,
@@ -178,7 +179,7 @@ function median(values: readonly number[]): number {
  */
 export function buildBigramProgressSeries(
 	sessions: readonly SessionSummary[],
-	thresholds: ClassificationThresholds
+	thresholds: ClassificationThresholds = DEFAULT_THRESHOLDS
 ): { healthy: TrendPoint[]; beyondAcquisition: TrendPoint[] } {
 	const ordered = chronological(sessions);
 	const lastOfDayIdx = new Map<string, number>();

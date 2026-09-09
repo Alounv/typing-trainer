@@ -8,9 +8,11 @@
 
 	let { children } = $props();
 
+	// No "New passage" entry: the dashboard's one action starts one, and the
+	// summary leads into the next. A nav tab that abandons a session in progress
+	// is a third way to do it and the only one that can lose work.
 	const nav = [
 		{ href: '/', label: 'Practice' },
-		{ href: '/session/real-text', label: 'New passage' },
 		{ href: '/analytics', label: 'Analytics' },
 		{ href: '/settings', label: 'Settings' }
 	] as const;

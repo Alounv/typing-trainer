@@ -1,6 +1,6 @@
 import type { ClassificationThresholds } from './types';
 
-export const DEFAULT_SPEED_THRESHOLD_MS = 200;
+const DEFAULT_SPEED_THRESHOLD_MS = 200;
 export const DEFAULT_HIGH_ERROR_THRESHOLD = 0.05;
 
 export const DEFAULT_THRESHOLDS: ClassificationThresholds = {

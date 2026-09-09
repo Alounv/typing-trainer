@@ -1,15 +1,15 @@
 /**
  * The in-session tint: which pending letters get colored, and how strongly.
  *
- * Everything the tint needs comes from one read of the profile plus recent
- * history, taken once when the session mounts. Both modes are derived from the
- * same summaries, so flipping the toggle mid-passage is a pure recompute — it
- * used to re-open IndexedDB and re-measure every stored keystroke stream.
+ * Everything comes from one read of the profile plus recent history, taken
+ * when the session mounts. Both modes derive from the same summaries, so
+ * flipping the toggle mid-passage is a pure recompute rather than another trip
+ * through IndexedDB and every stored keystroke stream.
  */
 import { assessPacing, hydrateSessions, summarizeBigrams, type BigramSummary } from '$lib/skill';
 import { getRecentSessions } from '$lib/support/storage';
 import { buildDefaultProfile, getProfile } from '$lib/settings';
-import { DEFAULT_THRESHOLDS, PACING_COMPARISON_WINDOW } from '$lib/support/core';
+import { PACING_COMPARISON_WINDOW } from '$lib/support/core';
 
 export type DifficultyMode = 'errors' | 'speed';
 
@@ -34,8 +34,7 @@ export async function loadTintContext(): Promise<TintContext> {
 	// Falling back to the factory profile matters: before this, a user who had
 	// never opened settings got no tint despite the default being on.
 	const settings = profile ?? buildDefaultProfile();
-	const thresholds = settings.thresholds ?? DEFAULT_THRESHOLDS;
-	const summaries = summarizeBigrams(hydrateSessions(rows, thresholds), undefined, thresholds);
+	const summaries = summarizeBigrams(hydrateSessions(rows));
 
 	return {
 		opening: openingMode(settings.colorizeBigramDifficulty ?? false, rows),

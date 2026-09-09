@@ -2,14 +2,12 @@ import { getSession, getRecentSessions } from '$lib/support/storage';
 import { getProfile } from '$lib/settings';
 import { hydrateSession, hydrateSessions } from '$lib/skill';
 import { loadBigramFrequencies, type FrequencyTable } from '$lib/corpus';
-import { DEFAULT_THRESHOLDS } from '$lib/support/core';
-import type { ClassificationThresholds, SessionSummary } from '$lib/support/core';
+import type { SessionSummary } from '$lib/support/core';
 
 interface SummaryContext {
 	session: SessionSummary;
 	statsSessions: readonly SessionSummary[];
 	corpusFrequencies: FrequencyTable | undefined;
-	thresholds: ClassificationThresholds;
 }
 
 /** `null` when there is no row for `id` — a cleared database, or a stale link. */
@@ -21,12 +19,9 @@ export async function loadSummaryContext(id: string): Promise<SummaryContext | n
 	]);
 	if (!row) return null;
 
-	const thresholds = profile?.thresholds ?? DEFAULT_THRESHOLDS;
-
 	return {
-		session: hydrateSession(row, thresholds),
-		statsSessions: hydrateSessions(statsRows, thresholds),
-		corpusFrequencies: await loadBigramFrequencies(profile?.language ?? 'en'),
-		thresholds
+		session: hydrateSession(row),
+		statsSessions: hydrateSessions(statsRows),
+		corpusFrequencies: await loadBigramFrequencies(profile?.language ?? 'en')
 	};
 }

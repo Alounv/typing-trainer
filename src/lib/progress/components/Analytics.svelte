@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ClassificationThresholds, SessionSummary } from '$lib/support/core';
+	import type { SessionSummary } from '$lib/support/core';
 	import type { FrequencyTable } from '$lib/corpus';
 	import { summarizeBigrams } from '$lib/skill';
 	import {
@@ -16,19 +16,18 @@
 	interface Props {
 		sessions: readonly SessionSummary[];
 		corpusFrequencies: FrequencyTable | undefined;
-		thresholds: ClassificationThresholds;
 	}
 
-	let { sessions, corpusFrequencies, thresholds }: Props = $props();
+	let { sessions, corpusFrequencies }: Props = $props();
 
 	// Every session, not just diagnostics: with one session type there is no
 	// longer a calibration run to single out, and the trend is more honest for
 	// covering everything typed.
 	const wpm = $derived(buildDailyWpmSeries(sessions));
 	const errorRate = $derived(buildDailyErrorRateSeries(sessions));
-	const bigramProgress = $derived(buildBigramProgressSeries(sessions, thresholds));
+	const bigramProgress = $derived(buildBigramProgressSeries(sessions));
 	const bigramRows = $derived(
-		buildBigramRows(sessions, summarizeBigrams(sessions, corpusFrequencies, thresholds))
+		buildBigramRows(sessions, summarizeBigrams(sessions, corpusFrequencies))
 	);
 	const liveClassification = $derived(tallyClassificationMix(bigramRows));
 

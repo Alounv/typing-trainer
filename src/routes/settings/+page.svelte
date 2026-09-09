@@ -1,9 +1,5 @@
 <script lang="ts">
 	/**
-	 * `UserSettings.thresholds` is deliberately absent from this page: editing it
-	 * silently re-scores every past session. A profile that already carries
-	 * custom values still honours them.
-	 *
 	 * There is no Save button — edits debounce into `saveProfile`, and the
 	 * timestamp and error live-region in the footer are the only feedback.
 	 */

@@ -5,7 +5,7 @@ import 'fake-indexeddb/auto';
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { buildDefaultProfile, getProfile, saveProfile, withDefaults } from './profile';
-import { DEFAULT_SPEED_THRESHOLD_MS } from '../support/core';
+import { DEFAULT_PASSAGE_WORDS } from '../support/core';
 import type { UserSettings } from '../support/core/types';
 import { clearAll } from '../support/storage/service';
 
@@ -43,6 +43,13 @@ describe('settings/profile — round-trip', () => {
 			shape: 'a planStructure from the removed planner',
 			legacy: { language: 'en', planStructure: { monday: 2 } },
 			expected: { language: 'en' }
+		},
+		{
+			// Dropped rather than ignored: an undeclared key survives the spread
+			// in `withDefaults` and would reappear in every export.
+			shape: 'thresholds, from when they were user-editable',
+			legacy: { language: 'en', thresholds: { speedMs: 120, errorRate: 0.02 } },
+			expected: { language: 'en' }
 		}
 	])('migrates $shape', async ({ legacy, expected }) => {
 		await saveProfile(legacy as unknown as UserSettings);
@@ -56,24 +63,15 @@ describe('settings/profile — defaults', () => {
 		expect(filled).toEqual({ ...buildDefaultProfile(), language: 'fr' });
 	});
 
-	it('keeps a stored threshold while filling in its missing sibling', () => {
-		// The two thresholds are set independently, so a profile written when
-		// only one existed must not lose it — nor inherit `undefined` for the other.
-		// The cast is the point: the current type demands both, but rows on disk
-		// predate that and `withDefaults` is what makes them safe to render.
-		const partial = { language: 'en', thresholds: { speedMs: 120 } } as UserSettings;
-		const filled = withDefaults(partial);
-		expect(filled.thresholds).toEqual({
-			speedMs: 120,
-			errorRate: buildDefaultProfile().thresholds!.errorRate
-		});
+	it('keeps a stored value rather than overwriting it with the default', () => {
+		expect(withDefaults({ language: 'en', passageWords: 60 }).passageWords).toBe(60);
 	});
 
 	it('hands each caller its own object, so one caller cannot mutate another', () => {
-		// The settings page auto-saves while reset builds a fresh profile; a
-		// shared reference would let one write bleed into the other.
+		// The settings page edits the object it was handed while auto-save reads
+		// it; a shared reference would let one write bleed into the other.
 		const first = buildDefaultProfile();
-		first.thresholds!.speedMs = 999;
-		expect(buildDefaultProfile().thresholds!.speedMs).toBe(DEFAULT_SPEED_THRESHOLD_MS);
+		first.passageWords = 999;
+		expect(buildDefaultProfile().passageWords).toBe(DEFAULT_PASSAGE_WORDS);
 	});
 });

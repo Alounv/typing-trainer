@@ -4,6 +4,7 @@ import type {
 	SessionSummary
 } from '../support/core';
 import { summarizeBigrams, type BigramSummary } from '$lib/skill';
+import { DEFAULT_THRESHOLDS } from '../support/core';
 import { buildWpmSeries } from './metrics';
 
 type MovementDirection = 'up' | 'down';
@@ -71,7 +72,7 @@ export function detectWindowedMovements(
 	after: readonly BigramSummary[],
 	allSessions: readonly SessionSummary[],
 	currentSessionId: string,
-	thresholds: ClassificationThresholds
+	thresholds: ClassificationThresholds = DEFAULT_THRESHOLDS
 ): MovementEvent[] {
 	const before = allSessions.filter((s) => s.id !== currentSessionId);
 	const beforeRows = summarizeBigrams(before, undefined, thresholds);

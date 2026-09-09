@@ -96,8 +96,6 @@ export interface UserSettings {
 	secondaryLanguage?: Language;
 	/** 0..100 share of draws taken from `secondaryLanguage`. */
 	secondaryMix?: number;
-	/** No longer editable in the UI: changing it re-scores every past session. */
-	thresholds?: ClassificationThresholds;
 	passageWords?: number;
 	/** The opening state only — the in-session toggle overrides it either way. */
 	colorizeBigramDifficulty?: boolean;
