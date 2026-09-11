@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { annotateFirstInputs, encodeStream } from '../skill';
-import type { KeystrokeEvent, StoredSession } from '../support/core';
+import type { KeystrokeEvent, Language, StoredSession } from '../support/core';
 
 /**
  * Raw WPM — smoothing lives in `progress/`. 5 chars = 1 word. Uses `textLength`
@@ -27,6 +27,11 @@ interface SessionRunnerClock {
 	timestampProvider?: () => number;
 }
 
+interface SessionRunnerOptions {
+	language?: Language;
+	clock?: SessionRunnerClock;
+}
+
 /**
  * In-flight session manager (pure TS; no timers). UI calls `recordEvent` per
  * keystroke, `isComplete()` when done, and `finalize(elapsedMs)` to persist.
@@ -39,7 +44,7 @@ export class SessionRunner {
 
 	constructor(
 		private readonly text: string,
-		private readonly clock: SessionRunnerClock = {}
+		private readonly options: SessionRunnerOptions = {}
 	) {}
 
 	recordEvent(event: KeystrokeEvent): void {
@@ -63,9 +68,10 @@ export class SessionRunner {
 	 */
 	finalize(elapsedMs: number): StoredSession {
 		return {
-			id: (this.clock.idGenerator ?? uuid)(),
-			timestamp: (this.clock.timestampProvider ?? Date.now)(),
+			id: (this.options.clock?.idGenerator ?? uuid)(),
+			timestamp: (this.options.clock?.timestampProvider ?? Date.now)(),
 			type: 'real-text',
+			language: this.options.language,
 			durationMs: elapsedMs,
 			wpm: computeWPM(this.text.length, elapsedMs),
 			errorRate: computeErrorRate(annotateFirstInputs(this.events_)),

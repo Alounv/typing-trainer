@@ -544,6 +544,7 @@ describe('assessPacing', () => {
 			id: 'now',
 			timestamp: 10_000,
 			type: 'real-text',
+			language: 'en',
 			wpm: 60,
 			// Error-free by default so `correctedWpm` is the identity here and
 			// these cases read as written. Corrections get their own case below.
@@ -620,6 +621,32 @@ describe('assessPacing', () => {
 		]);
 		expect(result.recentCleanWpm).toBe(60);
 		expect(result.verdict).toBe('room-to-push');
+	});
+
+	it('compares against its own language only', () => {
+		// The bug this fixes: one baseline over both banks sits between them, so
+		// the slower language reads as a shortfall it never had. 44 clears the
+		// French average of 40 but not the pooled 50.
+		const french = [
+			paced({ id: 'f1', timestamp: 1_000, language: 'fr', wpm: 40 }),
+			paced({ id: 'f2', timestamp: 2_000, language: 'fr', wpm: 40 })
+		];
+		const result = assessPacing(paced({ language: 'fr', errorRate: 0.01, wpm: 44 }), [
+			...sixtyWpmHistory,
+			...french
+		]);
+		expect(result.recentCleanWpm).toBe(40);
+		expect(result.verdict).toBe('well-paced');
+	});
+
+	it('leaves legacy rows out of the baseline rather than guessing their language', () => {
+		const legacy = [
+			paced({ id: 'l1', timestamp: 1_000, language: undefined, wpm: 20 }),
+			paced({ id: 'l2', timestamp: 2_000, language: undefined, wpm: 20 })
+		];
+		expect(assessPacing(paced({ wpm: 50 }), legacy).recentCleanWpm).toBeUndefined();
+		// Mirror image: an old summary still reads against the rows of its own era.
+		expect(assessPacing(paced({ language: undefined, wpm: 50 }), legacy).recentCleanWpm).toBe(20);
 	});
 
 	it('ignores sessions newer than the one being judged', () => {

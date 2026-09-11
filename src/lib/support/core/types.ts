@@ -74,6 +74,13 @@ export interface SessionSummary {
 	text?: string;
 	stream?: KeystrokeStream;
 	/**
+	 * The bank the passage was drawn from. A mixed passage takes its primary
+	 * language, since the secondary is a minority share by design. Absent on
+	 * legacy rows, which is what keeps them out of a new session's pacing
+	 * baseline.
+	 */
+	language?: Language;
+	/**
 	 * Derived from `stream` on read rather than persisted, which is what makes
 	 * a threshold change re-score history instead of only future sessions.
 	 */

@@ -11,7 +11,7 @@
 	import TypingSurface from './TypingSurface.svelte';
 	import TintToggle from './TintToggle.svelte';
 	import type { GhostRun } from '$lib/skill';
-	import type { KeystrokeEvent } from '$lib/support/core';
+	import type { KeystrokeEvent, Language } from '$lib/support/core';
 	import type { StoredSession } from '$lib/support/core';
 	import { SessionRunner } from '../runner';
 	import { loadTintContext, type DifficultyMode, type TintContext } from '../tint';
@@ -19,6 +19,8 @@
 
 	interface Props {
 		text: string;
+		/** Stored on the row, so pacing compares a session only against its own language. */
+		language: Language;
 		title: string;
 		/** One-sentence guidance on how the user should type through it. */
 		approach: string;
@@ -26,7 +28,7 @@
 		ghosts?: readonly GhostRun[];
 	}
 
-	let { text, title, approach, ghosts = [] }: Props = $props();
+	let { text, language, title, approach, ghosts = [] }: Props = $props();
 
 	// Word count for the eyebrow micro-label, so the passage's size is legible
 	// before the first keystroke.
@@ -57,7 +59,7 @@
 	// initial values is noise in this context; the runner instance is
 	// deliberately tied to the first-mount snapshot.
 	// svelte-ignore state_referenced_locally
-	const runner = new SessionRunner(text);
+	const runner = new SessionRunner(text, { language });
 
 	const progressPct = $derived(Math.round((position / text.length) * 100));
 

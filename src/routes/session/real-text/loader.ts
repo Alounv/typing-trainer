@@ -1,10 +1,14 @@
 import { loadQuoteBank, hasCorpus, buildPassage } from '$lib/corpus';
-import { CHARS_PER_WORD, DEFAULT_PASSAGE_WORDS } from '$lib/support/core';
+import { CHARS_PER_WORD, DEFAULT_PASSAGE_WORDS, type Language } from '$lib/support/core';
 import { getProfile } from '$lib/settings';
 import { getRecentSessions } from '$lib/support/storage';
 import { computeAllBigramDebts, findGhostRuns, hydrateSessions, type GhostRun } from '$lib/skill';
 
-export async function prepareRealTextSession(): Promise<{ text: string; ghosts: GhostRun[] }> {
+export async function prepareRealTextSession(): Promise<{
+	text: string;
+	language: Language;
+	ghosts: GhostRun[];
+}> {
 	const profile = await getProfile();
 	const language = profile?.language ?? 'en';
 	const secondaryMix = profile?.secondaryMix ?? 0;
@@ -42,5 +46,5 @@ export async function prepareRealTextSession(): Promise<{ text: string; ghosts: 
 
 	// The same rows again, read for a different question: which of this
 	// passage's quotes the typist has run before, and how fast.
-	return { text: passage.text, ghosts: findGhostRuns(passage, recentRows) };
+	return { text: passage.text, language, ghosts: findGhostRuns(passage, recentRows) };
 }

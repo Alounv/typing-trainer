@@ -18,6 +18,7 @@
 	<SessionShell
 		text={passage.current.data.text}
 		ghosts={passage.current.data.ghosts}
+		language={passage.current.data.language}
 		title="Real text"
 		approach="Push until errors show, then hold there — 5% is the ceiling. Keep moving; nothing here blocks you, and the verdict comes at the end."
 	/>

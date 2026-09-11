@@ -16,8 +16,7 @@ function event(
 /** Types `typed` against `expected`, one event per position, 100ms apart. */
 function run(expected: string, typed: string, elapsedMs = 60_000) {
 	const runner = new SessionRunner(expected, {
-		idGenerator: () => 'fixed-id',
-		timestampProvider: () => 1_000
+		clock: { idGenerator: () => 'fixed-id', timestampProvider: () => 1_000 }
 	});
 	for (let i = 0; i < typed.length; i++) {
 		runner.recordEvent(event(i, expected[i], typed[i], i * 100));
