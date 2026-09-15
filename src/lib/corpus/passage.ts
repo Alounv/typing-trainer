@@ -1,4 +1,4 @@
-import type { Quote, QuoteBank } from './types';
+import type { Passage, Quote, QuoteBank, QuoteSpan } from './types';
 import { selectQuoteByDebt } from './debt-selection';
 
 /**
@@ -38,7 +38,7 @@ interface Draw {
 	used: Set<number>;
 }
 
-export function buildPassage(spec: PassageSpec): string {
+export function buildPassage(spec: PassageSpec): Passage {
 	const rng = spec.rng ?? Math.random;
 	const debts = spec.bigramDebts?.size ? spec.bigramDebts : undefined;
 
@@ -67,7 +67,17 @@ export function buildPassage(spec: PassageSpec): string {
 		chars += drawn.text.length;
 	}
 
-	return texts.join(QUOTE_SEPARATOR);
+	return assemble(texts);
+}
+
+function assemble(texts: readonly string[]): Passage {
+	const quotes: QuoteSpan[] = [];
+	let start = 0;
+	for (const text of texts) {
+		quotes.push({ start, end: start + text.length });
+		start += text.length + QUOTE_SEPARATOR.length;
+	}
+	return { text: texts.join(QUOTE_SEPARATOR), quotes };
 }
 
 /** Take one quote out of `from`, marking it spent. `null` once it is exhausted. */

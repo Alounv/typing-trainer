@@ -12,4 +12,6 @@ export type { BigramSummary } from './assessment';
 export { classifyBigram, summarizeSamples } from './classification';
 export { computeAllBigramDebts } from './debt';
 export { assessPacing } from './pacing';
+export { findGhostRuns } from './ghost';
+export type { GhostRun } from './ghost';
 export type { PacingAssessment, PacingInput, PacingVerdict } from './pacing';

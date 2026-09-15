@@ -22,13 +22,13 @@ layers**; routes compose domains through a thin route-local `loader.ts`.
 
 ## Domains
 
-| Domain       | Responsibility                                          | Public surface                                       |
-| ------------ | ------------------------------------------------------- | ---------------------------------------------------- |
-| **Corpus**   | Produces the text the user will type.                   | `buildPassage`, `loadBigramFrequencies`              |
-| **Session**  | Runs the live typing loop and saves the result.         | `<SessionShell>`                                     |
-| **Skill**    | Measures how well the user types, from raw keystrokes.  | `hydrateSession`, `summarizeBigrams`, `assessPacing` |
-| **Progress** | Turns session history into views for the user.          | `<Summary>`, `<Analytics>`, `<PacingBadge>`          |
-| **Settings** | Reads and writes the user profile; makes data portable. | `getProfile`, `<DataTransfer>`                       |
+| Domain       | Responsibility                                          | Public surface                                                        |
+| ------------ | ------------------------------------------------------- | --------------------------------------------------------------------- |
+| **Corpus**   | Produces the text the user will type.                   | `buildPassage`, `loadBigramFrequencies`                               |
+| **Session**  | Runs the live typing loop and saves the result.         | `<SessionShell>`                                                      |
+| **Skill**    | Measures how well the user types, from raw keystrokes.  | `hydrateSession`, `summarizeBigrams`, `assessPacing`, `findGhostRuns` |
+| **Progress** | Turns session history into views for the user.          | `<Summary>`, `<Analytics>`, `<PacingBadge>`                           |
+| **Settings** | Reads and writes the user profile; makes data portable. | `getProfile`, `<DataTransfer>`                                        |
 
 ## Support layers (not domains)
 
@@ -88,7 +88,8 @@ Notes on the less obvious edges:
 - **Session touches storage directly**, in exactly two files: `persistence`
   (the session write) and `tint` (the one read the tint needs). Its components
   take everything else as props.
-- **Skill → Corpus and Progress → Corpus are type-only** (`FrequencyTable`).
+- **Skill → Corpus and Progress → Corpus are type-only** (`FrequencyTable`,
+  `Passage`).
 - **Session and Progress have no `index.ts`.** Their entire public surface is
   Svelte components, and re-exporting components through a `.ts` barrel costs
   HMR granularity for no gain. The lint rule exempts `.svelte` paths, so this is
@@ -114,13 +115,14 @@ than by separate modes:
                   (skill/debt)
 ```
 
-Three readings of the same history, each with one job:
+Four readings of the same history, each with one job:
 
-| Reading                                  | Decides                         |
-| ---------------------------------------- | ------------------------------- |
-| `assessPacing` (wpm + error rate)        | what the summary says           |
-| the same verdict, next session           | which tint the passage opens on |
-| `computeAllBigramDebts` → `buildPassage` | which passage comes next        |
+| Reading                                   | Decides                          |
+| ----------------------------------------- | -------------------------------- |
+| `assessPacing` (wpm + error rate)         | what the summary says            |
+| the same verdict, next session            | which tint the passage opens on  |
+| `computeAllBigramDebts` → `buildPassage`  | which passage comes next         |
+| `findGhostRuns` (past runs of its quotes) | what the ghost replays alongside |
 
 Accuracy is checked first, then pace:
 
@@ -147,10 +149,18 @@ to the typist instead of asserting a diagnosis. Acting on it is cheap either
 way: pushing on an off day produces errors, and the next session says
 `too-fast`.
 
-The tint follows the same rule. A pacer tells you what to do; the tint changes
-what you _notice_ and leaves the regulating to you. Both modes are derived from
-one read taken when the session mounts (`session/tint`), so flipping the toggle
-mid-passage is a pure recompute.
+The tint follows the same rule. A prescribed pace tells you what to do; the
+tint changes what you _notice_ and leaves the regulating to you. Both modes are
+derived from one read taken when the session mounts (`session/tint`), so
+flipping the toggle mid-passage is a pure recompute.
+
+The ghost is the one mark on the passage that does keep a pace, and it earns
+that by being nobody's prescription: it replays the typist's own fastest run of
+the quote in front of them. Quotes they have never typed get no ghost, and a
+run that broke the 5% ceiling is never the one replayed — a pace that cost
+accuracy is not a target the rest of the app would stand behind. The race is
+per quote, restarting at each quote boundary, so a slow opening quote does not
+hand the remaining ones to a ghost already out of sight.
 
 Delivery and accounting are separate choices: real words are what you type,
 transitions are what gets credited. Typing `brown` pays down `br ro ow wn`, so
@@ -197,9 +207,10 @@ reads it, and it survives so exporting an old database doesn't drop history.
   `assessPacing`. Scalars only, no stream decoded. One action: start a passage.
 - **Session (`/session/real-text`)** — `real-text/loader` hydrates recent
   history to price outstanding bigram debt, then asks `corpus` for the passage
-  that repays most per keystroke. `<SessionShell>` captures keystrokes, owns the
-  tint, and persists the run via `session/persistence` — the text and the raw
-  stream, nothing derived.
+  that repays most per keystroke, and reads the same rows once more for the
+  best past run of each quote in it. `<SessionShell>` captures keystrokes, owns
+  the tint and the ghost's clock, and persists the run via
+  `session/persistence` — the text and the raw stream, nothing derived.
 - **Summary (`/session/[id]/summary`)** — `summary/loader` fetches the session +
   recent history, or `null` if the id is unknown. The route renders `<Summary>`,
   which states the pacing verdict.

@@ -21,6 +21,8 @@
 		bigramDifficultyMap?: Map<string, number> | null;
 		/** DaisyUI CSS variable name the difficulty gradient lerps toward (e.g. `--color-warning`). */
 		difficultyHighlightVar?: string | null;
+		/** Where a replayed past run has got to; `null` when none is pacing. */
+		ghostPosition?: number | null;
 	}
 
 	let {
@@ -29,7 +31,8 @@
 		errorPositions = new Set<number>(),
 		correctedPositions = new Set<number>(),
 		bigramDifficultyMap = null,
-		difficultyHighlightVar = null
+		difficultyHighlightVar = null,
+		ghostPosition = null
 	}: Props = $props();
 
 	// Deliberately not a $derived array of char descriptors: on a 2k-char text
@@ -118,6 +121,21 @@
 		});
 	});
 
+	/** Left edge and height of the ghost's character; the marker is a rule, not a block. */
+	let ghostRect = $state({ x: 0, y: 0, h: 0, ready: false });
+
+	$effect(() => {
+		// The ghost parks one past the last character of its quote, which is the
+		// joining space — or nothing at all, when its quote ends the passage.
+		if (!viewportEl || ghostPosition === null || ghostPosition >= text.length) {
+			ghostRect = { x: 0, y: 0, h: 0, ready: false };
+			return;
+		}
+		const span = viewportEl.getElementsByTagName('span')[ghostPosition] as HTMLElement | undefined;
+		if (!span) return;
+		ghostRect = { x: span.offsetLeft, y: span.offsetTop, h: span.offsetHeight, ready: true };
+	});
+
 	/**
 	 * Respect `prefers-reduced-motion`. Smooth scrolling on every line
 	 * change can feel queasy for motion-sensitive users. Checked at call
@@ -163,6 +181,23 @@
 			: 0}"
 		aria-hidden="true"
 	></div>
+
+	<!--
+		The ghost: a hairline rule at the left edge of the character the typist's
+		own best run had reached by now. Deliberately not a second block cursor —
+		two filled bars in one line of text read as two carets.
+	-->
+	{#if ghostPosition !== null}
+		<div
+			class="pointer-events-none absolute top-0 left-0 w-0.5 rounded-full bg-secondary transition-[transform,height,opacity] duration-100 ease-out motion-reduce:transition-none"
+			style="transform: translate({ghostRect.x}px, {ghostRect.y}px); height: {ghostRect.h}px; opacity: {ghostRect.ready
+				? 1
+				: 0}"
+			data-testid="ghost-marker"
+			data-pos={ghostPosition}
+			aria-hidden="true"
+		></div>
+	{/if}
 
 	<div class="whitespace-pre-wrap">
 		{#each text as char, i (i)}

@@ -4,6 +4,7 @@ import {
 	assessPacing,
 	computeAllBigramDebts,
 	encodeStream,
+	findGhostRuns,
 	hydrateSession,
 	summarizeBigrams,
 	type PacingInput,
@@ -661,5 +662,90 @@ describe('assessPacing', () => {
 		expect(assessPacing(paced({ errorRate: 0.01, wpm: 60 }), sixtyWpmHistory).verdict).toBe(
 			'well-paced'
 		);
+	});
+});
+
+describe('findGhostRuns', () => {
+	const QUOTE = 'the cat sat';
+	const passage = { text: QUOTE, quotes: [{ start: 0, end: QUOTE.length }] };
+
+	/**
+	 * A stored run of `text`, one keystroke every `gapMs`. `typed` defaults to a
+	 * clean run; `stopAfter` cuts it short, as an abandoned row would be.
+	 */
+	function priorRun(
+		text: string,
+		gapMs: number,
+		{ typed = text, stopAfter = text.length }: { typed?: string; stopAfter?: number } = {}
+	): StoredSession {
+		const events: KeystrokeEvent[] = [...text].slice(0, stopAfter).map((ch, i) => ({
+			timestamp: i * gapMs,
+			expected: ch,
+			actual: typed[i],
+			position: i,
+			wordIndex: 0,
+			positionInWord: i
+		}));
+		return {
+			id: `run-${gapMs}`,
+			timestamp: 1_000,
+			type: 'real-text',
+			durationMs: text.length * gapMs,
+			wpm: 50,
+			errorRate: 0,
+			text,
+			stream: encodeStream(events)
+		};
+	}
+
+	it('paces the fastest run of the quote, not the most recent', () => {
+		const runs = findGhostRuns(passage, [priorRun(QUOTE, 100), priorRun(QUOTE, 250)]);
+
+		expect(runs).toHaveLength(1);
+		expect(runs[0]).toMatchObject({ start: 0, end: QUOTE.length });
+		expect(runs[0].times.at(-1)).toBe((QUOTE.length - 1) * 100);
+	});
+
+	it('starts the clock on the quote, wherever it sat in the older passage', () => {
+		// The quote is the tail of a two-quote passage, so its first character was
+		// typed 400ms in. The race still opens level.
+		const runs = findGhostRuns(passage, [priorRun(`ab. ${QUOTE}`, 100)]);
+
+		expect(runs[0].times[0]).toBe(0);
+		expect(runs[0].times.at(-1)).toBe((QUOTE.length - 1) * 100);
+	});
+
+	it('will not replay a run that broke the accuracy ceiling', () => {
+		// One wrong character in eleven is 9%, past the 5% the pacing verdict
+		// holds a session to — fast, but not a pace worth chasing.
+		const sloppy = priorRun(QUOTE, 50, { typed: 'the xat sat' });
+
+		expect(findGhostRuns(passage, [sloppy])).toEqual([]);
+		expect(findGhostRuns(passage, [sloppy, priorRun(QUOTE, 250)])[0].times.at(-1)).toBe(
+			(QUOTE.length - 1) * 250
+		);
+	});
+
+	it('will not replay a run that stopped part-way through the quote', () => {
+		expect(findGhostRuns(passage, [priorRun(QUOTE, 100, { stopAfter: 5 })])).toEqual([]);
+	});
+
+	it('paces only the quotes with history behind them', () => {
+		const twoQuotes = {
+			text: `${QUOTE} the dog ran`,
+			quotes: [
+				{ start: 0, end: QUOTE.length },
+				{ start: QUOTE.length + 1, end: QUOTE.length + 1 + 'the dog ran'.length }
+			]
+		};
+
+		const runs = findGhostRuns(twoQuotes, [priorRun(QUOTE, 100)]);
+
+		expect(runs).toHaveLength(1);
+		expect(runs[0].end).toBe(QUOTE.length);
+	});
+
+	it('has nothing to pace on prose the typist has never typed', () => {
+		expect(findGhostRuns(passage, [priorRun('a different quote entirely', 100)])).toEqual([]);
 	});
 });

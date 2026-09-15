@@ -64,10 +64,23 @@ describe('registry', () => {
 describe('buildPassage', () => {
 	it('assembles the passage from the bank verbatim', () => {
 		const bank = fixtureQuoteBank();
-		const text = buildPassage({ bank, targetLengthChars: 40 });
+		const { text } = buildPassage({ bank, targetLengthChars: 40 });
 		// The output must reproduce at least one quote's text verbatim — we don't
 		// care which, just that real prose is the source and nothing rewrites it.
 		expect(bank.quotes.some((q) => text.includes(q.text))).toBe(true);
+	});
+
+	it('reports where each quote sits in the assembled text', () => {
+		const bank = fixtureQuoteBank();
+		// Past what the three fixtures can cover, so every one of them is spent
+		// and the passage is more than a single quote.
+		const passage = buildPassage({ bank, targetLengthChars: 10_000 });
+
+		expect(passage.quotes.length).toBe(bank.quotes.length);
+		for (const span of passage.quotes) {
+			const quote = passage.text.slice(span.start, span.end);
+			expect(bank.quotes.some((q) => q.text === quote)).toBe(true);
+		}
 	});
 
 	it('prefers quotes that repay debt', () => {
@@ -78,7 +91,7 @@ describe('buildPassage', () => {
 				{ id: 2, text: 'abab abab abab abab abab.', source: 't', length: 25 }
 			]
 		};
-		const text = buildPassage({
+		const { text } = buildPassage({
 			bank,
 			targetLengthChars: 20,
 			bigramDebts: new Map([['ab', 10]])
@@ -95,7 +108,7 @@ describe('buildPassage', () => {
 		] as const)('mix=$mix draws from the $expected bank', ({ mix, expected, forbidden }) => {
 			const primary = fixtureQuoteBank();
 			const secondary = fixtureSecondaryBank();
-			const text = buildPassage({
+			const { text } = buildPassage({
 				bank: primary,
 				secondaryBank: secondary,
 				secondaryMix: mix,
@@ -110,7 +123,7 @@ describe('buildPassage', () => {
 		it('ignores the secondary bank when secondaryMix is omitted', () => {
 			const primary = fixtureQuoteBank();
 			const secondary = fixtureSecondaryBank();
-			const text = buildPassage({
+			const { text } = buildPassage({
 				bank: primary,
 				secondaryBank: secondary,
 				targetLengthChars: 40
@@ -125,7 +138,7 @@ describe('buildPassage', () => {
 			// French in because English ran out is worse than a short passage.
 			const primary = fixtureQuoteBank();
 			const secondary = fixtureSecondaryBank();
-			const text = buildPassage({
+			const { text } = buildPassage({
 				bank: primary,
 				secondaryBank: secondary,
 				secondaryMix: 0,
@@ -139,7 +152,7 @@ describe('buildPassage', () => {
 			// let an English id-1 draw silently retire the French id-1.
 			const primary = fixtureQuoteBank();
 			const secondary = fixtureSecondaryBank();
-			const text = buildPassage({
+			const { text } = buildPassage({
 				bank: primary,
 				secondaryBank: secondary,
 				secondaryMix: 50,
@@ -162,7 +175,7 @@ describe('buildPassage', () => {
 		const bank = fixtureQuoteBank();
 		// Far past what three quotes can cover, so the assembler is forced to
 		// either repeat or stop. It must stop.
-		const text = buildPassage({ bank, targetLengthChars: 10_000, bigramDebts });
+		const { text } = buildPassage({ bank, targetLengthChars: 10_000, bigramDebts });
 		for (const quote of bank.quotes) {
 			expect(text.split(quote.text).length - 1).toBeLessThanOrEqual(1);
 		}

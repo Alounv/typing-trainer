@@ -21,6 +21,8 @@
 		difficultyMap?: Map<string, number> | null;
 		/** Which tint is active — picks the color the gradient lerps toward. */
 		difficultyMode?: DifficultyMode | null;
+		/** Where a replayed past run has got to; `null` when none is pacing. */
+		ghostPosition?: number | null;
 		onEvent?: CaptureCallbacks['onEvent'];
 	}
 
@@ -31,6 +33,7 @@
 		correctedPositions,
 		difficultyMap = null,
 		difficultyMode = null,
+		ghostPosition = null,
 		onEvent
 	}: Props = $props();
 
@@ -58,6 +61,7 @@
 			{correctedPositions}
 			bigramDifficultyMap={difficultyMap}
 			difficultyHighlightVar={difficultyMode ? highlightVarForMode(difficultyMode) : null}
+			{ghostPosition}
 		/>
 	</div>
 

@@ -10,6 +10,7 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import TypingSurface from './TypingSurface.svelte';
 	import TintToggle from './TintToggle.svelte';
+	import type { GhostRun } from '$lib/skill';
 	import type { KeystrokeEvent } from '$lib/support/core';
 	import type { StoredSession } from '$lib/support/core';
 	import { SessionRunner } from '../runner';
@@ -21,9 +22,11 @@
 		title: string;
 		/** One-sentence guidance on how the user should type through it. */
 		approach: string;
+		/** The typist's own best run of each quote they have typed before. */
+		ghosts?: readonly GhostRun[];
 	}
 
-	let { text, title, approach }: Props = $props();
+	let { text, title, approach, ghosts = [] }: Props = $props();
 
 	// Word count for the eyebrow micro-label, so the passage's size is legible
 	// before the first keystroke.
@@ -80,11 +83,46 @@
 		difficultyMode = next;
 	}
 
+	// The ghost races one quote at a time, restarting at each quote boundary, so
+	// a slow first quote doesn't hand the rest of the passage to a run that is
+	// already out of sight. Its clock is wall-clock — it replays a recording,
+	// and only the typist's keystrokes are events.
+	let activeGhost = $state<GhostRun | null>(null);
+	let ghostPosition = $state<number | null>(null);
+	let ghostStartedAt = 0;
+
+	function startGhost(position: number) {
+		const ghost = ghosts.find((g) => g.start === position);
+		// Identity, not position: backspacing to the top of a quote and retyping
+		// it must not hand the typist a second start on the same race.
+		if (!ghost || ghost === activeGhost) return;
+		ghostStartedAt = performance.now();
+		activeGhost = ghost;
+	}
+
+	$effect(() => {
+		const ghost = activeGhost;
+		if (!ghost) return;
+		// Level on the character that starts the race: the typist has just typed
+		// it, and so had the run being replayed.
+		let index = 1;
+		let frame = 0;
+		const tick = () => {
+			const elapsed = performance.now() - ghostStartedAt;
+			while (index < ghost.times.length && ghost.times[index] <= elapsed) index++;
+			ghostPosition = ghost.start + index;
+			if (index < ghost.times.length) frame = requestAnimationFrame(tick);
+		};
+		tick();
+		return () => cancelAnimationFrame(frame);
+	});
+
 	function onEvent(event: KeystrokeEvent) {
 		if (sessionStart === null) {
 			sessionStart = performance.now();
 			running = true;
 		}
+		startGhost(event.position);
 		runner.recordEvent(event);
 		position = runner.position;
 		// Error / correction state for the drill rendering. We don't read
@@ -157,6 +195,21 @@
 		</dl>
 
 		<TintToggle value={difficultyMode} onChange={chooseTint} />
+
+		{#if ghosts.length > 0}
+			<div class="space-y-1.5" data-testid="ghost-legend">
+				<div class="flex items-center gap-3">
+					<span class="text-[11px] font-medium tracking-[0.18em] text-base-content/40 uppercase">
+						Ghost
+					</span>
+					<span class="h-3.5 w-0.5 rounded-full bg-secondary" aria-hidden="true"></span>
+				</div>
+				<p class="text-xs text-base-content/50">
+					Your own best run of {ghosts.length === 1 ? 'this quote' : 'these quotes'}, replayed
+					beside you.
+				</p>
+			</div>
+		{/if}
 	</header>
 
 	<!--
@@ -186,6 +239,7 @@
 			{correctedPositions}
 			{difficultyMap}
 			{difficultyMode}
+			{ghostPosition}
 			{onEvent}
 		/>
 	</div>
