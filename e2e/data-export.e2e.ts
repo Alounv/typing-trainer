@@ -30,18 +30,16 @@ test('data export: downloaded JSON round-trips through the same shape import acc
 
 	// Header fields: app identity + schema version so the round-trip is verifiable.
 	expect(payload.app).toBe('typing-trainer');
-	expect(payload.schemaVersion).toBe(2);
+	expect(payload.schemaVersion).toBe(3);
 	expect(typeof payload.exportedAt).toBe('number');
 
 	expect(Array.isArray(payload.data.sessions)).toBe(true);
 	expect(payload.data.sessions.length).toBeGreaterThan(0);
-	expect(Array.isArray(payload.data.bigramRecords)).toBe(true);
 
 	// The session must carry its own evidence: the text typed, plus a keystroke
 	// stream whose three columns line up. Typed arrays don't survive JSON, so
 	// this is where a botched serialization would show up.
 	const session = payload.data.sessions[0];
-	expect(session.type).toBe('real-text');
 	expect(typeof session.text).toBe('string');
 	expect(session.text.length).toBeGreaterThan(0);
 	expect(Array.isArray(session.stream.positions)).toBe(true);

@@ -25,14 +25,12 @@ function run(expected: string, typed: string, elapsedMs = 60_000) {
 }
 
 describe('SessionRunner', () => {
-	it('stores the text and the keystroke stream, and no aggregates', () => {
+	it('stores the text and the keystroke stream', () => {
 		const { session } = run('the cat', 'the cat');
 
 		expect(session.text).toBe('the cat');
-		expect(session.stream?.typed).toBe('the cat');
-		expect(session.stream?.positions).toBeInstanceOf(Int16Array);
-		// Aggregates are a reading of the stream, measured on load.
-		expect(session.bigramAggregates).toBeUndefined();
+		expect(session.stream.typed).toBe('the cat');
+		expect(session.stream.positions).toBeInstanceOf(Int16Array);
 	});
 
 	it('rates WPM off the prompt length, not the keystroke count', () => {

@@ -12,8 +12,7 @@ import type { StoredSession } from '../support/core';
 /**
  * Persist one session row: the text, the keystroke stream, and the two scalars
  * list views sort on. Nothing derived is written, so there is no second table
- * to keep in step and no transaction to wrap — `bigramRecords` holds legacy
- * rows only and is deliberately never written again.
+ * to keep in step and no transaction to wrap.
  */
 export async function saveSession(session: StoredSession): Promise<void> {
 	await db.sessions.put(session);

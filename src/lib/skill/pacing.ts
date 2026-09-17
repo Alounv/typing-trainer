@@ -14,7 +14,7 @@ export type PacingVerdict = 'well-paced' | 'room-to-push' | 'too-fast';
 /** Scalars only, so a caller that wants the verdict need not decode a stream. */
 export type PacingInput = Pick<
 	SessionSummary,
-	'id' | 'timestamp' | 'type' | 'wpm' | 'errorRate' | 'language'
+	'id' | 'timestamp' | 'wpm' | 'errorRate' | 'language'
 >;
 
 export interface PacingAssessment {
@@ -51,10 +51,12 @@ export interface PacingAssessment {
  * observation rather than claiming a diagnosis. `history` may include
  * `session` itself — excluded by id — and needs no particular order.
  *
- * The window is same-language as well as same-type. The two banks are typed at
- * genuinely different speeds — accents cost a reach, and the letter mix differs
- * — so one baseline spanning both sits between them, and reports every session
- * in the faster language as short while clearing every one in the slower.
+ * The window is same-language. The two banks are typed at genuinely different
+ * speeds — accents cost a reach, and the letter mix differs — so one baseline
+ * spanning both sits between them, and reports every session in the faster
+ * language as short while clearing every one in the slower. Rows written before
+ * the field existed carry no language, so they match each other and nothing
+ * else: a new session never compares against them.
  */
 export function assessPacing(
 	session: PacingInput,
@@ -107,16 +109,10 @@ function recentAverageCleanWpm(
 	session: PacingInput,
 	history: readonly PacingInput[]
 ): number | undefined {
-	// Legacy rows carry no language, so they match each other and nothing else:
-	// a new session never compares against them, and an old session's summary
-	// still reads the same as it did before the field existed.
 	const comparable = history
 		.filter(
 			(s) =>
-				s.id !== session.id &&
-				s.type === session.type &&
-				s.language === session.language &&
-				s.timestamp < session.timestamp
+				s.id !== session.id && s.language === session.language && s.timestamp < session.timestamp
 		)
 		.sort((a, b) => b.timestamp - a.timestamp)
 		.slice(0, RECENT_WINDOW);

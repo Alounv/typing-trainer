@@ -106,9 +106,9 @@ export function detectWindowedMovements(
 
 /**
  * Round-number WPM milestones worth calling out. 50 is deliberately missing —
- * it tends to coincide with first-diagnostic baselines for touch typists and
- * would fire without being earned. The jumps of 10 above 60 reflect how
- * meaningfully harder each step gets.
+ * it tends to coincide with an untrained touch typist's starting pace and would
+ * fire without being earned. The jumps of 10 above 60 reflect how meaningfully
+ * harder each step gets.
  */
 const WPM_MILESTONES = [60, 70, 80, 90, 100] as const;
 type WpmMilestone = (typeof WPM_MILESTONES)[number];

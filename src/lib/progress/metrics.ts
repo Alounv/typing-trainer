@@ -70,7 +70,7 @@ export interface TrendPoint {
 	plus1Sigma: number | null;
 	minus1Sigma: number | null;
 	/**
-	 * Intra-bucket spread (e.g. min/max across a day's diagnostics). Both `null`
+	 * Intra-bucket spread (e.g. min/max across a day's sessions). Both `null`
 	 * for buckets with a single sample, since a whisker over one point is noise.
 	 */
 	low: number | null;
@@ -225,7 +225,6 @@ export function buildBigramProgressSeries(
 	for (let i = 0; i < ordered.length; i++) {
 		const s = ordered[i];
 		for (const agg of s.bigramAggregates) {
-			if (!agg.samples || agg.samples.length === 0) continue;
 			let buf = buffers.get(agg.bigram);
 			if (!buf) {
 				buf = [];
@@ -273,7 +272,6 @@ function buildRecentSamplesIndex(
 	const out = new Map<string, BigramSample[]>();
 	for (const s of chronological(sessions)) {
 		for (const agg of s.bigramAggregates) {
-			if (!agg.samples || agg.samples.length === 0) continue;
 			let buf = out.get(agg.bigram);
 			if (!buf) {
 				buf = [];

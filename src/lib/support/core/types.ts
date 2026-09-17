@@ -31,21 +31,9 @@ export interface BigramAggregate {
 	/** First-input errors — a backspace does not erase one. */
 	errorCount: number;
 	errorRate: number;
-	/**
-	 * Recomputed on read for rows that carry a `stream`. On legacy rows it is
-	 * frozen at whatever the thresholds were that day, and cannot be re-scored.
-	 */
 	classification: BigramClassification;
-	/** Absent on legacy rows; consumers fall back to the scalars above. */
-	samples?: BigramSample[];
+	samples: BigramSample[];
 }
-
-/**
- * `real-text` is the only type produced now. The other two remain because
- * stored rows carry them, and pacing must not compare across types — drill
- * passages were bigram-dense and typed slower than prose.
- */
-type SessionType = 'diagnostic' | 'bigram-drill' | 'real-text';
 
 /**
  * Columnar rather than an array of objects so IndexedDB stores the numeric
@@ -65,19 +53,17 @@ export interface KeystrokeStream {
 export interface SessionSummary {
 	id: string;
 	timestamp: number;
-	type: SessionType;
 	durationMs: number;
 	/** Raw. Smoothing lives in `progress/`. */
 	wpm: number;
 	errorRate: number;
-	/** Absent on legacy rows, which is why theirs cannot be re-measured. */
-	text?: string;
-	stream?: KeystrokeStream;
+	text: string;
+	stream: KeystrokeStream;
 	/**
 	 * The bank the passage was drawn from. A mixed passage takes its primary
-	 * language, since the secondary is a minority share by design. Absent on
-	 * legacy rows, which is what keeps them out of a new session's pacing
-	 * baseline.
+	 * language, since the secondary is a minority share by design. Absent on rows
+	 * written before the field existed, which is what keeps them out of a new
+	 * session's pacing baseline.
 	 */
 	language?: Language;
 	/**
@@ -88,13 +74,10 @@ export interface SessionSummary {
 }
 
 /**
- * Aggregates are absent on rows written from schema v2 on: persisting them
- * would be a second, staler source of the same truth. Legacy rows are the
- * mirror image — aggregates, no stream.
+ * Aggregates are never persisted — they would be a second, staler source of the
+ * same truth as `stream`.
  */
-export interface StoredSession extends Omit<SessionSummary, 'bigramAggregates'> {
-	bigramAggregates?: BigramAggregate[];
-}
+export type StoredSession = Omit<SessionSummary, 'bigramAggregates'>;
 
 export type Language = 'en' | 'fr';
 

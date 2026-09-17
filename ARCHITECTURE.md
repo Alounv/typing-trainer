@@ -194,12 +194,11 @@ Two consequences worth knowing:
   aggregates); consumers read `SessionSummary` (aggregates required). The type
   gap is deliberate — a caller that forgets to hydrate fails to compile.
 
-Rows written before this model have aggregates and no text. `hydrateSession`
-passes them through untouched, but they can never gain context: their
-keystrokes were never kept. Their session types (`diagnostic`, `bigram-drill`)
-no longer exist either — they stay in `SessionType` so old summaries still open.
-The `bigramRecords` table mirrors those rows only; nothing writes it and nothing
-reads it, and it survives so exporting an old database doesn't drop history.
+Every row carries its text and its stream, so there is one way to read a
+session and no second shape to branch on. Rows written before this model held
+aggregates and no keystrokes, which nothing here can re-measure: schema v2 of
+the Dexie store deletes them on upgrade, and importing a v1 or v2 export skips
+them rather than rejecting the file.
 
 ## Main flows
 

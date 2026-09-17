@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { StoredSession, UserSettings, BigramAggregate } from '../core';
+import type { StoredSession, UserSettings } from '../core';
 
 export const SINGLETON_ID = 'default';
 
@@ -9,16 +9,12 @@ interface ProfileRecord {
 }
 
 /**
- * `bigramRecords` is written by nothing and read by nothing — the graduation
- * filter that consulted it is gone. It survives only so that exporting an old
- * database does not silently drop pre-stream history.
- *
  * To change an index, bump `version(n)` with a new `.stores(...)`. Never mutate
- * v1: both the legacy and current row shapes live in its stores.
+ * an existing version — Dexie replays them in order on any database that has
+ * not seen them yet, so v1 still has to describe the shape v1 wrote.
  */
 class TypingTrainerDB extends Dexie {
 	sessions!: EntityTable<StoredSession, 'id'>;
-	bigramRecords!: EntityTable<BigramAggregate & { key: string }, 'key'>;
 	profile!: EntityTable<ProfileRecord, 'id'>;
 
 	constructor() {
@@ -28,6 +24,18 @@ class TypingTrainerDB extends Dexie {
 			bigramRecords: 'key, bigram, sessionId, classification',
 			profile: 'id'
 		});
+		// Pre-stream rows stored aggregates instead of keystrokes, so nothing can
+		// re-measure them against current thresholds. Deleted rather than kept as
+		// rows every reader would have to special-case; `bigramRecords` mirrored
+		// those rows only, so it goes with them.
+		this.version(2)
+			.stores({ sessions: 'id, timestamp', bigramRecords: null })
+			.upgrade((tx) =>
+				tx
+					.table<Partial<StoredSession>>('sessions')
+					.filter((row) => !row.stream)
+					.delete()
+			);
 	}
 }
 

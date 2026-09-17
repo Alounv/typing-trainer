@@ -35,7 +35,7 @@ export function findGhostRuns(passage: Passage, history: readonly GhostSource[])
 	function firstInputs(row: GhostSource): readonly AnnotatedKeystrokeEvent[] {
 		let events = firstInputsByRow.get(row);
 		if (!events) {
-			events = annotateFirstInputs(decodeStream(row.stream!, row.text!));
+			events = annotateFirstInputs(decodeStream(row.stream, row.text));
 			firstInputsByRow.set(row, events);
 		}
 		return events;
@@ -47,7 +47,6 @@ export function findGhostRuns(passage: Passage, history: readonly GhostSource[])
 		let best: GhostRun | null = null;
 
 		for (const row of history) {
-			if (!row.text || !row.stream) continue;
 			const at = row.text.indexOf(quote);
 			if (at < 0) continue;
 

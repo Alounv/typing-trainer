@@ -40,8 +40,7 @@ export interface BigramSummary {
 /**
  * Aggregate observed bigrams. Class/meanTime/errorRate come from the rolling window of
  * the last `window` samples so a small recent session can't mask a well-established
- * bigram; `occurrences` is the lifetime sum. Legacy data without samples falls back to
- * the latest aggregate.
+ * bigram; `occurrences` is the lifetime sum.
  */
 export function summarizeBigrams(
 	sessions: readonly SessionSummary[],
@@ -54,14 +53,11 @@ export function summarizeBigrams(
 	// Newest-first so the inverted index ends up in pool order.
 	const orderedNewestFirst = [...sessions].sort((a, b) => b.timestamp - a.timestamp);
 
-	// First-seen wins → newest snapshot, since we walk newest-first.
-	const latest = new Map<string, BigramAggregate>();
-	const occurrences = new Map<string, number>();
+	const lifetime = new Map<string, number>();
 	const aggsByBigram = new Map<string, BigramAggregate[]>();
 	for (const s of orderedNewestFirst) {
 		for (const agg of s.bigramAggregates) {
-			if (!latest.has(agg.bigram)) latest.set(agg.bigram, agg);
-			occurrences.set(agg.bigram, (occurrences.get(agg.bigram) ?? 0) + agg.occurrences);
+			lifetime.set(agg.bigram, (lifetime.get(agg.bigram) ?? 0) + agg.occurrences);
 			let arr = aggsByBigram.get(agg.bigram);
 			if (!arr) {
 				arr = [];
@@ -79,44 +75,34 @@ export function summarizeBigrams(
 	// loss is a property of the whole set, so scoring waits for pass 2.
 	interface PooledBigram {
 		bigram: string;
-		latestAgg: BigramAggregate;
+		occurrences: number;
 		pooled: BigramSample[];
 		classification: BigramClassification;
 		meanTime: number;
 		errorRate: number;
 	}
 	const partials: PooledBigram[] = [];
-	for (const [bigram, latestAgg] of latest) {
-		const aggs = aggsByBigram.get(bigram);
+	for (const [bigram, aggs] of aggsByBigram) {
 		const pooled: BigramSample[] = [];
-		if (aggs) {
-			for (const agg of aggs) {
-				if (!agg.samples || agg.samples.length === 0) continue;
-				const remaining = window - pooled.length;
-				if (remaining <= 0) break;
-				const start = Math.max(0, agg.samples.length - remaining);
-				for (let i = start; i < agg.samples.length; i++) pooled.push(agg.samples[i]);
-				if (pooled.length >= window) break;
-			}
+		for (const agg of aggs) {
+			const remaining = window - pooled.length;
+			if (remaining <= 0) break;
+			const start = Math.max(0, agg.samples.length - remaining);
+			for (let i = start; i < agg.samples.length; i++) pooled.push(agg.samples[i]);
 		}
 
-		let classification: BigramClassification;
-		let meanTime: number;
-		let errorRate: number;
-		if (pooled.length > 0) {
-			({ meanTime, errorRate } = summarizeSamples(pooled));
-			classification = classifyBigram(
+		const { meanTime, errorRate } = summarizeSamples(pooled);
+		partials.push({
+			bigram,
+			occurrences: lifetime.get(bigram) ?? pooled.length,
+			pooled,
+			classification: classifyBigram(
 				{ occurrences: pooled.length, meanTime, errorRate },
 				thresholds
-			);
-		} else {
-			// Legacy data without samples — no rolling window to compute from.
-			classification = latestAgg.classification;
-			meanTime = latestAgg.meanTime;
-			errorRate = latestAgg.errorRate;
-		}
-
-		partials.push({ bigram, latestAgg, pooled, classification, meanTime, errorRate });
+			),
+			meanTime,
+			errorRate
+		});
 	}
 
 	const baselineMs = typicalInterval(partials.flatMap((p) => p.pooled));
@@ -124,20 +110,13 @@ export function summarizeBigrams(
 	// Pass 2: price each bigram in milliseconds, then rank.
 	const rows: BigramSummary[] = partials.map((p) => {
 		const frequency = corpus?.[p.bigram] ?? fallbackFreq;
-		const observed = p.pooled.length > 0 ? p.pooled.length : p.latestAgg.occurrences;
-		const timeLossMs = timeLossPerOccurrence(
-			p.pooled,
-			p.errorRate,
-			p.meanTime,
-			baselineMs,
-			observed
-		);
+		const timeLossMs = timeLossPerOccurrence(p.pooled, p.errorRate, baselineMs);
 		return {
 			bigram: p.bigram,
 			classification: p.classification,
 			meanTime: p.meanTime,
 			errorRate: p.errorRate,
-			occurrences: occurrences.get(p.bigram) ?? p.latestAgg.occurrences,
+			occurrences: p.occurrences,
 			timeLossMs,
 			frequency,
 			priorityScore: timeLossMs * Math.pow(frequency, PRIORITY_FREQUENCY_EXPONENT)
@@ -188,11 +167,9 @@ function typicalInterval(samples: readonly BigramSample[]): number {
 function timeLossPerOccurrence(
 	pooled: readonly BigramSample[],
 	errorRate: number,
-	meanTime: number,
-	baselineMs: number,
-	observed: number
+	baselineMs: number
 ): number {
-	const confidence = observed / (observed + MIN_OCCURRENCES_FOR_CLASSIFICATION);
+	const confidence = pooled.length / (pooled.length + MIN_OCCURRENCES_FOR_CLASSIFICATION);
 	const errorCost = errorRate * ERROR_TIME_BUDGET_MS;
 	if (!Number.isFinite(baselineMs)) return errorCost * confidence;
 
@@ -204,14 +181,7 @@ function timeLossPerOccurrence(
 		timed++;
 	}
 
-	// Legacy aggregates carry no samples, so the per-occurrence excess degrades to
-	// the excess of the stored mean — the very approximation described above.
-	const cleanExcess = (() => {
-		if (timed > 0) return excessSum / timed;
-		if (Number.isFinite(meanTime)) return Math.max(0, meanTime - baselineMs);
-		return 0;
-	})();
-
+	const cleanExcess = timed > 0 ? excessSum / timed : 0;
 	return ((1 - errorRate) * cleanExcess + errorCost) * confidence;
 }
 

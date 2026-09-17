@@ -23,7 +23,7 @@ export async function getRecentSessions(
 
 /** Wipe all persisted data — used by "reset" and by the test suite. */
 export async function clearAll(): Promise<void> {
-	await db.transaction('rw', [db.sessions, db.bigramRecords, db.profile], async () => {
-		await Promise.all([db.sessions.clear(), db.bigramRecords.clear(), db.profile.clear()]);
+	await db.transaction('rw', [db.sessions, db.profile], async () => {
+		await Promise.all([db.sessions.clear(), db.profile.clear()]);
 	});
 }

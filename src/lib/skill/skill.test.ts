@@ -29,9 +29,16 @@ import type {
 	BigramClassification,
 	BigramSample,
 	KeystrokeEvent,
+	KeystrokeStream,
 	SessionSummary,
 	StoredSession
 } from '../support/core';
+
+const EMPTY_STREAM: KeystrokeStream = {
+	positions: Int16Array.from([]),
+	times: Uint32Array.from([]),
+	typed: ''
+};
 
 /**
  * Annotated by construction — `extractBigramAggregates` takes first-input
@@ -72,6 +79,7 @@ function agg(
 		errorCount: 0,
 		errorRate: 0,
 		classification: 'healthy' as BigramClassification,
+		samples: [],
 		...overrides
 	};
 }
@@ -80,6 +88,8 @@ function cleanSamples(n: number, timing: number): BigramSample[] {
 	return Array.from({ length: n }, () => ({ correct: true, timing }));
 }
 
+// The aggregates are handed in directly, so the row's own text and stream are
+// never read — they are here to satisfy the shape a hydrated row has.
 function session(
 	id: string,
 	timestamp: number,
@@ -88,10 +98,11 @@ function session(
 	return {
 		id,
 		timestamp,
-		type: 'real-text',
 		durationMs: 60_000,
 		wpm: 50,
 		errorRate: 0,
+		text: '',
+		stream: EMPTY_STREAM,
 		bigramAggregates: aggregates
 	};
 }
@@ -458,10 +469,11 @@ describe('hydrateSession', () => {
 		return {
 			id: 'sess',
 			timestamp: 1_000,
-			type: 'real-text',
 			durationMs: 60_000,
 			wpm: 50,
 			errorRate: 0,
+			text: '',
+			stream: EMPTY_STREAM,
 			...overrides
 		};
 	}
@@ -526,14 +538,7 @@ describe('hydrateSession', () => {
 		expect(slow.bigramAggregates.find((a) => a.bigram === 'th')!.classification).toBe('fluency');
 	});
 
-	it('hands back a legacy row’s stored aggregates untouched', () => {
-		// No text, no stream — nothing to re-measure from, so the frozen
-		// session-time classification is all there is.
-		const stored = row({ bigramAggregates: [agg('th', 'sess', { classification: 'hasty' })] });
-		expect(hydrateSession(stored).bigramAggregates).toEqual(stored.bigramAggregates);
-	});
-
-	it('reports no bigrams for a row with neither stream nor aggregates', () => {
+	it('reports no bigrams for a row whose stream is empty', () => {
 		expect(hydrateSession(row()).bigramAggregates).toEqual([]);
 	});
 });
@@ -543,7 +548,6 @@ describe('assessPacing', () => {
 		return {
 			id: 'now',
 			timestamp: 10_000,
-			type: 'real-text',
 			language: 'en',
 			wpm: 60,
 			// Error-free by default so `correctedWpm` is the identity here and
@@ -553,7 +557,7 @@ describe('assessPacing', () => {
 		};
 	}
 
-	/** History of same-type sessions averaging 60 WPM, all older than `paced()`. */
+	/** History of same-language sessions averaging 60 WPM, all older than `paced()`. */
 	const sixtyWpmHistory: PacingInput[] = [
 		paced({ id: 'h1', timestamp: 1_000, wpm: 55 }),
 		paced({ id: 'h2', timestamp: 2_000, wpm: 65 })
@@ -608,21 +612,6 @@ describe('assessPacing', () => {
 		expect(assessPacing(session, [...sixtyWpmHistory, session]).recentCleanWpm).toBe(60);
 	});
 
-	it('compares against its own session type only', () => {
-		// Drill passages are bigram-dense and type slower than prose; averaging
-		// them in would read every real-text session as a personal best.
-		const drills = [
-			paced({ id: 'd1', timestamp: 1_000, type: 'bigram-drill', wpm: 20 }),
-			paced({ id: 'd2', timestamp: 2_000, type: 'bigram-drill', wpm: 20 })
-		];
-		const result = assessPacing(paced({ errorRate: 0.01, wpm: 50 }), [
-			...sixtyWpmHistory,
-			...drills
-		]);
-		expect(result.recentCleanWpm).toBe(60);
-		expect(result.verdict).toBe('room-to-push');
-	});
-
 	it('compares against its own language only', () => {
 		// The bug this fixes: one baseline over both banks sits between them, so
 		// the slower language reads as a shortfall it never had. 44 clears the
@@ -639,14 +628,16 @@ describe('assessPacing', () => {
 		expect(result.verdict).toBe('well-paced');
 	});
 
-	it('leaves legacy rows out of the baseline rather than guessing their language', () => {
-		const legacy = [
+	it('leaves unlabelled rows out of the baseline rather than guessing their language', () => {
+		const unlabelled = [
 			paced({ id: 'l1', timestamp: 1_000, language: undefined, wpm: 20 }),
 			paced({ id: 'l2', timestamp: 2_000, language: undefined, wpm: 20 })
 		];
-		expect(assessPacing(paced({ wpm: 50 }), legacy).recentCleanWpm).toBeUndefined();
+		expect(assessPacing(paced({ wpm: 50 }), unlabelled).recentCleanWpm).toBeUndefined();
 		// Mirror image: an old summary still reads against the rows of its own era.
-		expect(assessPacing(paced({ language: undefined, wpm: 50 }), legacy).recentCleanWpm).toBe(20);
+		expect(assessPacing(paced({ language: undefined, wpm: 50 }), unlabelled).recentCleanWpm).toBe(
+			20
+		);
 	});
 
 	it('ignores sessions newer than the one being judged', () => {
@@ -716,7 +707,6 @@ describe('findGhostRuns', () => {
 		return {
 			id: `run-${gapMs}`,
 			timestamp: 1_000,
-			type: 'real-text',
 			durationMs: text.length * gapMs,
 			wpm: 50,
 			errorRate: 0,

@@ -63,7 +63,7 @@ function poolNewestFirst(
 	const newestFirst = [...sessions].sort((a, b) => b.timestamp - a.timestamp);
 	for (const session of newestFirst) {
 		for (const agg of session.bigramAggregates) {
-			if (!wanted.has(agg.bigram) || !agg.samples) continue;
+			if (!wanted.has(agg.bigram)) continue;
 			let buffer = out.get(agg.bigram);
 			if (!buffer) {
 				buffer = [];

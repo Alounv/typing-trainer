@@ -24,8 +24,7 @@ export async function runSession(page: Page): Promise<void> {
 
 /**
  * Several passages back to back. A single passage is ~125 chars, which is too
- * few bigrams for anything that needs a populated table; the diagnostic that
- * used to seed these tests was five times longer on its own.
+ * few bigrams for anything that needs a populated table.
  */
 export async function runSessions(page: Page, count: number): Promise<void> {
 	for (let i = 0; i < count; i++) await runSession(page);

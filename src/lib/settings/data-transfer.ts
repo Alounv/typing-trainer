@@ -5,12 +5,7 @@
  * session IDs, diverging aggregates); the source file on disk is the undo.
  */
 import { db, SINGLETON_ID } from '$lib/support/storage';
-import type {
-	StoredSession,
-	BigramAggregate,
-	KeystrokeStream,
-	UserSettings
-} from '$lib/support/core';
+import type { StoredSession, KeystrokeStream, UserSettings } from '$lib/support/core';
 
 interface ProfileRecord {
 	id: typeof SINGLETON_ID;
@@ -23,15 +18,15 @@ interface ProfileRecord {
  *
  *   v1 — sessions carried bigram aggregates and no keystrokes.
  *   v2 — sessions carry `text` + `stream`; aggregates are derived on read.
+ *   v3 — pre-stream sessions and the `bigramRecords` table are gone.
  *
- * v1 files still import: their sessions land as legacy rows, exactly as
- * pre-stream rows already in the database behave.
+ * v1 and v2 files still import. Their pre-stream rows are skipped rather than
+ * rejecting the whole file, so an old export stays usable as a restore point —
+ * a v1 file is just one where every row is skipped.
  */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const APP_TAG = 'typing-trainer' as const;
-
-type BigramRow = BigramAggregate & { key: string };
 
 /**
  * JSON has no typed arrays, so the stream's numeric columns travel as plain
@@ -46,36 +41,25 @@ interface SerializedStream {
 	typed: string;
 }
 
+/** `stream` is absent on rows from a v1/v2 file, which is what marks them skippable. */
 type ExportedSession = Omit<StoredSession, 'stream'> & { stream?: SerializedStream };
 
-/**
- * `bigramRecords` holds legacy per-bigram rows that nothing writes any more; we
- * round-trip it faithfully so importing an old export doesn't silently drop
- * pre-stream history, orphan rows included.
- */
+type ImportableSession = ExportedSession & { stream: SerializedStream };
+
 export interface ExportFile {
 	app: typeof APP_TAG;
 	schemaVersion: number;
 	exportedAt: number;
 	data: {
 		sessions: ExportedSession[];
-		bigramRecords: BigramRow[];
 		profile: ProfileRecord | null;
 	};
 }
 
 export async function exportAll(): Promise<ExportFile> {
-	const [sessions, bigramRecords, profile] = await db.transaction(
-		'r',
-		[db.sessions, db.bigramRecords, db.profile],
-		async () => {
-			return Promise.all([
-				db.sessions.toArray(),
-				db.bigramRecords.toArray(),
-				db.profile.get(SINGLETON_ID)
-			]);
-		}
-	);
+	const [sessions, profile] = await db.transaction('r', [db.sessions, db.profile], async () => {
+		return Promise.all([db.sessions.toArray(), db.profile.get(SINGLETON_ID)]);
+	});
 
 	return {
 		app: APP_TAG,
@@ -83,14 +67,12 @@ export async function exportAll(): Promise<ExportFile> {
 		exportedAt: Date.now(),
 		data: {
 			sessions: sessions.map(serializeSession),
-			bigramRecords,
 			profile: profile ?? null
 		}
 	};
 }
 
 function serializeSession({ stream, ...rest }: StoredSession): ExportedSession {
-	if (!stream) return rest;
 	return {
 		...rest,
 		stream: {
@@ -99,11 +81,6 @@ function serializeSession({ stream, ...rest }: StoredSession): ExportedSession {
 			typed: stream.typed
 		}
 	};
-}
-
-function deserializeSession({ stream, ...rest }: ExportedSession): StoredSession {
-	if (!stream) return rest;
-	return { ...rest, stream: toKeystrokeStream(stream) };
 }
 
 function toKeystrokeStream(stream: SerializedStream): KeystrokeStream {
@@ -122,26 +99,64 @@ export class ImportValidationError extends Error {
 }
 
 /**
+ * What an import will actually land. The modal previews this before the wipe,
+ * and `importAll` keeps exactly the same rows — one definition of "pre-stream"
+ * for both. Tolerates a half-checked payload, since the preview runs before
+ * {@link importAll} validates.
+ */
+export function summarizeImport(payload: ExportFile): {
+	sessions: number;
+	skipped: number;
+	hasProfile: boolean;
+} {
+	const rows = Array.isArray(payload.data?.sessions) ? payload.data.sessions : [];
+	const importable = rows.filter(hasStream).length;
+	return {
+		sessions: importable,
+		skipped: rows.length - importable,
+		hasProfile: payload.data?.profile != null
+	};
+}
+
+function hasStream(session: ExportedSession): session is ImportableSession {
+	return session.stream !== undefined;
+}
+
+/**
  * All-or-nothing: validation, then a single transaction clears and refills.
  * A mid-write crash leaves the DB empty rather than half-merged — acceptable
  * since the user still has the source file on disk.
  */
 export async function importAll(payload: unknown): Promise<void> {
 	const file = validate(payload);
+	const sessions = file.data.sessions.filter(hasStream);
 
-	await db.transaction('rw', [db.sessions, db.bigramRecords, db.profile], async () => {
-		await Promise.all([db.sessions.clear(), db.bigramRecords.clear(), db.profile.clear()]);
+	await db.transaction('rw', [db.sessions, db.profile], async () => {
+		await Promise.all([db.sessions.clear(), db.profile.clear()]);
 
-		if (file.data.sessions.length > 0) {
-			await db.sessions.bulkPut(file.data.sessions.map(deserializeSession));
-		}
-		if (file.data.bigramRecords.length > 0) {
-			await db.bigramRecords.bulkPut(file.data.bigramRecords);
+		if (sessions.length > 0) {
+			await db.sessions.bulkPut(sessions.map(deserializeSession));
 		}
 		if (file.data.profile) {
 			await db.profile.put(file.data.profile);
 		}
 	});
+}
+
+// Field by field rather than a spread: a v1/v2 row carries `type` and
+// `bigramAggregates`, which this build has no meaning for and would otherwise
+// persist untouched.
+function deserializeSession(session: ImportableSession): StoredSession {
+	return {
+		id: session.id,
+		timestamp: session.timestamp,
+		durationMs: session.durationMs,
+		wpm: session.wpm,
+		errorRate: session.errorRate,
+		text: session.text,
+		language: session.language,
+		stream: toKeystrokeStream(session.stream)
+	};
 }
 
 /**
@@ -165,8 +180,9 @@ function validate(payload: unknown): ExportFile {
 			`Export was produced by a newer build (schemaVersion=${payload.schemaVersion}, supported ≤${SCHEMA_VERSION}).`
 		);
 	}
-	// v1 needs no migration: its sessions have no stream, which is precisely
-	// what a legacy row is. Anything older than v1 never shipped.
+	// v1 and v2 need no migration: a row either carries a stream or is skipped,
+	// and that is the only difference between them here. Anything older than v1
+	// never shipped.
 	if (payload.schemaVersion < 1) {
 		throw new ImportValidationError(
 			`Export uses an older schema (v${payload.schemaVersion}) that this build can no longer read.`
@@ -175,14 +191,11 @@ function validate(payload: unknown): ExportFile {
 	if (!isRecord(payload.data)) {
 		throw new ImportValidationError('Missing "data" object.');
 	}
-	const { sessions, bigramRecords, profile } = payload.data as Record<string, unknown>;
+	const { sessions, profile } = payload.data as Record<string, unknown>;
 	if (!Array.isArray(sessions)) {
 		throw new ImportValidationError('"data.sessions" must be an array.');
 	}
-	if (!Array.isArray(bigramRecords)) {
-		throw new ImportValidationError('"data.bigramRecords" must be an array.');
-	}
-	if (profile !== null && !isRecord(profile)) {
+	if (profile !== null && profile !== undefined && !isRecord(profile)) {
 		throw new ImportValidationError('"data.profile" must be an object or null.');
 	}
 
@@ -192,11 +205,6 @@ function validate(payload: unknown): ExportFile {
 			throw new ImportValidationError('A session row is missing required fields.');
 		}
 		if (s.stream !== undefined) validateStream(s.stream, s.id);
-	}
-	for (const b of bigramRecords) {
-		if (!isRecord(b) || typeof b.key !== 'string' || typeof b.bigram !== 'string') {
-			throw new ImportValidationError('A bigramRecord row is missing required fields.');
-		}
 	}
 
 	return payload as unknown as ExportFile;

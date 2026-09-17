@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { exportAll, importAll, ImportValidationError, type ExportFile } from './data-transfer';
+	import {
+		exportAll,
+		importAll,
+		ImportValidationError,
+		summarizeImport,
+		type ExportFile
+	} from './data-transfer';
 
 	// After a successful load we force a full page reload. Other stores on this
 	// page memoized the old data at mount time; hot-swapping them reactively
@@ -123,16 +129,8 @@
 		confirmDialog?.close();
 	}
 
-	/** Counts shown in the confirmation modal. Undefined when no pending file. */
-	let pendingCounts = $derived.by(() => {
-		if (!pendingImport) return null;
-		const d = pendingImport.data as Partial<ExportFile['data']> | undefined;
-		return {
-			sessions: Array.isArray(d?.sessions) ? d.sessions.length : 0,
-			bigramRecords: Array.isArray(d?.bigramRecords) ? d.bigramRecords.length : 0,
-			hasProfile: d?.profile != null
-		};
-	});
+	/** Counts shown in the confirmation modal. Null when no pending file. */
+	let pendingCounts = $derived(pendingImport ? summarizeImport(pendingImport) : null);
 </script>
 
 <section class="space-y-6" aria-labelledby="data-heading">
@@ -199,17 +197,19 @@
 					<span>Sessions</span>
 					<span>{pendingCounts.sessions}</span>
 				</li>
-				<li class="flex justify-between">
-					<span>Bigram records</span>
-					<span>{pendingCounts.bigramRecords}</span>
-				</li>
+				{#if pendingCounts.skipped > 0}
+					<li class="flex justify-between text-base-content/55">
+						<span>Skipped (pre-stream)</span>
+						<span>{pendingCounts.skipped}</span>
+					</li>
+				{/if}
 				<li class="flex justify-between">
 					<span>Profile</span>
 					<span>{pendingCounts.hasProfile ? 'yes' : 'no'}</span>
 				</li>
 			</ul>
 			<p class="text-sm text-error">
-				Your existing sessions, bigram history, and settings will be permanently replaced.
+				Your existing sessions and settings will be permanently replaced.
 			</p>
 		{/if}
 		<div class="flex justify-end gap-4 pt-2">

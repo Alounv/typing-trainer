@@ -10,8 +10,8 @@ import { expect, test } from '@playwright/test';
  * guards against someone removing it. Unit tests on `importAll` can't catch
  * the bug because the proxy only exists in a live Svelte component.
  *
- * The payload is small but realistic: one session with one mirrored bigram
- * record plus a profile singleton, exercising every table we write to.
+ * The payload carries one importable session and one pre-stream row, so the
+ * same run covers the write path and the rows an older export loses.
  */
 
 test('data import: a valid export round-trips through the UI without DataCloneError', async ({
@@ -19,45 +19,31 @@ test('data import: a valid export round-trips through the UI without DataCloneEr
 }) => {
 	const payload = {
 		app: 'typing-trainer',
-		schemaVersion: 1,
+		schemaVersion: 3,
 		exportedAt: Date.now(),
 		data: {
 			sessions: [
 				{
 					id: 'e2e-import-1',
 					timestamp: 1_700_000_000_000,
-					type: 'bigram-drill',
 					durationMs: 60_000,
 					wpm: 65,
-					errorRate: 0.02,
-					bigramAggregates: [
-						{
-							bigram: 'th',
-							sessionId: 'e2e-import-1',
-							occurrences: 10,
-							meanTime: 140,
-							stdTime: 20,
-							errorCount: 0,
-							errorRate: 0,
-							classification: 'healthy'
-						}
-					]
-				}
-			],
-			bigramRecords: [
-				{
-					key: 'th::e2e-import-1',
-					bigram: 'th',
-					sessionId: 'e2e-import-1',
-					occurrences: 10,
-					meanTime: 140,
-					stdTime: 20,
-					errorCount: 0,
 					errorRate: 0,
-					classification: 'healthy'
+					language: 'en',
+					text: 'the',
+					stream: { positions: [0, 1, 1], times: [0, 120, 110], typed: 'the' }
+				},
+				{
+					id: 'e2e-import-legacy',
+					timestamp: 1_600_000_000_000,
+					type: 'bigram-drill',
+					durationMs: 60_000,
+					wpm: 40,
+					errorRate: 0.02,
+					bigramAggregates: []
 				}
 			],
-			profile: { id: 'default', settings: { languages: ['en'], corpusIds: ['en'] } }
+			profile: { id: 'default', settings: { language: 'en' } }
 		}
 	};
 
@@ -72,11 +58,12 @@ test('data import: a valid export round-trips through the UI without DataCloneEr
 		buffer: Buffer.from(JSON.stringify(payload))
 	});
 
-	// Modal opens with counts populated from the payload.
+	// Modal opens with counts populated from the payload: one row lands, the
+	// pre-stream one is reported as dropped rather than silently vanishing.
 	const modal = page.getByTestId('data-import-confirm');
 	await expect(modal).toHaveAttribute('open', '');
 	await expect(modal).toContainText('Sessions');
-	await expect(modal).toContainText('Bigram records');
+	await expect(modal).toContainText('Skipped (pre-stream)');
 
 	await page.getByTestId('data-import-confirm-button').click();
 

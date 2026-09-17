@@ -70,7 +70,6 @@ export class SessionRunner {
 		return {
 			id: (this.options.clock?.idGenerator ?? uuid)(),
 			timestamp: (this.options.clock?.timestampProvider ?? Date.now)(),
-			type: 'real-text',
 			language: this.options.language,
 			durationMs: elapsedMs,
 			wpm: computeWPM(this.text.length, elapsedMs),

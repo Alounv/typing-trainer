@@ -1,13 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { summarizeBigrams } from '$lib/skill';
 import { DEFAULT_THRESHOLDS, RECENT_WINDOW } from '$lib/support/core';
-import type { SessionSummary, BigramAggregate, BigramSample } from '$lib/support/core';
+import type {
+	SessionSummary,
+	BigramAggregate,
+	BigramSample,
+	KeystrokeStream
+} from '$lib/support/core';
 import type { FrequencyTable } from '$lib/corpus';
 // One level in: movement detection is what the summary page is built around,
 // and `progress` exposes only components, so there is no barrel to go through.
 import { detectMilestone, detectWindowedMovements } from './celebrations';
 
 const PAIRS = ['th', 'he', 'in', 'er', 'an', 're', 'on', 'at', 'en', 'nd'];
+
+// These fixtures hand their aggregates in directly, so the row's own text and
+// stream are never read — they are here to satisfy the shape a hydrated row has.
+const EMPTY_STREAM: KeystrokeStream = {
+	positions: Int16Array.from([]),
+	times: Uint32Array.from([]),
+	typed: ''
+};
 
 function samples(n: number, timing: number, errEvery: number): BigramSample[] {
 	return Array.from({ length: n }, (_, k) => ({
@@ -37,10 +50,11 @@ function session(i: number): SessionSummary {
 	return {
 		id: `s${i}`,
 		timestamp: i * 1000,
-		type: 'real-text',
 		durationMs: 60000,
 		wpm: 40 + i * 4,
 		errorRate: improving ? 0.01 : 0.08,
+		text: '',
+		stream: EMPTY_STREAM,
 		bigramAggregates: aggs
 	} as SessionSummary;
 }
@@ -72,10 +86,11 @@ const wpmSession = (i: number, wpm: number) =>
 	({
 		id: `s${i}`,
 		timestamp: i * 1000,
-		type: 'real-text',
 		durationMs: 60_000,
 		wpm,
 		errorRate: 0.02,
+		text: '',
+		stream: EMPTY_STREAM,
 		bigramAggregates: []
 	}) as SessionSummary;
 

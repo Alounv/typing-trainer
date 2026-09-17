@@ -13,7 +13,6 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
 	return {
 		id: 's1',
 		timestamp: 1_000,
-		type: 'real-text',
 		durationMs: 300_000,
 		wpm: 68,
 		errorRate: 0.03,
